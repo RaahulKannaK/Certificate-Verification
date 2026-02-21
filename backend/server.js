@@ -701,29 +701,32 @@ app.post(
   upload.single("certificate"),
   async (req, res) => {
     try {
-      console.log("Cloud name:", process.env.CLOUDINARY_CLOUD_NAME);
-      console.log("API key exists:", !!process.env.CLOUDINARY_API_KEY);
-      console.log("FILE:", req.file);
-      console.log("BODY:", req.body);
+      console.log("=== UPLOAD DEBUG START ===");
+      console.log("File:", req.file);
+      console.log("Body:", req.body);
 
       if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+        return res.status(400).json({
+          success: false,
+          message: "No file received",
+        });
       }
 
-      res.json({
-        message: "Uploaded to Cloudinary",
+      return res.json({
+        success: true,
         filePath: req.file.path,
       });
 
     } catch (error) {
       console.error("🔥 FULL UPLOAD ERROR:", error);
-      res.status(500).json({
-        message: "Upload failed",
-        error: error.message,
+      return res.status(500).json({
+        success: false,
+        message: error.message,
       });
     }
   }
 );
+
 // ==========================================================
 // 🪶 ISSUE CREDENTIAL
 // ==========================================================
