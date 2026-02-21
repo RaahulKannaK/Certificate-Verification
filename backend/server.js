@@ -701,6 +701,8 @@ app.post(
   upload.single("certificate"),
   async (req, res) => {
     try {
+      console.log("Cloud name:", process.env.CLOUDINARY_CLOUD_NAME);
+      console.log("API key exists:", !!process.env.CLOUDINARY_API_KEY);
       console.log("FILE:", req.file);
       console.log("BODY:", req.body);
 
