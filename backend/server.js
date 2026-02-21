@@ -701,18 +701,24 @@ app.post(
   upload.single("certificate"),
   async (req, res) => {
     try {
+      console.log("FILE:", req.file);
+      console.log("BODY:", req.body);
+
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
 
       res.json({
         message: "Uploaded to Cloudinary",
-        filePath: req.file.path, // ✅ Cloudinary secure_url
+        filePath: req.file.path,
       });
 
     } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ message: "Upload failed" });
+      console.error("🔥 FULL UPLOAD ERROR:", error);
+      res.status(500).json({
+        message: "Upload failed",
+        error: error.message,
+      });
     }
   }
 );

@@ -90,7 +90,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       // SIGN MODE → fetch from backend (Cloudinary URL)
       if (credentialId && !file) {
         const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/credential/${credentialId}`
+          `${import.meta.env.VITE_API_URL}/institution/issueCredential`
         );
         url = res.data.filePath; // Cloudinary URL
       }
