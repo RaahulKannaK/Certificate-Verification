@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import upload from "./upload.js";
 
 
 // ✅ Only one DB import
@@ -680,23 +681,7 @@ app.get("/institution/getStudents", async (req, res) => {
   }
 });
 
-// ==========================================================
-// 🧾 MULTER UPLOAD (certificate)
-// ==========================================================
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join("uploads", "certificates");
-    if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${Math.random()}${ext}`);
-  },
-});
-const upload = multer({ storage });
 
-const { upload } = require("./upload");
 
 app.post(
   "/institution/upload",
