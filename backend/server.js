@@ -7,7 +7,8 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
+import streamifier from "streamifier";
+import cloudinary from "./cloudinary.js";
 
 // ✅ Only one DB import
 import db from "./config/db.js";
@@ -16,7 +17,6 @@ import { issueOnBlockchain } from "./services/blockchainService.js";
 import issueCredential from "./blockchain/issueCredential.js";
 
 const app = express();
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 // ========================
 // 🔧 Middleware
 // ========================
@@ -683,26 +683,40 @@ app.get("/institution/getStudents", async (req, res) => {
 // ==========================================================
 // 🧾 MULTER UPLOAD (certificate)
 // ==========================================================
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join("uploads", "certificates");
-    if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${Math.random()}${ext}`);
-  },
-});
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-app.post("/institution/upload", upload.single("certificate"), (req, res) => {
-  if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+app.post("/institution/upload", upload.single("certificate"), async (req, res) => {
+  try {
+    if (!req.file)
+      return res.status(400).json({ message: "No file uploaded" });
 
-  res.json({
-    message: "File uploaded successfully",
-    filePath: `/uploads/certificates/${req.file.filename}`,
-  });
+    const streamUpload = () =>
+      new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: "certificates",
+            resource_type: "auto",
+          },
+          (error, result) => {
+            if (result) resolve(result);
+            else reject(error);
+          }
+        );
+
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+
+    const result = await streamUpload();
+
+    res.json({
+      message: "File uploaded successfully",
+      filePath: result.secure_url, // 🔥 STORE THIS IN DB
+    });
+  } catch (error) {
+    console.error("Upload Error:", error);
+    res.status(500).json({ message: "Upload failed" });
+  }
 });
 // ==========================================================
 // 🪶 ISSUE CREDENTIAL
