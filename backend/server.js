@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import upload from "./upload.js";
+import upload from ".middleware/upload.js";
 
 
 // ✅ Only one DB import
