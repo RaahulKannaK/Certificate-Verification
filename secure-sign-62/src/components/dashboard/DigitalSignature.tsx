@@ -61,7 +61,7 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
         );
 
         const res = await fetch(
-          "/getIssuedCredentials",
+          `${import.meta.env.VITE_API_URL}/getIssuedCredentials`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
