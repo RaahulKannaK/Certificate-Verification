@@ -64,6 +64,7 @@ export const CertificatePreview = ({
       : undefined);
 
   /* ================= LOAD PDF ================= */
+  
   useEffect(() => {
     if (!documentUrl || !pdfCanvasRef) return;
 
