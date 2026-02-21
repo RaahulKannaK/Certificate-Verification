@@ -691,28 +691,26 @@ app.post("/institution/upload", upload.single("certificate"), async (req, res) =
     if (!req.file)
       return res.status(400).json({ message: "No file uploaded" });
 
-    const streamUpload = () =>
-      new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            folder: "certificates",
-            resource_type: "auto",
-          },
-          (error, result) => {
-            if (result) resolve(result);
-            else reject(error);
-          }
-        );
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: "certificates",
+          resource_type: "auto",
+        },
+        (error, result) => {
+          if (result) resolve(result);
+          else reject(error);
+        }
+      );
 
-        streamifier.createReadStream(req.file.buffer).pipe(stream);
-      });
-
-    const result = await streamUpload();
+      stream.end(req.file.buffer);
+    });
 
     res.json({
       message: "File uploaded successfully",
-      filePath: result.secure_url, // 🔥 STORE THIS IN DB
+      filePath: result.secure_url,
     });
+
   } catch (error) {
     console.error("Upload Error:", error);
     res.status(500).json({ message: "Upload failed" });
