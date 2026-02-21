@@ -695,7 +695,6 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${Math.random()}${ext}`);
   },
 });
-const upload = multer({ storage });
 
 app.post(
   "/institution/upload",
