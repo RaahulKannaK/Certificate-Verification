@@ -1,0 +1,19 @@
+.env
+backend/.env
+node_modules
+
+# Compilation output
+/dist
+
+# pnpm deploy output
+/bundle
+
+
+
+
+
+# Typechain output
+/types
+
+# Hardhat coverage reports
+/coverage

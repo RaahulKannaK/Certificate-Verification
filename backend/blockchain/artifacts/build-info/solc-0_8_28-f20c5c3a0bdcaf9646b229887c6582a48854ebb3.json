@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-f20c5c3a0bdcaf9646b229887c6582a48854ebb3",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/Counter.sol": "project/contracts/Counter.sol",
+    "contracts/CredentialRegistry.sol": "project/contracts/CredentialRegistry.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Counter.sol": {
+        "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity ^0.8.28;\n\ncontract Counter {\n  uint public x;\n\n  event Increment(uint by);\n\n  function inc() public {\n    x++;\n    emit Increment(1);\n  }\n\n  function incBy(uint by) public {\n    require(by > 0, \"incBy: increment should be positive\");\n    x += by;\n    emit Increment(by);\n  }\n}\n"
+      },
+      "project/contracts/CredentialRegistry.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.17;\r\n\r\n\r\ncontract CredentialRegistry {\r\n    address public owner;\r\n\r\n    struct Credential {\r\n        address issuer;     \r\n        address recipient;    \r\n        bytes32 credentialHash; \r\n        uint256 issuedAt;     \r\n        bool revoked;         \r\n    }\r\n\r\n    mapping(bytes32 => Credential) private credentials;\r\n\r\n    mapping(address => bytes32[]) private recipientIndex;\r\n\r\n    event CredentialIssued(bytes32 indexed credentialHash, address indexed recipient, uint256 issuedAt);\r\n    event CredentialRevoked(bytes32 indexed credentialHash, uint256 revokedAt);\r\n\r\n    modifier onlyOwner() {\r\n        require(msg.sender == owner, \"only owner\");\r\n        _;\r\n    }\r\n\r\n    constructor() {\r\n        owner = msg.sender;\r\n    }\r\n\r\n\r\n    function issueCredential(bytes32 _credentialHash, address _recipient) external onlyOwner {\r\n        require(_credentialHash != bytes32(0), \"invalid hash\");\r\n        Credential storage c = credentials[_credentialHash];\r\n        require(c.issuedAt == 0, \"already issued\");\r\n\r\n        credentials[_credentialHash] = Credential({\r\n            issuer: msg.sender,\r\n            recipient: _recipient,\r\n            credentialHash: _credentialHash,\r\n            issuedAt: block.timestamp,\r\n            revoked: false\r\n        });\r\n\r\n        recipientIndex[_recipient].push(_credentialHash);\r\n\r\n        emit CredentialIssued(_credentialHash, _recipient, block.timestamp);\r\n    }\r\n\r\n\r\n    function verifyCredential(bytes32 _credentialHash) external view returns (bool exists, address issuer, address recipient, uint256 issuedAt, bool revoked) {\r\n        Credential memory c = credentials[_credentialHash];\r\n        if (c.issuedAt == 0) {\r\n            return (false, address(0), address(0), 0, false);\r\n        }\r\n        return (true, c.issuer, c.recipient, c.issuedAt, c.revoked);\r\n    }\r\n\r\n\r\n    function revokeCredential(bytes32 _credentialHash) external onlyOwner {\r\n        Credential storage c = credentials[_credentialHash];\r\n        require(c.issuedAt != 0, \"not issued\");\r\n        require(!c.revoked, \"already revoked\");\r\n        c.revoked = true;\r\n        emit CredentialRevoked(_credentialHash, block.timestamp);\r\n    }\r\n\r\n    function getCredentialsForRecipient(address _recipient) external view returns (bytes32[] memory) {\r\n        return recipientIndex[_recipient];\r\n    }\r\n}\r\n"
+      }
+    }
+  }
+}
