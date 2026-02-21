@@ -16,7 +16,7 @@ import { issueOnBlockchain } from "./services/blockchainService.js";
 import issueCredential from "./blockchain/issueCredential.js";
 
 const app = express();
-
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 // ========================
 // 🔧 Middleware
 // ========================

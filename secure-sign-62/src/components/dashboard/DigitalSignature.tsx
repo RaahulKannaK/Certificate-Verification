@@ -113,32 +113,8 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
   });
 
   /* ================= ACTIONS ================= */
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  if (!e.target.files?.[0]) return;
+  const handleFileSelect = () => fileInputRef.current?.click();
 
-  const formData = new FormData();
-  formData.append("certificate", e.target.files[0]);
-
-  try {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/institution/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    const data = await res.json();
-
-    if (!res.ok) throw new Error(data.message);
-
-    toast.success("Upload successful");
-    console.log("File URL:", data.filePath);
-  } catch (err) {
-    toast.error("Upload failed");
-    console.error(err);
-  }
-};
   const handleStartSigning = (certificate: Certificate) => {
     if (!user?.biometricSetup) {
       toast.error("Please complete biometric setup first");
