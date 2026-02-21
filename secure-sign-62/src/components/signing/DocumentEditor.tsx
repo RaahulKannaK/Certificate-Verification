@@ -177,7 +177,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       formData.append("certificate", file);
 
       const uploadRes = await axios.post(
-        "http://localhost:5000/institution/upload",
+        `${import.meta.env.VITE_API_URL}/institution/upload`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -203,7 +203,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       };
 
       const res = await axios.post(
-        "http://localhost:5000/institution/issueCredential",
+        `${import.meta.env.VITE_API_URL}/institution/issueCredential`,
         payload
       );
 
@@ -227,7 +227,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     try {
       setProcessing(true);
 
-      const res = await axios.post("http://localhost:5000/credential/sign", {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/credential/sign`, {
         credentialId,
         signerPublicKey: user.walletPublicKey,
       });

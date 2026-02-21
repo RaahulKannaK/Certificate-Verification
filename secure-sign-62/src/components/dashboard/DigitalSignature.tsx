@@ -61,7 +61,7 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
         );
 
         const res = await fetch(
-          "http://localhost:5000/getIssuedCredentials",
+          "/getIssuedCredentials",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

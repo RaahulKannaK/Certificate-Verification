@@ -66,7 +66,7 @@ const SignCertificate: React.FC<SignCertificateProps> = ({
     const fetchCertificate = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/issuedCredential/${credentialId}`
+          `${import.meta.env.VITE_API_URL}/issuedCredential/${credentialId}`
         );
 
         if (!res.ok) throw new Error("Failed to fetch certificate");
@@ -97,7 +97,7 @@ const SignCertificate: React.FC<SignCertificateProps> = ({
 
       try {
         const res = await fetch(
-          `http://localhost:5000/biometric/status/${user.walletPublicKey}`
+          `${import.meta.env.VITE_API_URL}/biometric/status/${user.walletPublicKey}`
         );
         const data = await res.json();
         setIsSetupComplete(!!data.enrolled);
@@ -155,7 +155,7 @@ const SignCertificate: React.FC<SignCertificateProps> = ({
     try {
       setIsSubmitting(true);
 
-      const res = await fetch("http://localhost:5000/credential/sign", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/credential/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
