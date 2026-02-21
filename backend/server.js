@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import streamifier from "streamifier";
-import cloudinary from "./cloudinary.js";
+import cloudinary from "./config/cloudinary.js";
 
 // ✅ Only one DB import
 import db from "./config/db.js";
