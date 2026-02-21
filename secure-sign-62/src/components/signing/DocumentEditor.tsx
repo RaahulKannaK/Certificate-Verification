@@ -24,7 +24,7 @@ const DOC_HEIGHT = 1120;
 
 /* ================= TYPES ================= */
 interface DocumentEditorProps {
-  file?: File;
+  file: File;
   signingType: SigningType;
   signers: Signer[];
   credentialId?: string;
@@ -77,26 +77,12 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   /* ================= PDF LOAD ================= */
   useEffect(() => {
-    if (!file && !credentialId) return;
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    setPdfUrl(url);
 
     const loadPdf = async () => {
-      let url = "";
-
-      // ISSUE MODE → local file
-      if (file) {
-        url = URL.createObjectURL(file);
-      }
-
-      // SIGN MODE → fetch from backend (Cloudinary URL)
-      if (credentialId && !file) {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/credential/${credentialId}`
-        );
-        url = res.data.filePath; // Cloudinary URL
-      }
-
-      setPdfUrl(url);
-
       const pdf = await pdfjsLib.getDocument(url).promise;
       const page = await pdf.getPage(1);
 
@@ -115,7 +101,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     };
 
     loadPdf();
-  }, [file, credentialId]);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   /* ================= INIT SIGNATURE BOXES ================= */
   useEffect(() => {
@@ -187,7 +174,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       setProcessing(true);
 
       const formData = new FormData();
-      formData.append("certificate", file!);
+      formData.append("certificate", file);
 
       const uploadRes = await axios.post(
         `${import.meta.env.VITE_API_URL}/institution/upload`,
@@ -199,8 +186,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         studentPublicKey: user.walletPublicKey,
         institutionPublicKey: signers.map((s) => s.publicKey),
         credentialId: `CRD-${Date.now()}`,
-        filePath: uploadRes.data.filePath, // Cloudinary URL
-        title: file?.name,
+        filePath: uploadRes.data.filePath,
+        title: file.name,
         purpose: "Digital document signing",
         signingType,
         signers,
@@ -223,6 +210,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       if (res.data.success) {
         toast.success("Credential issued successfully");
         onComplete();
+      } else {
+        toast.error(res.data.message);
       }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Server error");
@@ -238,13 +227,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     try {
       setProcessing(true);
 
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/credential/sign`,
-        {
-          credentialId,
-          signerPublicKey: user.walletPublicKey,
-        }
-      );
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/credential/sign`, {
+        credentialId,
+        signerPublicKey: user.walletPublicKey,
+      });
 
       if (res.data.success) {
         toast.success("Signed successfully");
@@ -265,7 +251,27 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   return (
     <div className="animate-fade-in">
       <div className="flex gap-6">
+        {/* DOCUMENT */}
         <div className="flex-1">
+          <div className="glass rounded-2xl p-4 mb-4 flex gap-2">
+            <Button
+              size="sm"
+              variant={selectedTool === "move" ? "default" : "ghost"}
+              onClick={() => setSelectedTool("move")}
+            >
+              <Move className="w-4 h-4 mr-1" /> Move
+            </Button>
+            <Button size="sm" variant="ghost">
+              <Square className="w-4 h-4 mr-1" /> Box
+            </Button>
+            <Button size="sm" variant="ghost">
+              <Type className="w-4 h-4 mr-1" /> Text
+            </Button>
+            <Button size="sm" variant="ghost">
+              <Eraser className="w-4 h-4 mr-1" /> Eraser
+            </Button>
+          </div>
+
           <div
             ref={containerRef}
             className="relative glass rounded-2xl overflow-auto mx-auto"
@@ -281,45 +287,90 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
               className="w-full h-full"
             />
 
-            {signatureBoxes.map((box) => (
-              <div
-                key={box.id}
-                onMouseDown={(e) => handleMouseDown(e, box.id)}
-                className="absolute group cursor-move"
-                style={{
-                  left: box.xRatio * pdfSize.width,
-                  top: box.yRatio * pdfSize.height,
-                  width: box.widthRatio * pdfSize.width,
-                  height: box.heightRatio * pdfSize.height,
-                  border: `2px dashed hsl(var(--${box.color}))`,
-                  borderRadius: 10,
-                }}
-              >
-                {mode === "sign" && !box.signed && (
-                  <Button
-                    size="xs"
-                    className="absolute bottom-0 right-0 m-1"
-                    onClick={() => handleSignDocument(box)}
-                    disabled={processing}
+            {signatureBoxes.map((box) => {
+              const signer = signers.find(
+                (s) => s.publicKey === box.signerPublicKey
+              );
+
+              return (
+                <div
+                  key={box.id}
+                  onMouseDown={(e) => handleMouseDown(e, box.id)}
+                  className="absolute group cursor-move"
+                  style={{
+                    left: box.xRatio * pdfSize.width,
+                    top: box.yRatio * pdfSize.height,
+                    width: box.widthRatio * pdfSize.width,
+                    height: box.heightRatio * pdfSize.height,
+                    border: `2px dashed hsl(var(--${box.color}))`,
+                    borderRadius: 10,
+                  }}
+                >
+                  <div
+                    className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100"
+                    style={{
+                      background: `hsl(var(--${box.color}))`,
+                      color: "#fff",
+                    }}
                   >
-                    Sign
-                  </Button>
-                )}
+                    {signer?.name}
+                  </div>
+
+                  {mode === "sign" && !box.signed && (
+                    <Button
+                      size="xs"
+                      className="absolute bottom-0 right-0 m-1"
+                      onClick={() => handleSignDocument(box)}
+                      disabled={processing}
+                    >
+                      Sign
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* SIDEBAR */}
+        <div className="w-80">
+          <div className="glass rounded-2xl p-6 sticky top-6">
+            <h3 className="text-lg font-semibold mb-4">Signers</h3>
+
+            {signers.map((signer) => (
+              <div
+                key={signer.id}
+                className="p-4 rounded-xl border mb-3"
+                style={{ borderColor: `hsl(var(--${signer.color}))` }}
+              >
+                <div className="flex items-center gap-3">
+                  <User className="w-4 h-4" />
+                  <span className="text-sm font-medium">{signer.name}</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 flex gap-1">
+                  <Clock className="w-3 h-3" />
+                  {signatureBoxes.find(
+                    (b) => b.signerPublicKey === signer.publicKey
+                  )?.signed
+                    ? "Signed"
+                    : "Pending"}
+                </div>
               </div>
             ))}
-          </div>
 
-          {mode === "issue" && (
-            <Button
-              variant="hero"
-              className="mt-4"
-              onClick={handleIssueCredential}
-              disabled={processing}
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              {processing ? "Issuing..." : "Issue Credential"}
-            </Button>
-          )}
+            {mode === "issue" && (
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full mt-6"
+                onClick={handleIssueCredential}
+                disabled={processing}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                {processing ? "Issuing..." : "Issue Credential"}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

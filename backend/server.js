@@ -11,7 +11,6 @@ import fs from "fs";
 
 // ✅ Only one DB import
 import db from "./config/db.js";
-import upload from "./middleware/upload.js";
 
 import { issueOnBlockchain } from "./services/blockchainService.js";
 import issueCredential from "./blockchain/issueCredential.js";
@@ -695,38 +694,16 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${Math.random()}${ext}`);
   },
 });
+const upload = multer({ storage });
 
-app.post(
-  "/institution/upload",
-  upload.single("certificate"),
-  async (req, res) => {
-    try {
-      console.log("=== UPLOAD DEBUG START ===");
-      console.log("File:", req.file);
-      console.log("Body:", req.body);
+app.post("/institution/upload", upload.single("certificate"), (req, res) => {
+  if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: "No file received",
-        });
-      }
-
-      return res.json({
-        success: true,
-        filePath: req.file.path,
-      });
-
-    } catch (error) {
-      console.error("🔥 FULL UPLOAD ERROR:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
-  }
-);
-
+  res.json({
+    message: "File uploaded successfully",
+    filePath: `/uploads/certificates/${req.file.filename}`,
+  });
+});
 // ==========================================================
 // 🪶 ISSUE CREDENTIAL
 // ==========================================================
