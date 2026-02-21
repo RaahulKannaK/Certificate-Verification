@@ -8,10 +8,10 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
+
 // ✅ Only one DB import
 import db from "./config/db.js";
 import upload from "./middleware/upload.js";
-
 
 import { issueOnBlockchain } from "./services/blockchainService.js";
 import issueCredential from "./blockchain/issueCredential.js";
@@ -681,7 +681,21 @@ app.get("/institution/getStudents", async (req, res) => {
   }
 });
 
-
+// ==========================================================
+// 🧾 MULTER UPLOAD (certificate)
+// ==========================================================
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join("uploads", "certificates");
+    if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${Math.random()}${ext}`);
+  },
+});
+const upload = multer({ storage });
 
 app.post(
   "/institution/upload",
