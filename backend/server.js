@@ -696,13 +696,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-app.post("/institution/upload", upload.single("certificate"), (req, res) => {
-  if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+app.post("/institution/upload", upload.single("certificate"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
 
-  res.json({
-    message: "File uploaded successfully",
-    filePath: `/uploads/certificates/${req.file.filename}`,
-  });
+    res.json({
+      message: "File uploaded successfully",
+      filePath: req.file.path,  // ✅ Cloudinary URL
+    });
+
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ message: "Upload failed" });
+  }
 });
 // ==========================================================
 // 🪶 ISSUE CREDENTIAL

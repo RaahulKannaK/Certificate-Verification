@@ -60,7 +60,7 @@ export const CertificatePreview = ({
   const documentUrl =
     certificate.documentUrl ||
     (certificate.filePath
-      ? `${import.meta.env.VITE_API_URL}${certificate.filePath}`
+      ? certificate.filePath
       : undefined);
 
   /* ================= LOAD PDF ================= */
