@@ -1,7 +1,6 @@
 import base64
 import numpy as np
 import face_recognition
-import os
 import cv2
 from flask import Flask, request, jsonify
 
@@ -170,7 +169,5 @@ def home():
 # =====================================================
 # Run server
 # =====================================================
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5001))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="127.0.0.1", port=5001)

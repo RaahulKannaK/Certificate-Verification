@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   ============================================================ */
   const refreshBiometricStatus = async (email: string): Promise<void> => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/biometric/status/${email}`);
+      const res = await axios.get(`/biometric/status/${email}`);
       const data = res.data;
 
       setUser((prev) => {
@@ -107,7 +107,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     >
   ): Promise<User | null> => {
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/signup`, userData);
+      const response = await axios.post("/signup", userData);
       toast.success(response.data.message || "Account created successfully!");
       return response.data.user || null;
     } catch (err: any) {
@@ -127,7 +127,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/login`, {
+      const response = await axios.post("/login", {
         publicKey: publicKey.trim(),
       });
 
@@ -189,7 +189,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/biometric/face`, {
+      const res = await axios.post("/biometric/face", {
         email: user.email,
         image,
       });
@@ -226,7 +226,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/biometric/verify-face`, {
+      const res = await axios.post("/biometric/verify-face", {
         email: user.email,
         image,
       });

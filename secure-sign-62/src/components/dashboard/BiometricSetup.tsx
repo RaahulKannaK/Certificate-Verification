@@ -132,7 +132,7 @@ export const BiometricSetup: React.FC<BiometricSetupProps> = ({
         // Send photo to server for setup
         console.log("📤 Sending face to server for setup...", { email: user?.email });
 
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/biometric/face`, {
+        const res = await fetch("http://localhost:5000/biometric/face", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
