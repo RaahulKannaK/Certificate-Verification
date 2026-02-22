@@ -1,23 +1,30 @@
+# Use Python base image
 FROM python:3.10-slim
 
+# Set working directory
 WORKDIR /app
 
-# System dependencies (IMPORTANT)
+# Install system dependencies (IMPORTANT for cv2)
 RUN apt-get update && apt-get install -y \
     build-essential \
+    cmake \
+    libopenblas-dev \
+    liblapack-dev \
+    libx11-dev \
     libgl1 \
-    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
-COPY backend/requirements.txt .
+COPY requirements.txt .
+
+# Upgrade pip
+RUN pip install --upgrade pip
 
 # Install Python packages
-RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
-COPY backend ./backend
+# Copy entire project
+COPY . .
 
-# Start server
+# Start command (IMPORTANT)
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "backend.face_service:app"]
