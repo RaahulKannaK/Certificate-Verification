@@ -209,7 +209,7 @@ app.post("/biometric/face", async (req, res) => {
     console.log("🤖 Sending image to Python...");
 
     const aiRes = await axios.post(
-      "http://127.0.0.1:5001/extract-face",
+      `${process.env.PYTHON_AI_URL}/extract-face`,
       { image },
       { timeout: 60000 }
     );
@@ -366,7 +366,7 @@ app.post("/credential/sign", async (req, res) => {
     const storedVector = Array.from(decrypted);
 
     // ---------------------- 3️⃣ Face verification ----------------------
-    const aiResponse = await axios.post("http://127.0.0.1:5001/verify-face", {
+    const aiResponse = await axios.post(`${process.env.PYTHON_AI_URL}/verify-face`, {
       image: faceImage,
       storedVector,
     });
