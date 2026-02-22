@@ -29,7 +29,6 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // ✅ Serve uploaded files statically
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // ✅ Test route
 app.get("/", (req, res) => res.send("✅ Backend is running!"));

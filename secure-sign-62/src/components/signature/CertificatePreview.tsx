@@ -8,9 +8,8 @@ import { BiometricVerify } from "../dashboard/BiometricVerify";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 /* ================= TYPES ================= */
-
 interface SignatureField {
-  id?: number;
+  id: number;
   signerPublicKey: string;
   xRatio: number;
   yRatio: number;
@@ -27,7 +26,6 @@ interface CertificatePreviewProps {
 }
 
 /* ================= CONSTANTS ================= */
-
 const DOC_WIDTH = 720;
 
 const fontOptions = [
@@ -54,19 +52,14 @@ export const CertificatePreview = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
 
+  /* 🔐 biometric */
   const [isVerified, setIsVerified] = useState(false);
   const [showBiometric, setShowBiometric] = useState(false);
 
-  /* ================= FIXED DOCUMENT URL ================= */
-
-  const documentUrl =
-    certificate.documentUrl ||
-    (certificate.filePath
-      ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/${certificate.filePath.replace(/^\//, "")}`
-      : undefined);
+  /* ================= DOCUMENT URL ================= */
+  const documentUrl = certificate.filePath;
 
   /* ================= LOAD PDF ================= */
-
   useEffect(() => {
     if (!documentUrl || !pdfCanvasRef) return;
 
@@ -78,16 +71,11 @@ export const CertificatePreview = ({
       const scale = DOC_WIDTH / baseViewport.width;
       const viewport = page.getViewport({ scale });
 
-      const ctx = pdfCanvasRef.getContext("2d");
-      if (!ctx) return;
-
+      const ctx = pdfCanvasRef.getContext("2d")!;
       pdfCanvasRef.width = viewport.width;
       pdfCanvasRef.height = viewport.height;
 
-      setPdfSize({
-        width: viewport.width || DOC_WIDTH,
-        height: viewport.height || 0,
-      });
+      setPdfSize({ width: viewport.width, height: viewport.height });
 
       ctx.clearRect(0, 0, viewport.width, viewport.height);
       await page.render({ canvasContext: ctx, viewport }).promise;
@@ -97,7 +85,6 @@ export const CertificatePreview = ({
   }, [documentUrl, pdfCanvasRef]);
 
   /* ================= SIGNATURE BOX ================= */
-
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
 
@@ -110,24 +97,20 @@ export const CertificatePreview = ({
   const signatureBox = useMemo(() => {
     if (!myBox) return null;
 
-    const safeWidth = pdfSize.width || DOC_WIDTH;
-    const safeHeight = pdfSize.height || 0;
-
     return {
-      x: (myBox.xRatio || 0) * safeWidth,
-      y: (myBox.yRatio || 0) * safeHeight,
-      width: (myBox.wRatio || 0) * safeWidth || 200,
-      height: (myBox.hRatio || 0) * safeHeight || 64,
+      x: myBox.xRatio * pdfSize.width,
+      y: myBox.yRatio * pdfSize.height,
+      width: myBox.wRatio * pdfSize.width || 200,
+      height: myBox.hRatio * pdfSize.height || 64,
       color: myBox.color,
     };
   }, [myBox, pdfSize]);
 
   /* ================= CLEAR ================= */
-
   const clearSignature = () => {
     if (signCanvasRef) {
-      const ctx = signCanvasRef.getContext("2d");
-      if (ctx) ctx.clearRect(0, 0, signCanvasRef.width, signCanvasRef.height);
+      const ctx = signCanvasRef.getContext("2d")!;
+      ctx.clearRect(0, 0, signCanvasRef.width, signCanvasRef.height);
     }
 
     setTypedName("");
@@ -137,7 +120,6 @@ export const CertificatePreview = ({
   };
 
   /* ================= TYPED SIGNATURE ================= */
-
   useEffect(() => {
     if (activeTab !== "type" || !signatureBox) return;
 
@@ -151,9 +133,7 @@ export const CertificatePreview = ({
     canvas.width = signatureBox.width;
     canvas.height = signatureBox.height;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
+    const ctx = canvas.getContext("2d")!;
     ctx.font = fontOptions[selectedFont].font;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -167,19 +147,16 @@ export const CertificatePreview = ({
   }, [typedName, selectedFont, activeTab, signatureBox]);
 
   /* ================= DRAW SIGNATURE ================= */
-
   const getCoords = (e: React.MouseEvent) => {
     const rect = signCanvasRef!.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
   const startDrawing = (e: React.MouseEvent) => {
-    if (!signatureBox || !signCanvasRef) return;
+    if (!signatureBox) return;
 
-    const ctx = signCanvasRef.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, signCanvasRef.width, signCanvasRef.height);
+    const ctx = signCanvasRef!.getContext("2d")!;
+    ctx.clearRect(0, 0, signCanvasRef!.width, signCanvasRef!.height);
 
     setSignatureImage(null);
     setIsVerified(false);
@@ -188,11 +165,9 @@ export const CertificatePreview = ({
   };
 
   const draw = (e: React.MouseEvent) => {
-    if (!isDrawing || !signCanvasRef) return;
+    if (!isDrawing) return;
 
-    const ctx = signCanvasRef.getContext("2d");
-    if (!ctx) return;
-
+    const ctx = signCanvasRef!.getContext("2d")!;
     const pos = getCoords(e);
 
     ctx.beginPath();
@@ -207,23 +182,19 @@ export const CertificatePreview = ({
   };
 
   const stopDrawing = () => {
-    if (!isDrawing || !signCanvasRef) return;
-
+    if (!isDrawing) return;
     setIsDrawing(false);
 
-    const image = signCanvasRef.toDataURL("image/png");
+    const image = signCanvasRef!.toDataURL("image/png");
     setSignatureImage(image);
     onSignatureChange({ image, ...signatureBox });
   };
 
   /* ================= RENDER ================= */
-
-  const safePdfWidth = pdfSize.width || DOC_WIDTH;
-  const safePdfHeight = pdfSize.height || 0;
-
   return (
     <div className="space-y-6">
 
+      {/* 🔐 Biometric Popup */}
       {showBiometric && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="w-[420px] max-w-full">
@@ -239,40 +210,46 @@ export const CertificatePreview = ({
         </div>
       )}
 
-      {/* PDF */}
+      {/* PDF Preview */}
       <div className="border rounded-xl bg-muted/20 overflow-auto relative">
         <div
           className="relative mx-auto bg-white shadow"
-          style={{ width: safePdfWidth, height: safePdfHeight }}
+          style={{ width: pdfSize.width, height: pdfSize.height }}
         >
           <canvas ref={setPdfCanvasRef} />
 
-          {certificate.signatureFields
-            ?.filter(Boolean)
-            .map((field: SignatureField, index: number) => {
-              const isMine =
-                field.signerPublicKey === myPublicKey && !field.signed;
+          {certificate.signatureFields?.map((field: SignatureField) => {
+            const isMine =
+              field.signerPublicKey === myPublicKey && !field.signed;
 
-              return (
-                <div
-                  key={`field-${field.id ?? `${field.xRatio}-${field.yRatio}` ?? index}`}
-                  className="absolute rounded-lg"
-                  style={{
-                    left: (field.xRatio || 0) * safePdfWidth,
-                    top: (field.yRatio || 0) * safePdfHeight,
-                    width: (field.wRatio || 0) * safePdfWidth,
-                    height: (field.hRatio || 0) * safePdfHeight,
-                    border: `2px dashed hsl(var(--${field.color}))`,
-                    zIndex: isMine ? 10 : 1,
-                  }}
-                />
-              );
-            })}
+            return (
+              <div
+                key={field.id}
+                className="absolute rounded-lg"
+                style={{
+                  left: field.xRatio * pdfSize.width,
+                  top: field.yRatio * pdfSize.height,
+                  width: field.wRatio * pdfSize.width,
+                  height: field.hRatio * pdfSize.height,
+                  border: `2px dashed hsl(var(--${field.color}))`,
+                  zIndex: isMine ? 10 : 1,
+                }}
+              >
+                {isMine && !signatureImage && (
+                  <div
+                    className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs font-semibold text-white"
+                    style={{ background: `hsl(var(--${field.color}))` }}
+                  >
+                    Your Signature
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {signatureImage && signatureBox && (
             <img
               src={signatureImage}
-              alt="signature"
               className="absolute"
               style={{
                 left: signatureBox.x,
@@ -286,7 +263,7 @@ export const CertificatePreview = ({
         </div>
       </div>
 
-      {/* Tools */}
+      {/* SIGN TOOLS */}
       {signatureBox && (
         <div className="bg-card border rounded-xl p-6 space-y-4">
           <div className="flex justify-between items-center">
@@ -313,12 +290,25 @@ export const CertificatePreview = ({
           </div>
 
           {activeTab === "type" && (
-            <input
-              className="w-full p-3 border rounded-lg"
-              placeholder="Type your institution name"
-              value={typedName}
-              onChange={(e) => setTypedName(e.target.value)}
-            />
+            <>
+              <input
+                className="w-full p-3 border rounded-lg"
+                placeholder="Type your institution name"
+                value={typedName}
+                onChange={(e) => setTypedName(e.target.value)}
+              />
+              <div className="flex gap-2 flex-wrap">
+                {fontOptions.map((f, i) => (
+                  <Button
+                    key={i}
+                    variant={selectedFont === i ? "default" : "outline"}
+                    onClick={() => setSelectedFont(i)}
+                  >
+                    {f.name}
+                  </Button>
+                ))}
+              </div>
+            </>
           )}
 
           {activeTab === "draw" && signatureBox && (
@@ -334,6 +324,7 @@ export const CertificatePreview = ({
             />
           )}
 
+          {/* Verify Button */}
           {signatureImage && !isVerified && (
             <Button
               className="w-full mt-4"
