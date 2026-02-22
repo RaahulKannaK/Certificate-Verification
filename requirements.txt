@@ -1,6 +1,6 @@
 flask
 numpy
 gunicorn
-face-recognition
-dlib
 opencv-python-headless
+face-recognition==1.3.0
+dlib==19.24.2
