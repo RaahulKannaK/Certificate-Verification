@@ -212,7 +212,7 @@ app.post("/biometric/face", async (req, res) => {
     const aiRes = await axios.post(
       "https://unvertically-pottier-cordelia.ngrok-free.dev/extract-face",
       { image },
-      { timeout: 60000 }
+      { timeout: 180000 }
     );
 
     if (!aiRes.data.success) {
