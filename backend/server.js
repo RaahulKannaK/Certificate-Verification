@@ -145,6 +145,7 @@ app.get("/biometric/status/:email", async (req, res) => {
       "SELECT biometric_type FROM users WHERE email = ?",
       [email]
     );
+    
 
     const [[institution]] = await db.query(
       "SELECT biometric_type FROM institutions WHERE email = ?",
@@ -209,7 +210,7 @@ app.post("/biometric/face", async (req, res) => {
     console.log("🤖 Sending image to Python...");
 
     const aiRes = await axios.post(
-      "http://127.0.0.1:5001/extract-face",
+      "https://unvertically-pottier-cordelia.ngrok-free.dev/extract-face",
       { image },
       { timeout: 60000 }
     );
@@ -366,7 +367,7 @@ app.post("/credential/sign", async (req, res) => {
     const storedVector = Array.from(decrypted);
 
     // ---------------------- 3️⃣ Face verification ----------------------
-    const aiResponse = await axios.post("http://127.0.0.1:5001/verify-face", {
+    const aiResponse = await axios.post("https://unvertically-pottier-cordelia.ngrok-free.dev/verify-face", {
       image: faceImage,
       storedVector,
     });
@@ -608,7 +609,7 @@ app.post("/biometric/verify-face", async (req, res) => {
     // 8️⃣ Call Python service
     // ===============================
     const aiResponse = await axios.post(
-      "http://127.0.0.1:5001/verify-face",
+      "https://unvertically-pottier-cordelia.ngrok-free.dev/verify-face",
       {
         image: faceImage,
         storedVector,
