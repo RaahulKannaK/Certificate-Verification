@@ -40,6 +40,7 @@ export const CertificatePreview = ({
   myPublicKey,
   onSignatureChange,
 }: CertificatePreviewProps) => {
+
   const [pdfCanvasRef, setPdfCanvasRef] = useState<HTMLCanvasElement | null>(null);
   const [signCanvasRef, setSignCanvasRef] = useState<HTMLCanvasElement | null>(null);
 
@@ -52,11 +53,12 @@ export const CertificatePreview = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
 
-  /* 🔐 biometric */
-  const [isVerified, setIsVerified] = useState(false);
+  /* 🔐 SECURITY STATES */
+  const [isPreVerified, setIsPreVerified] = useState(false);
+  const [isPostVerified, setIsPostVerified] = useState(false);
   const [showBiometric, setShowBiometric] = useState(false);
+  const [verifyMode, setVerifyMode] = useState<"pre" | "post">("pre");
 
-  /* ================= DOCUMENT URL ================= */
   const documentUrl = certificate.filePath;
 
   /* ================= LOAD PDF ================= */
@@ -115,19 +117,16 @@ export const CertificatePreview = ({
 
     setTypedName("");
     setSignatureImage(null);
-    setIsVerified(false);
+    setIsPostVerified(false);
     onSignatureChange(null);
   };
 
   /* ================= TYPED SIGNATURE ================= */
   useEffect(() => {
-    if (activeTab !== "type" || !signatureBox) return;
-
-    setSignatureImage(null);
-    setIsVerified(false);
-    onSignatureChange(null);
-
+    if (!signatureBox || activeTab !== "type") return;
     if (!typedName.trim()) return;
+
+    setIsPostVerified(false);
 
     const canvas = document.createElement("canvas");
     canvas.width = signatureBox.width;
@@ -144,6 +143,7 @@ export const CertificatePreview = ({
     const image = canvas.toDataURL("image/png");
     setSignatureImage(image);
     onSignatureChange({ image, ...signatureBox });
+
   }, [typedName, selectedFont, activeTab, signatureBox]);
 
   /* ================= DRAW SIGNATURE ================= */
@@ -159,7 +159,7 @@ export const CertificatePreview = ({
     ctx.clearRect(0, 0, signCanvasRef!.width, signCanvasRef!.height);
 
     setSignatureImage(null);
-    setIsVerified(false);
+    setIsPostVerified(false);
     setIsDrawing(true);
     setLastPos(getCoords(e));
   };
@@ -201,7 +201,11 @@ export const CertificatePreview = ({
             <BiometricVerify
               credentialId={certificate.credentialId}
               onComplete={() => {
-                setIsVerified(true);
+                if (verifyMode === "pre") {
+                  setIsPreVerified(true);
+                } else {
+                  setIsPostVerified(true);
+                }
                 setShowBiometric(false);
               }}
               onCancel={() => setShowBiometric(false)}
@@ -210,136 +214,157 @@ export const CertificatePreview = ({
         </div>
       )}
 
-      {/* PDF Preview */}
-      <div className="border rounded-xl bg-muted/20 overflow-auto relative">
-        <div
-          className="relative mx-auto bg-white shadow"
-          style={{ width: pdfSize.width, height: pdfSize.height }}
+      {/* 🔐 PRE VERIFY */}
+      {!isPreVerified && (
+        <Button
+          className="w-full"
+          onClick={() => {
+            setVerifyMode("pre");
+            setShowBiometric(true);
+          }}
         >
-          <canvas ref={setPdfCanvasRef} />
+          🔐 Verify Identity Before Signing
+        </Button>
+      )}
 
-          {certificate.signatureFields?.map((field: SignatureField) => {
-            const isMine =
-              field.signerPublicKey === myPublicKey && !field.signed;
+      {/* AFTER PRE VERIFY SHOW EVERYTHING */}
+      {isPreVerified && (
+        <>
+          {/* PDF Preview */}
+          <div className="border rounded-xl bg-muted/20 overflow-auto relative">
+            <div
+              className="relative mx-auto bg-white shadow"
+              style={{ width: pdfSize.width, height: pdfSize.height }}
+            >
+              <canvas ref={setPdfCanvasRef} />
 
-            return (
-              <div
-                key={field.id}
-                className="absolute rounded-lg"
-                style={{
-                  left: field.xRatio * pdfSize.width,
-                  top: field.yRatio * pdfSize.height,
-                  width: field.wRatio * pdfSize.width,
-                  height: field.hRatio * pdfSize.height,
-                  border: `2px dashed hsl(var(--${field.color}))`,
-                  zIndex: isMine ? 10 : 1,
-                }}
-              >
-                {isMine && !signatureImage && (
+              {certificate.signatureFields?.map((field: SignatureField) => {
+                const isMine =
+                  field.signerPublicKey === myPublicKey && !field.signed;
+
+                return (
                   <div
-                    className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs font-semibold text-white"
-                    style={{ background: `hsl(var(--${field.color}))` }}
+                    key={field.id}
+                    className="absolute rounded-lg"
+                    style={{
+                      left: field.xRatio * pdfSize.width,
+                      top: field.yRatio * pdfSize.height,
+                      width: field.wRatio * pdfSize.width,
+                      height: field.hRatio * pdfSize.height,
+                      border: `2px dashed hsl(var(--${field.color}))`,
+                      zIndex: isMine ? 10 : 1,
+                    }}
                   >
-                    Your Signature
+                    {isMine && !signatureImage && (
+                      <div
+                        className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs font-semibold text-white"
+                        style={{ background: `hsl(var(--${field.color}))` }}
+                      >
+                        Your Signature
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
 
-          {signatureImage && signatureBox && (
-            <img
-              src={signatureImage}
-              className="absolute"
-              style={{
-                left: signatureBox.x,
-                top: signatureBox.y,
-                width: signatureBox.width,
-                height: signatureBox.height,
-                zIndex: 11,
-              }}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* SIGN TOOLS */}
-      {signatureBox && (
-        <div className="bg-card border rounded-xl p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="font-semibold">Add Signature</h3>
-            <Button variant="ghost" onClick={clearSignature}>
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Clear
-            </Button>
+              {signatureImage && signatureBox && (
+                <img
+                  src={signatureImage}
+                  className="absolute"
+                  style={{
+                    left: signatureBox.x,
+                    top: signatureBox.y,
+                    width: signatureBox.width,
+                    height: signatureBox.height,
+                    zIndex: 11,
+                  }}
+                />
+              )}
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              variant={activeTab === "type" ? "default" : "outline"}
-              onClick={() => setActiveTab("type")}
-            >
-              <Type className="w-4 h-4 mr-2" /> Type
-            </Button>
-            <Button
-              variant={activeTab === "draw" ? "default" : "outline"}
-              onClick={() => setActiveTab("draw")}
-            >
-              <MousePointer className="w-4 h-4 mr-2" /> Draw
-            </Button>
-          </div>
+          {/* SIGN TOOLS */}
+          {signatureBox && (
+            <div className="bg-card border rounded-xl p-6 space-y-4">
 
-          {activeTab === "type" && (
-            <>
-              <input
-                className="w-full p-3 border rounded-lg"
-                placeholder="Type your institution name"
-                value={typedName}
-                onChange={(e) => setTypedName(e.target.value)}
-              />
-              <div className="flex gap-2 flex-wrap">
-                {fontOptions.map((f, i) => (
-                  <Button
-                    key={i}
-                    variant={selectedFont === i ? "default" : "outline"}
-                    onClick={() => setSelectedFont(i)}
-                  >
-                    {f.name}
-                  </Button>
-                ))}
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold">Add Signature</h3>
+                <Button variant="ghost" onClick={clearSignature}>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Clear
+                </Button>
               </div>
-            </>
-          )}
 
-          {activeTab === "draw" && signatureBox && (
-            <canvas
-              ref={setSignCanvasRef}
-              width={signatureBox.width}
-              height={signatureBox.height}
-              className="border rounded-lg cursor-crosshair"
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-            />
-          )}
+              <div className="flex gap-2">
+                <Button
+                  variant={activeTab === "type" ? "default" : "outline"}
+                  onClick={() => setActiveTab("type")}
+                >
+                  <Type className="w-4 h-4 mr-2" /> Type
+                </Button>
+                <Button
+                  variant={activeTab === "draw" ? "default" : "outline"}
+                  onClick={() => setActiveTab("draw")}
+                >
+                  <MousePointer className="w-4 h-4 mr-2" /> Draw
+                </Button>
+              </div>
 
-          {/* Verify Button */}
-          {signatureImage && !isVerified && (
-            <Button
-              className="w-full mt-4"
-              onClick={() => setShowBiometric(true)}
-            >
-              Verify & Confirm Signature
-            </Button>
-          )}
+              {activeTab === "type" && (
+                <>
+                  <input
+                    className="w-full p-3 border rounded-lg"
+                    placeholder="Type your institution name"
+                    value={typedName}
+                    onChange={(e) => setTypedName(e.target.value)}
+                  />
+                  <div className="flex gap-2 flex-wrap">
+                    {fontOptions.map((f, i) => (
+                      <Button
+                        key={i}
+                        variant={selectedFont === i ? "default" : "outline"}
+                        onClick={() => setSelectedFont(i)}
+                      >
+                        {f.name}
+                      </Button>
+                    ))}
+                  </div>
+                </>
+              )}
 
-          {isVerified && (
-            <div className="text-center text-green-600 font-semibold mt-2">
-              ✔ Signature Verified
+              {activeTab === "draw" && signatureBox && (
+                <canvas
+                  ref={setSignCanvasRef}
+                  width={signatureBox.width}
+                  height={signatureBox.height}
+                  className="border rounded-lg cursor-crosshair"
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                />
+              )}
+
+              {signatureImage && !isPostVerified && (
+                <Button
+                  className="w-full mt-4"
+                  onClick={() => {
+                    setVerifyMode("post");
+                    setShowBiometric(true);
+                  }}
+                >
+                  Verify & Confirm Signature
+                </Button>
+              )}
+
+              {isPostVerified && (
+                <div className="text-center text-green-600 font-semibold mt-2">
+                  ✔ Signature Verified Successfully
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
