@@ -614,7 +614,7 @@ app.post("/biometric/verify-face", async (req, res) => {
         image: faceImage,
         storedVector,
       },
-      { timeout: 18000 }
+      { timeout: 40000 }
     );
 
     const { match, confidence } = aiResponse.data;
