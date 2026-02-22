@@ -213,7 +213,7 @@ app.post("/biometric/face", async (req, res) => {
     const aiRes = await axios.post(
       `${process.env.FACE_API_URL}/extract-face`,
       { image },
-      { timeout: 100000 }
+      { timeout: 3000000 }
     );
 
     if (!aiRes.data.success) {
@@ -615,7 +615,7 @@ app.post("/biometric/verify-face", async (req, res) => {
         image: faceImage,
         storedVector,
       },
-      { timeout: 180000 }
+      { timeout: 3000000 }
     );
 
     const { match, confidence } = aiResponse.data;
