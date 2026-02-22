@@ -211,7 +211,7 @@ app.post("/biometric/face", async (req, res) => {
     console.log("🤖 Sending image to Python...");
 
     const aiRes = await axios.post(
-      "https://unvertically-pottier-cordelia.ngrok-free.dev/extract-face",
+      `${process.env.FACE_API_URL}/extract-face`,
       { image },
       { timeout: 100000 }
     );
@@ -368,7 +368,7 @@ app.post("/credential/sign", async (req, res) => {
     const storedVector = Array.from(decrypted);
 
     // ---------------------- 3️⃣ Face verification ----------------------
-    const aiResponse = await axios.post("https://unvertically-pottier-cordelia.ngrok-free.dev/verify-face", {
+    const aiResponse = await axios.post(`${process.env.FACE_API_URL}/verify-face`, {
       image: faceImage,
       storedVector,
     });
@@ -610,7 +610,7 @@ app.post("/biometric/verify-face", async (req, res) => {
     // 8️⃣ Call Python service
     // ===============================
     const aiResponse = await axios.post(
-      "https://unvertically-pottier-cordelia.ngrok-free.dev/verify-face",
+      `${process.env.FACE_API_URL}/verify-face`,
       {
         image: faceImage,
         storedVector,
