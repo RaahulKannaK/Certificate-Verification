@@ -608,7 +608,7 @@ app.post("/biometric/verify-face", async (req, res) => {
     // 8️⃣ Call Python service
     // ===============================
     const aiResponse = await axios.post(
-      "http://127.0.0.1:5001/verify-face",
+      `${process.env.PYTHON_AI_URL}/verify-face`,
       {
         image: faceImage,
         storedVector,
