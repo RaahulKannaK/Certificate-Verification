@@ -1,6 +1,7 @@
 import base64
 import numpy as np
 import face_recognition
+import os
 import cv2
 from flask import Flask, request, jsonify
 
