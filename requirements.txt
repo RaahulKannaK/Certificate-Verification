@@ -1,6 +1,6 @@
 flask
 numpy
 gunicorn
-pip install face_recognition
-pip install dlib --no-cache-dir
-pip install opencv-python-headless
+face-recognition
+dlib
+opencv-python-headless
