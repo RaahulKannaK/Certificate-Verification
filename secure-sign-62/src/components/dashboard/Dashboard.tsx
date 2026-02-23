@@ -19,8 +19,8 @@ const getTheme = (role: string) => {
     // Brown + Peach theme — #50311D base
     return {
       pageBg: "#fdf6f0",
-      blob1: "radial-gradient(circle, #f5dcc8 0%, transparent 70%)",
-      blob2: "radial-gradient(circle, #ede0d4 0%, transparent 70%)",
+      blob1: "radial-gradient(circle, #f2af79 0%, transparent 70%)",
+      blob2: "radial-gradient(circle, #f7b77b 0%, transparent 70%)",
       navBorder: "#d4a882",
       iconGradient: "linear-gradient(135deg, #50311D, #a0522d)",
       iconShadow: "0 8px 20px rgba(80,49,29,0.35)",
