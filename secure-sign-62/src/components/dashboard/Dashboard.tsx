@@ -4,18 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { BiometricSetup } from "./BiometricSetup";
 import { DocumentSigningFlow } from "../signing/DocumentSigningFlow";
 import {
-  Copy,
-  Check,
-  LogOut,
-  FileSignature,
-  Shield,
-  Key,
-  Settings,
-  Fingerprint,
-  ScanFace,
-  CreditCard,
-  Sparkles,
-  Activity,
+  Copy, Check, LogOut, FileSignature, Shield, Key,
+  Settings, Fingerprint, ScanFace, CreditCard, Sparkles, Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,14 +13,65 @@ interface DashboardProps {
   onNavigate: (view: "digital-signature") => void;
 }
 
+/* ── Role-based theme ── */
+const getTheme = (role: string) => {
+  if (role === "institution") {
+    return {
+      // Rose/Pink theme
+      pageBg: "#fff5f5",
+      blob1: "radial-gradient(circle, #ffe4e6 0%, transparent 70%)",
+      blob2: "radial-gradient(circle, #fce7f3 0%, transparent 70%)",
+      navBg: "rgba(255,255,255,0.88)",
+      navBorder: "#fecdd3",
+      iconGradient: "linear-gradient(135deg, #f43f5e, #ec4899)",
+      iconShadow: "0 8px 20px rgba(244,63,94,0.35)",
+      cardBorder: "#fecdd3",
+      cardShadow: "0 4px 16px rgba(244,63,94,0.08)",
+      badgeBg: "#fff1f2",
+      badgeBorder: "#fecdd3",
+      badgeColor: "#f43f5e",
+      btnGradient: "linear-gradient(135deg, #f43f5e, #ec4899)",
+      btnShadow: "0 6px 20px rgba(244,63,94,0.35)",
+      btnShadowHover: "0 10px 28px rgba(244,63,94,0.45)",
+      actionBg: "linear-gradient(135deg, #fff1f2 0%, #fce7f3 100%)",
+      actionBorder: "#fecdd3",
+      accentText: "linear-gradient(135deg, #f43f5e, #ec4899)",
+      statIconColor: "#f43f5e",
+    };
+  }
+  // Default: Student — Blue/Indigo theme
+  return {
+    pageBg: "#f0f4f8",
+    blob1: "radial-gradient(circle, #dbeafe 0%, transparent 70%)",
+    blob2: "radial-gradient(circle, #ede9fe 0%, transparent 70%)",
+    navBg: "rgba(255,255,255,0.88)",
+    navBorder: "#bfdbfe",
+    iconGradient: "linear-gradient(135deg, #3b82f6, #6366f1)",
+    iconShadow: "0 8px 20px rgba(99,102,241,0.35)",
+    cardBorder: "#bfdbfe",
+    cardShadow: "0 4px 16px rgba(99,102,241,0.08)",
+    badgeBg: "#eff6ff",
+    badgeBorder: "#bfdbfe",
+    badgeColor: "#3b82f6",
+    btnGradient: "linear-gradient(135deg, #3b82f6, #6366f1)",
+    btnShadow: "0 6px 20px rgba(99,102,241,0.35)",
+    btnShadowHover: "0 10px 28px rgba(99,102,241,0.45)",
+    actionBg: "linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%)",
+    actionBorder: "#bfdbfe",
+    accentText: "linear-gradient(135deg, #3b82f6, #6366f1)",
+    statIconColor: "#3b82f6",
+  };
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { user, logout } = useAuth();
-
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [showSigning, setShowSigning] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
 
   if (!user) return null;
+
+  const theme = getTheme(user.role || "student");
 
   const copyPublicKey = async () => {
     await navigator.clipboard.writeText(user.publicKey);
@@ -48,193 +89,267 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     setShowSigning(true);
   };
 
-  const handleViewCredentials = () => {
-    onNavigate("digital-signature");
-  };
-
-  if (showSigning) {
-    return <DocumentSigningFlow onBack={() => setShowSigning(false)} />;
-  }
+  if (showSigning) return <DocumentSigningFlow onBack={() => setShowSigning(false)} />;
 
   if (showBiometricSetup) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-        <BiometricSetup
-          onComplete={() => setShowBiometricSetup(false)}
-          onSkip={() => setShowBiometricSetup(false)}
-        />
+      <div style={{ background: theme.pageBg }} className="min-h-screen flex items-center justify-center p-6">
+        <BiometricSetup onComplete={() => setShowBiometricSetup(false)} onSkip={() => setShowBiometricSetup(false)} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/30">
-      
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/70 border-b border-border/40">
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/30">
-              <FileSignature className="w-5 h-5 text-white" />
+    <div style={{ background: theme.pageBg, position: 'relative', overflow: 'hidden', minHeight: '100vh' }}>
+
+      {/* Background blobs */}
+      <div style={{
+        position: 'fixed', top: '-100px', right: '-100px',
+        width: '500px', height: '500px', borderRadius: '50%',
+        background: theme.blob1, zIndex: 0, pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'fixed', bottom: '-80px', left: '-80px',
+        width: '420px', height: '420px', borderRadius: '50%',
+        background: theme.blob2, zIndex: 0, pointerEvents: 'none',
+      }} />
+
+      {/* ── NAVBAR ── */}
+      <div style={{ position: 'sticky', top: '16px', zIndex: 50, display: 'flex', justifyContent: 'center', padding: '0 24px' }}>
+        <nav style={{
+          width: '100%', maxWidth: '1100px',
+          background: theme.navBg,
+          backdropFilter: 'blur(16px)',
+          borderRadius: '16px',
+          border: `1px solid ${theme.navBorder}`,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          padding: '12px 24px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '38px', height: '38px', borderRadius: '10px',
+              background: theme.iconGradient,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: theme.iconShadow,
+            }}>
+              <FileSignature size={18} color="white" />
             </div>
-            <span className="text-xl font-bold tracking-tight">
+            <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: '19px', fontWeight: 700, color: '#1e293b' }}>
               SignChain
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowBiometricSetup(true)}
-            >
-              <Settings className="w-5 h-5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              onClick={logout}
-              className="hover:text-destructive"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
+          {/* Role Badge */}
+          <div style={{
+            padding: '5px 14px', borderRadius: '999px',
+            background: theme.badgeBg, border: `1px solid ${theme.badgeBorder}`,
+            fontSize: '13px', fontWeight: 600, color: theme.badgeColor,
+            textTransform: 'capitalize',
+          }}>
+            {user.role || 'Student'}
           </div>
-        </div>
-      </header>
 
-      {/* MAIN */}
-      <main className="container mx-auto px-6 py-10">
+          {/* Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={() => setShowBiometricSetup(true)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '8px', color: '#64748b', transition: 'background 0.2s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            >
+              <Settings size={20} />
+            </button>
+            <button
+              onClick={logout}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0',
+                background: 'white', color: '#64748b', fontSize: '14px', fontWeight: 500,
+                cursor: 'pointer', transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { (e.currentTarget.style.borderColor = '#fca5a5'); (e.currentTarget.style.color = '#ef4444'); }}
+              onMouseLeave={e => { (e.currentTarget.style.borderColor = '#e2e8f0'); (e.currentTarget.style.color = '#64748b'); }}
+            >
+              <LogOut size={15} /> Logout
+            </button>
+          </div>
+        </nav>
+      </div>
+
+      {/* ── MAIN ── */}
+      <main style={{ position: 'relative', zIndex: 1, maxWidth: '1100px', margin: '0 auto', padding: '40px 24px 60px' }}>
 
         {/* Welcome */}
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold tracking-tight mb-2">
-            Welcome back,{" "}
-            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+        <div style={{ marginBottom: '36px' }}>
+          <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+            Welcome back,{' '}
+            <span style={{ background: theme.accentText, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
               {user.name}
             </span>
           </h1>
-          <p className="text-muted-foreground text-lg">
+          <p style={{ fontSize: '16px', color: '#64748b' }}>
             Securely manage your digital identity and document signatures.
           </p>
         </div>
 
-        {/* STAT CARDS */}
-        <div className="grid md:grid-cols-3 gap-6 mb-10">
+        {/* ── STAT CARDS ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '32px' }}>
 
           {/* Public Key */}
-          <div className="rounded-2xl p-6 bg-background border border-border/40 hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <Key className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold">Public Key</h3>
+          <div style={{
+            background: 'white', borderRadius: '16px',
+            border: `1px solid ${theme.cardBorder}`,
+            boxShadow: theme.cardShadow, padding: '24px',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+            onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-3px)'); (e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'); }}
+            onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = theme.cardShadow); }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Key size={18} color={theme.statIconColor} />
+              <span style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Public Key</span>
             </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-secondary/40 rounded-lg px-3 py-2 font-mono text-xs truncate">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                flex: 1, background: '#f8fafc', borderRadius: '8px',
+                padding: '8px 12px', fontFamily: 'monospace', fontSize: '12px',
+                color: '#334155', border: '1px solid #e2e8f0',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
                 {user.publicKey}
               </div>
-
-              <Button variant="ghost" size="icon" onClick={copyPublicKey}>
-                {copiedKey ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </Button>
+              <button
+                onClick={copyPublicKey}
+                style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}
+              >
+                {copiedKey ? <Check size={15} color="#22c55e" /> : <Copy size={15} color="#64748b" />}
+              </button>
             </div>
           </div>
 
           {/* Security */}
-          <div className="rounded-2xl p-6 bg-background border border-border/40 hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <Shield className="w-5 h-5 text-accent" />
-              <h3 className="font-semibold">Security</h3>
+          <div style={{
+            background: 'white', borderRadius: '16px',
+            border: `1px solid ${theme.cardBorder}`,
+            boxShadow: theme.cardShadow, padding: '24px',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+            onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-3px)'); (e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'); }}
+            onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = theme.cardShadow); }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Shield size={18} color={theme.statIconColor} />
+              <span style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Security</span>
             </div>
-
             {user.biometricSetup ? (
-              <div className="flex items-center gap-2 text-sm">
-                {user.biometricType === "fingerprint" ? (
-                  <Fingerprint className="w-5 h-5 text-primary" />
-                ) : (
-                  <ScanFace className="w-5 h-5 text-primary" />
-                )}
-                <span>
-                  {user.biometricType === "fingerprint"
-                    ? "Fingerprint Enabled"
-                    : "Face Recognition Enabled"}
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#374151' }}>
+                {user.biometricType === "fingerprint"
+                  ? <Fingerprint size={18} color={theme.statIconColor} />
+                  : <ScanFace size={18} color={theme.statIconColor} />}
+                <span>{user.biometricType === "fingerprint" ? "Fingerprint Enabled" : "Face Recognition Enabled"}</span>
               </div>
             ) : (
               <div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Biometric authentication not configured.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
+                <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px' }}>Biometric authentication not configured.</p>
+                <button
                   onClick={() => setShowBiometricSetup(true)}
+                  style={{
+                    padding: '7px 16px', borderRadius: '8px', border: `1px solid ${theme.cardBorder}`,
+                    background: theme.badgeBg, color: theme.badgeColor,
+                    fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  }}
                 >
                   Enable Now
-                </Button>
+                </button>
               </div>
             )}
           </div>
 
           {/* Documents */}
-          <div className="rounded-2xl p-6 bg-background border border-border/40 hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <Activity className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold">Documents</h3>
+          <div style={{
+            background: 'white', borderRadius: '16px',
+            border: `1px solid ${theme.cardBorder}`,
+            boxShadow: theme.cardShadow, padding: '24px',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+            onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-3px)'); (e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'); }}
+            onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = theme.cardShadow); }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Activity size={18} color={theme.statIconColor} />
+              <span style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Documents</span>
             </div>
-
-            <div className="flex justify-between text-sm">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-2xl font-bold">0</p>
-                <p className="text-muted-foreground">Pending</p>
+                <p style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>0</p>
+                <p style={{ fontSize: '13px', color: '#94a3b8' }}>Pending</p>
               </div>
               <div>
-                <p className="text-2xl font-bold">0</p>
-                <p className="text-muted-foreground">Signed</p>
+                <p style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>0</p>
+                <p style={{ fontSize: '13px', color: '#94a3b8' }}>Signed</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ACTION PANEL */}
-        <div className="rounded-3xl p-10 bg-gradient-to-br from-primary/10 to-accent/10 border border-border/40 text-center shadow-lg">
-          
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/40">
-            <Sparkles className="w-10 h-10 text-white" />
+        {/* ── ACTION PANEL ── */}
+        <div style={{
+          background: theme.actionBg,
+          borderRadius: '24px',
+          border: `1px solid ${theme.actionBorder}`,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+          padding: '48px 32px',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            width: '72px', height: '72px', borderRadius: '20px',
+            background: theme.iconGradient,
+            boxShadow: theme.iconShadow,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 24px',
+          }}>
+            <Sparkles size={32} color="white" />
           </div>
 
-          <h2 className="text-3xl font-bold mb-3">
+          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: '28px', fontWeight: 800, color: '#0f172a', marginBottom: '12px' }}>
             Start Secure Signing
           </h2>
-
-          <p className="text-muted-foreground max-w-xl mx-auto mb-8">
+          <p style={{ fontSize: '15px', color: '#64748b', maxWidth: '520px', margin: '0 auto 32px', lineHeight: 1.7 }}>
             Upload documents and initiate secure signing workflows —
             self-signing, sequential approvals, or parallel signatures.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              size="lg"
-              className="px-8 py-6 text-base font-semibold shadow-lg hover:scale-105 transition"
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '14px' }}>
+            <button
               onClick={handleStartSigning}
+              style={{
+                padding: '13px 32px', borderRadius: '10px', border: 'none',
+                background: theme.btnGradient, color: 'white',
+                fontSize: '15px', fontWeight: 600, cursor: 'pointer',
+                boxShadow: theme.btnShadow, transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-2px)'); (e.currentTarget.style.boxShadow = theme.btnShadowHover); }}
+              onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = theme.btnShadow); }}
             >
               Start Signing
-            </Button>
+            </button>
 
-            <Button
-              variant="outline"
-              size="lg"
-              className="px-8 py-6 text-base"
-              onClick={handleViewCredentials}
+            <button
+              onClick={() => onNavigate("digital-signature")}
+              style={{
+                padding: '13px 32px', borderRadius: '10px',
+                border: `1.5px solid ${theme.cardBorder}`, background: 'white',
+                color: '#374151', fontSize: '15px', fontWeight: 600,
+                cursor: 'pointer', transition: 'all 0.2s',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}
+              onMouseEnter={e => { (e.currentTarget.style.borderColor = theme.statIconColor); (e.currentTarget.style.color = theme.statIconColor); }}
+              onMouseLeave={e => { (e.currentTarget.style.borderColor = theme.cardBorder); (e.currentTarget.style.color = '#374151'); }}
             >
-              <CreditCard className="w-5 h-5 mr-2" />
-              View Credentials
-            </Button>
+              <CreditCard size={16} /> View Credentials
+            </button>
           </div>
         </div>
       </main>
