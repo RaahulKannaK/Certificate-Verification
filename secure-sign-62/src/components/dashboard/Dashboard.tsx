@@ -16,50 +16,51 @@ interface DashboardProps {
 /* ── Role-based theme ── */
 const getTheme = (role: string) => {
   if (role === "institution") {
+    // Brown + Peach theme — #50311D base
     return {
-      // Rose/Pink theme
-      pageBg: "#fff5f5",
-      blob1: "radial-gradient(circle, #ffe4e6 0%, transparent 70%)",
-      blob2: "radial-gradient(circle, #fce7f3 0%, transparent 70%)",
-      navBg: "rgba(255,255,255,0.88)",
-      navBorder: "#fecdd3",
-      iconGradient: "linear-gradient(135deg, #f43f5e, #ec4899)",
-      iconShadow: "0 8px 20px rgba(244,63,94,0.35)",
-      cardBorder: "#fecdd3",
-      cardShadow: "0 4px 16px rgba(244,63,94,0.08)",
-      badgeBg: "#fff1f2",
-      badgeBorder: "#fecdd3",
-      badgeColor: "#f43f5e",
-      btnGradient: "linear-gradient(135deg, #f43f5e, #ec4899)",
-      btnShadow: "0 6px 20px rgba(244,63,94,0.35)",
-      btnShadowHover: "0 10px 28px rgba(244,63,94,0.45)",
-      actionBg: "linear-gradient(135deg, #fff1f2 0%, #fce7f3 100%)",
-      actionBorder: "#fecdd3",
-      accentText: "linear-gradient(135deg, #f43f5e, #ec4899)",
-      statIconColor: "#f43f5e",
+      pageBg: "#fdf6f0",
+      blob1: "radial-gradient(circle, #f5dcc8 0%, transparent 70%)",
+      blob2: "radial-gradient(circle, #ede0d4 0%, transparent 70%)",
+      navBorder: "#d4a882",
+      iconGradient: "linear-gradient(135deg, #50311D, #a0522d)",
+      iconShadow: "0 8px 20px rgba(80,49,29,0.35)",
+      cardBorder: "#d4a882",
+      cardShadow: "0 4px 16px rgba(80,49,29,0.08)",
+      badgeBg: "#fdf0e6",
+      badgeBorder: "#d4a882",
+      badgeColor: "#50311D",
+      btnGradient: "linear-gradient(135deg, #50311D, #a0522d)",
+      btnShadow: "0 6px 20px rgba(80,49,29,0.35)",
+      btnShadowHover: "0 10px 28px rgba(80,49,29,0.45)",
+      actionBg: "linear-gradient(135deg, #fdf6f0 0%, #f5dcc8 100%)",
+      actionBorder: "#d4a882",
+      accentText: "linear-gradient(135deg, #50311D, #a0522d)",
+      statIconColor: "#50311D",
+      outlineBtnHoverColor: "#50311D",
     };
   }
-  // Default: Student — Blue/Indigo theme
+
+  // Student — Light Purple theme
   return {
-    pageBg: "#f0f4f8",
-    blob1: "radial-gradient(circle, #dbeafe 0%, transparent 70%)",
-    blob2: "radial-gradient(circle, #ede9fe 0%, transparent 70%)",
-    navBg: "rgba(255,255,255,0.88)",
-    navBorder: "#bfdbfe",
-    iconGradient: "linear-gradient(135deg, #3b82f6, #6366f1)",
-    iconShadow: "0 8px 20px rgba(99,102,241,0.35)",
-    cardBorder: "#bfdbfe",
-    cardShadow: "0 4px 16px rgba(99,102,241,0.08)",
-    badgeBg: "#eff6ff",
-    badgeBorder: "#bfdbfe",
-    badgeColor: "#3b82f6",
-    btnGradient: "linear-gradient(135deg, #3b82f6, #6366f1)",
-    btnShadow: "0 6px 20px rgba(99,102,241,0.35)",
-    btnShadowHover: "0 10px 28px rgba(99,102,241,0.45)",
-    actionBg: "linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%)",
-    actionBorder: "#bfdbfe",
-    accentText: "linear-gradient(135deg, #3b82f6, #6366f1)",
-    statIconColor: "#3b82f6",
+    pageBg: "#f5f3ff",
+    blob1: "radial-gradient(circle, #ede9fe 0%, transparent 70%)",
+    blob2: "radial-gradient(circle, #ddd6fe 0%, transparent 70%)",
+    navBorder: "#c4b5fd",
+    iconGradient: "linear-gradient(135deg, #7c3aed, #a78bfa)",
+    iconShadow: "0 8px 20px rgba(124,58,237,0.35)",
+    cardBorder: "#c4b5fd",
+    cardShadow: "0 4px 16px rgba(124,58,237,0.08)",
+    badgeBg: "#f5f3ff",
+    badgeBorder: "#c4b5fd",
+    badgeColor: "#7c3aed",
+    btnGradient: "linear-gradient(135deg, #7c3aed, #a78bfa)",
+    btnShadow: "0 6px 20px rgba(124,58,237,0.35)",
+    btnShadowHover: "0 10px 28px rgba(124,58,237,0.45)",
+    actionBg: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
+    actionBorder: "#c4b5fd",
+    accentText: "linear-gradient(135deg, #7c3aed, #a78bfa)",
+    statIconColor: "#7c3aed",
+    outlineBtnHoverColor: "#7c3aed",
   };
 };
 
@@ -118,11 +119,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <div style={{ position: 'sticky', top: '16px', zIndex: 50, display: 'flex', justifyContent: 'center', padding: '0 24px' }}>
         <nav style={{
           width: '100%', maxWidth: '1100px',
-          background: theme.navBg,
+          background: 'rgba(255,255,255,0.90)',
           backdropFilter: 'blur(16px)',
           borderRadius: '16px',
           border: `1px solid ${theme.navBorder}`,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.07)',
           padding: '12px 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
@@ -198,12 +199,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '32px' }}>
 
           {/* Public Key */}
-          <div style={{
-            background: 'white', borderRadius: '16px',
-            border: `1px solid ${theme.cardBorder}`,
-            boxShadow: theme.cardShadow, padding: '24px',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-          }}
+          <div style={{ background: 'white', borderRadius: '16px', border: `1px solid ${theme.cardBorder}`, boxShadow: theme.cardShadow, padding: '24px', transition: 'transform 0.2s, box-shadow 0.2s' }}
             onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-3px)'); (e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'); }}
             onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = theme.cardShadow); }}
           >
@@ -220,22 +216,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               }}>
                 {user.publicKey}
               </div>
-              <button
-                onClick={copyPublicKey}
-                style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}
-              >
+              <button onClick={copyPublicKey} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}>
                 {copiedKey ? <Check size={15} color="#22c55e" /> : <Copy size={15} color="#64748b" />}
               </button>
             </div>
           </div>
 
           {/* Security */}
-          <div style={{
-            background: 'white', borderRadius: '16px',
-            border: `1px solid ${theme.cardBorder}`,
-            boxShadow: theme.cardShadow, padding: '24px',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-          }}
+          <div style={{ background: 'white', borderRadius: '16px', border: `1px solid ${theme.cardBorder}`, boxShadow: theme.cardShadow, padding: '24px', transition: 'transform 0.2s, box-shadow 0.2s' }}
             onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-3px)'); (e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'); }}
             onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = theme.cardShadow); }}
           >
@@ -255,11 +243,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px' }}>Biometric authentication not configured.</p>
                 <button
                   onClick={() => setShowBiometricSetup(true)}
-                  style={{
-                    padding: '7px 16px', borderRadius: '8px', border: `1px solid ${theme.cardBorder}`,
-                    background: theme.badgeBg, color: theme.badgeColor,
-                    fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                  }}
+                  style={{ padding: '7px 16px', borderRadius: '8px', border: `1px solid ${theme.cardBorder}`, background: theme.badgeBg, color: theme.badgeColor, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                 >
                   Enable Now
                 </button>
@@ -268,12 +252,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
 
           {/* Documents */}
-          <div style={{
-            background: 'white', borderRadius: '16px',
-            border: `1px solid ${theme.cardBorder}`,
-            boxShadow: theme.cardShadow, padding: '24px',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-          }}
+          <div style={{ background: 'white', borderRadius: '16px', border: `1px solid ${theme.cardBorder}`, boxShadow: theme.cardShadow, padding: '24px', transition: 'transform 0.2s, box-shadow 0.2s' }}
             onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-3px)'); (e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'); }}
             onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = theme.cardShadow); }}
           >
@@ -296,17 +275,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
         {/* ── ACTION PANEL ── */}
         <div style={{
-          background: theme.actionBg,
-          borderRadius: '24px',
+          background: theme.actionBg, borderRadius: '24px',
           border: `1px solid ${theme.actionBorder}`,
           boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-          padding: '48px 32px',
-          textAlign: 'center',
+          padding: '48px 32px', textAlign: 'center',
         }}>
           <div style={{
             width: '72px', height: '72px', borderRadius: '20px',
-            background: theme.iconGradient,
-            boxShadow: theme.iconShadow,
+            background: theme.iconGradient, boxShadow: theme.iconShadow,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 24px',
           }}>
