@@ -121,7 +121,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
                 placeholder="0x..."
                 value={publicKey}
                 onChange={(e) => setPublicKey(e.target.value)}
-                className="mt-1.5 font-mono text-sm bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1.5 font-mono text-sm bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 text-slate-900 placeholder:text-slate-400"
                 disabled={loading}
               />
               <p className="text-xs text-slate-400 mt-2">
