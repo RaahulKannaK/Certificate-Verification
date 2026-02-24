@@ -4,6 +4,121 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ScanFace, Loader2, X, AlertCircle, Check } from "lucide-react";
 import { toast } from "sonner";
 
+
+function getTheme(role?: string) {
+  const isInstitution = role === "institution";
+
+  return isInstitution
+    ? {
+        /* ——— Institution — Jungle Green ——— */
+        cardBg: "#ffffff",
+        cardBorder: "1.5px solid #bbf7d0",
+        cardShadow:
+          "0 8px 32px rgba(5,150,105,0.10), 0 2px 8px rgba(22,163,74,0.07)",
+
+        overlayBg: "rgba(240, 250, 244, 0.97)",
+
+        closeBg: "#f0faf4",
+        closeBorder: "1px solid #bbf7d0",
+        closeColor: "#16a34a",
+        closeHover: "#dcfce7",
+
+        viewportBg: "#f0faf4",
+        viewportBorder: "1.5px solid #bbf7d0",
+
+        ovalBorder: "2.5px solid rgba(22, 163, 74, 0.65)",
+        ovalShadow:
+          "0 0 0 4px rgba(22,163,74,0.10), 0 0 24px rgba(5,150,105,0.18)",
+
+        retryGradient: "linear-gradient(135deg, #16a34a, #059669)",
+
+        loaderColor: "#16a34a",
+        verifyingText: "#14532d",
+        progressTrack: "#dcfce7",
+        progressFill: "linear-gradient(90deg, #16a34a, #059669)",
+        progressPct: "#15803d",
+
+        iconBg: "linear-gradient(135deg, #f0faf4 0%, #dcfce7 100%)",
+        iconBorder: "1.5px solid #86efac",
+        iconShadow: "0 4px 16px rgba(22,163,74,0.13)",
+        iconColor: "#16a34a",
+
+        headingColor: "#052e16",
+        subtitleColor: "#15803d",
+
+        btnGradient: "linear-gradient(135deg, #16a34a 0%, #059669 100%)",
+        btnGradientActive: "#059669",
+        btnShadow: "0 4px 14px rgba(22,163,74,0.35)",
+        btnShadowHover: "0 6px 20px rgba(22,163,74,0.45)",
+
+        badgeColor: "#059669",
+        badgeDot: "#059669",
+
+        /* verified — always green ✓ */
+        verifiedBg: "#f0faf4",
+        verifiedBorder: "1.5px solid #bbf7d0",
+        verifiedShadow: "0 4px 16px rgba(5,150,105,0.13)",
+        verifiedCheck: "#059669",
+        verifiedTitle: "#052e16",
+        verifiedSub: "#059669",
+      }
+    : {
+        /* ——— Student — Purple ——— */
+        cardBg: "#ffffff",
+        cardBorder: "1.5px solid #ede9fe",
+        cardShadow:
+          "0 8px 32px rgba(124,58,237,0.10), 0 2px 8px rgba(99,102,241,0.07)",
+
+        overlayBg: "rgba(245, 243, 255, 0.97)",
+
+        closeBg: "#f5f3ff",
+        closeBorder: "1px solid #ede9fe",
+        closeColor: "#7c3aed",
+        closeHover: "#ede9fe",
+
+        viewportBg: "#f5f3ff",
+        viewportBorder: "1.5px solid #ede9fe",
+
+        ovalBorder: "2.5px solid rgba(124, 58, 237, 0.65)",
+        ovalShadow:
+          "0 0 0 4px rgba(124,58,237,0.10), 0 0 24px rgba(99,102,241,0.18)",
+
+        retryGradient: "linear-gradient(135deg, #7c3aed, #6366f1)",
+
+        loaderColor: "#7c3aed",
+        verifyingText: "#4c1d95",
+        progressTrack: "#ede9fe",
+        progressFill: "linear-gradient(90deg, #7c3aed, #6366f1)",
+        progressPct: "#6d28d9",
+
+        iconBg: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
+        iconBorder: "1.5px solid #ddd6fe",
+        iconShadow: "0 4px 16px rgba(124,58,237,0.13)",
+        iconColor: "#7c3aed",
+
+        headingColor: "#1e1b4b",
+        subtitleColor: "#6d28d9",
+
+        btnGradient: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)",
+        btnGradientActive: "#6366f1",
+        btnShadow: "0 4px 14px rgba(124,58,237,0.35)",
+        btnShadowHover: "0 6px 20px rgba(124,58,237,0.45)",
+
+        badgeColor: "#7c3aed",
+        badgeDot: "#7c3aed",
+
+        /* verified — always green ✓ */
+        verifiedBg: "#f0faf4",
+        verifiedBorder: "1.5px solid #bbf7d0",
+        verifiedShadow: "0 4px 16px rgba(5,150,105,0.13)",
+        verifiedCheck: "#059669",
+        verifiedTitle: "#065f46",
+        verifiedSub: "#059669",
+      };
+}
+
+/* ================================================================ */
+
 interface BiometricVerifyProps {
   credentialId: string;
   onComplete: (faceImage?: string) => void;
@@ -16,6 +131,9 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
   onCancel,
 }) => {
   const { user } = useAuth();
+
+  /* 🎨 Theme derived from user role — UI only, no logic change */
+  const theme = getTheme(user?.role);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -121,7 +239,6 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
       stopCamera();
       setShowCamera(false);
 
-      /* 🔥 Correct request body */
       const res = await fetch(`${import.meta.env.VITE_API_URL}/biometric/verify-face`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -140,7 +257,7 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
       toast.success("Face verified successfully");
 
       setTimeout(() => {
-        onComplete(photo); // pass photo back for signing
+        onComplete(photo);
       }, 800);
     } catch (err: any) {
       console.error("❌ Face verify error:", err);
@@ -152,20 +269,21 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
     }
   };
 
-  /* ---------------- CAMERA UI ---------------- */
+  /* ================================================================
+     CAMERA UI
+     ================================================================ */
   if (showCamera) {
     return (
       <div
         className="fixed inset-0 backdrop-blur-xl z-50 flex items-center justify-center p-4"
-        style={{ backgroundColor: "rgba(245, 243, 255, 0.97)" }}
+        style={{ backgroundColor: theme.overlayBg }}
       >
         <div
           className="rounded-3xl p-8 max-w-lg w-full relative"
           style={{
-            background: "#ffffff",
-            border: "1.5px solid #ede9fe",
-            boxShadow:
-              "0 8px 32px rgba(124, 58, 237, 0.10), 0 2px 8px rgba(99, 102, 241, 0.07)",
+            background: theme.cardBg,
+            border: theme.cardBorder,
+            boxShadow: theme.cardShadow,
           }}
         >
           {/* Close button */}
@@ -173,16 +291,12 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
             onClick={handleCancel}
             className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
             style={{
-              background: "#f5f3ff",
-              border: "1px solid #ede9fe",
-              color: "#7c3aed",
+              background: theme.closeBg,
+              border: theme.closeBorder,
+              color: theme.closeColor,
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = "#ede9fe")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "#f5f3ff")
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.background = theme.closeHover)}
+            onMouseLeave={(e) => (e.currentTarget.style.background = theme.closeBg)}
           >
             <X className="w-4 h-4" />
           </button>
@@ -191,8 +305,8 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
           <div
             className="aspect-video rounded-2xl mb-6 flex items-center justify-center relative overflow-hidden"
             style={{
-              background: "#f5f3ff",
-              border: "1.5px solid #ede9fe",
+              background: theme.viewportBg,
+              border: theme.viewportBorder,
             }}
           >
             {cameraError ? (
@@ -207,7 +321,7 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
                 <button
                   className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
                   style={{
-                    background: "linear-gradient(135deg, #7c3aed, #6366f1)",
+                    background: theme.retryGradient,
                     color: "#ffffff",
                     border: "none",
                   }}
@@ -230,9 +344,8 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
                   <div
                     className="w-48 h-64 rounded-full animate-pulse"
                     style={{
-                      border: "2.5px solid rgba(124, 58, 237, 0.65)",
-                      boxShadow:
-                        "0 0 0 4px rgba(124, 58, 237, 0.10), 0 0 24px rgba(99, 102, 241, 0.18)",
+                      border: theme.ovalBorder,
+                      boxShadow: theme.ovalShadow,
                     }}
                   />
                 </div>
@@ -246,30 +359,27 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
             <div className="text-center">
               <Loader2
                 className="w-8 h-8 animate-spin mx-auto mb-3"
-                style={{ color: "#7c3aed" }}
+                style={{ color: theme.loaderColor }}
               />
-              <p className="font-semibold text-sm" style={{ color: "#4c1d95" }}>
+              <p className="font-semibold text-sm" style={{ color: theme.verifyingText }}>
                 Verifying face…
               </p>
 
               {/* Progress bar */}
               <div
                 className="w-full h-2 rounded-full mt-4 overflow-hidden"
-                style={{ background: "#ede9fe" }}
+                style={{ background: theme.progressTrack }}
               >
                 <div
                   className="h-full rounded-full transition-all duration-300"
                   style={{
                     width: `${scanProgress}%`,
-                    background: "linear-gradient(90deg, #7c3aed, #6366f1)",
+                    background: theme.progressFill,
                   }}
                 />
               </div>
 
-              <p
-                className="text-xs mt-2 font-medium"
-                style={{ color: "#6d28d9" }}
-              >
+              <p className="text-xs mt-2 font-medium" style={{ color: theme.progressPct }}>
                 {scanProgress}%
               </p>
             </div>
@@ -279,61 +389,63 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
     );
   }
 
-  /* ---------------- MAIN UI ---------------- */
+  /* ================================================================
+     MAIN UI
+     ================================================================ */
   return (
     <div
       className="rounded-3xl p-8 max-w-md w-full text-center"
       style={{
-        background: "#ffffff",
-        border: "1.5px solid #ede9fe",
-        boxShadow:
-          "0 8px 32px rgba(124, 58, 237, 0.10), 0 2px 8px rgba(99, 102, 241, 0.07)",
+        background: theme.cardBg,
+        border: theme.cardBorder,
+        boxShadow: theme.cardShadow,
       }}
     >
       {verified ? (
+        /* ——— Verified state ——— */
         <>
-          {/* Success state — green tones */}
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
             style={{
-              background: "#f0faf4",
-              border: "1.5px solid #bbf7d0",
-              boxShadow: "0 4px 16px rgba(5, 150, 105, 0.13)",
+              background: theme.verifiedBg,
+              border: theme.verifiedBorder,
+              boxShadow: theme.verifiedShadow,
             }}
           >
-            <Check className="w-8 h-8" style={{ color: "#059669" }} />
+            <Check className="w-8 h-8" style={{ color: theme.verifiedCheck }} />
           </div>
           <p
             className="font-bold text-lg tracking-tight"
-            style={{ color: "#065f46" }}
+            style={{ color: theme.verifiedTitle }}
           >
             Face Verified
           </p>
-          <p className="text-sm mt-1" style={{ color: "#059669" }}>
+          <p className="text-sm mt-1" style={{ color: theme.verifiedSub }}>
             Identity confirmed successfully
           </p>
         </>
       ) : (
+        /* ——— Default state ——— */
         <>
-          {/* Icon */}
+          {/* Icon container */}
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
             style={{
-              background: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
-              border: "1.5px solid #ddd6fe",
-              boxShadow: "0 4px 16px rgba(124, 58, 237, 0.13)",
+              background: theme.iconBg,
+              border: theme.iconBorder,
+              boxShadow: theme.iconShadow,
             }}
           >
-            <ScanFace className="w-8 h-8" style={{ color: "#7c3aed" }} />
+            <ScanFace className="w-8 h-8" style={{ color: theme.iconColor }} />
           </div>
 
           <h2
             className="text-xl font-bold mb-2 tracking-tight"
-            style={{ color: "#1e1b4b" }}
+            style={{ color: theme.headingColor }}
           >
             Face Verification Required
           </h2>
-          <p className="text-sm mb-6" style={{ color: "#6d28d9" }}>
+          <p className="text-sm mb-6" style={{ color: theme.subtitleColor }}>
             Please verify your identity to continue signing.
           </p>
 
@@ -341,31 +453,23 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
           <button
             className="w-full py-3 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{
-              background: isProcessing
-                ? "#6366f1"
-                : "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)",
+              background: isProcessing ? theme.btnGradientActive : theme.btnGradient,
               color: "#ffffff",
               border: "none",
-              boxShadow: isProcessing
-                ? "none"
-                : "0 4px 14px rgba(124, 58, 237, 0.35)",
+              boxShadow: isProcessing ? "none" : theme.btnShadow,
               letterSpacing: "0.01em",
             }}
             onClick={handleVerify}
             disabled={isProcessing}
             onMouseEnter={(e) => {
               if (!isProcessing) {
-                (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                  "0 6px 20px rgba(124, 58, 237, 0.45)";
-                (e.currentTarget as HTMLButtonElement).style.transform =
-                  "translateY(-1px)";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = theme.btnShadowHover;
+                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
               }
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                "0 4px 14px rgba(124, 58, 237, 0.35)";
-              (e.currentTarget as HTMLButtonElement).style.transform =
-                "translateY(0)";
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = theme.btnShadow;
+              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
             }}
           >
             {isProcessing ? (
@@ -378,14 +482,14 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
             )}
           </button>
 
-          {/* Subtle trust badge */}
+          {/* Trust badge */}
           <div
             className="mt-4 flex items-center justify-center gap-1.5 text-xs"
-            style={{ color: "#059669" }}
+            style={{ color: theme.badgeColor }}
           >
             <div
               className="w-1.5 h-1.5 rounded-full"
-              style={{ background: "#059669" }}
+              style={{ background: theme.badgeDot }}
             />
             Secured & encrypted
           </div>
