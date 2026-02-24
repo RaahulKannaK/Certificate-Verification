@@ -1,40 +1,32 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-
   :root {
+    /* ─────────────────────────────────────────────────────────────
+       ORIGINAL TOKENS — not changed
+    ───────────────────────────────────────────────────────────── */
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;
-
     --card: 222 47% 8%;
     --card-foreground: 210 40% 98%;
-
     --popover: 222 47% 10%;
     --popover-foreground: 210 40% 98%;
-
     --primary: 173 80% 40%;
     --primary-foreground: 222 47% 6%;
-
     --secondary: 222 47% 14%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 222 47% 12%;
     --muted-foreground: 215 20% 55%;
-
     --accent: 262 83% 58%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 222 47% 18%;
     --input: 222 47% 15%;
     --ring: 173 80% 40%;
-
     --radius: 0.75rem;
 
     /* Custom colors for signers */
@@ -65,44 +57,84 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 222 47% 18%;
     --sidebar-ring: 173 80% 40%;
+
+    /* ─────────────────────────────────────────────────────────────
+       NEW — Role-based color tokens (UI only, no logic)
+       ─────────────────────────────────────────────────────────────
+       Student     → purple  #f5f3ff bg │ #7c3aed → #6366f1 buttons
+       Institution → green   #f0faf4 bg │ #16a34a → #059669 buttons
+    ───────────────────────────────────────────────────────────── */
+
+    /* Student — purple surface */
+    --s-bg:            #f5f3ff;
+    --s-bg-soft:       #ede9fe;
+    --s-border-light:  #ddd6fe;
+    --s-border-mid:    #c4b5fd;
+    --s-border-strong: #a78bfa;
+    --s-btn-from:      #7c3aed;
+    --s-btn-to:        #6366f1;
+    --s-glow:          rgba(124, 58, 237, 0.22);
+    --s-blob-a:        rgba(124, 58, 237, 0.14);
+    --s-blob-b:        rgba(99, 102, 241, 0.09);
+
+    /* Institution — jungle green surface */
+    --i-bg:            #f0faf4;
+    --i-bg-soft:       #dcfce7;
+    --i-border-light:  #bbf7d0;
+    --i-border-mid:    #86efac;
+    --i-border-strong: #4ade80;
+    --i-btn-from:      #16a34a;
+    --i-btn-to:        #059669;
+    --i-glow:          rgba(22, 163, 74, 0.20);
+    --i-blob-a:        rgba(22, 163, 74, 0.13);
+    --i-blob-b:        rgba(5, 150, 105, 0.08);
+
+    /* Shared role gradients */
+    --gradient-student: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+    --gradient-inst:    linear-gradient(135deg, #16a34a 0%, #059669 100%);
+
+    /* Role glow shadows */
+    --shadow-glow-student: 0 0 44px rgba(124, 58, 237, 0.22);
+    --shadow-glow-inst:    0 0 44px rgba(22, 163, 74, 0.20);
   }
 }
 
+/* ════════════════════════════════════════════════════════════════
+   ORIGINAL BASE — not changed
+═══════════════════════════════════════════════════════════════ */
 @layer base {
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', sans-serif;
   }
-
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Space Grotesk', sans-serif;
   }
 }
 
+/* ════════════════════════════════════════════════════════════════
+   ORIGINAL UTILITIES — not changed
+═══════════════════════════════════════════════════════════════ */
 @layer utilities {
   .glass {
     background: var(--glass-bg);
     backdrop-filter: blur(16px);
     border: 1px solid var(--glass-border);
   }
-
   .gradient-text {
     background: var(--gradient-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-
   .gradient-border {
     position: relative;
     background: hsl(var(--card));
     border-radius: var(--radius);
   }
-
   .gradient-border::before {
     content: '';
     position: absolute;
@@ -115,46 +147,267 @@
     -webkit-mask-composite: xor;
     mask-composite: exclude;
   }
-
   .glow {
     box-shadow: var(--shadow-glow);
   }
-
   .animate-float {
     animation: float 6s ease-in-out infinite;
   }
-
   .animate-pulse-glow {
     animation: pulse-glow 2s ease-in-out infinite;
   }
-
   @keyframes float {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
   }
-
   @keyframes pulse-glow {
     0%, 100% { opacity: 0.5; }
     50% { opacity: 1; }
   }
-
   .signer-box-1 {
     background: hsl(var(--signer-1) / 0.2);
     border: 2px dashed hsl(var(--signer-1));
   }
-
   .signer-box-2 {
     background: hsl(var(--signer-2) / 0.2);
     border: 2px dashed hsl(var(--signer-2));
   }
-
   .signer-box-3 {
     background: hsl(var(--signer-3) / 0.2);
     border: 2px dashed hsl(var(--signer-3));
   }
-
   .signer-box-4 {
     background: hsl(var(--signer-4) / 0.2);
     border: 2px dashed hsl(var(--signer-4));
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     NEW — Student (purple) utilities
+  ═══════════════════════════════════════════════════════════════ */
+
+  /* Background */
+  .bg-student {
+    background-color: var(--s-bg); /* #f5f3ff */
+  }
+
+  /* Blobs — dual radial purple tones */
+  .blob-student {
+    background:
+      radial-gradient(ellipse 58% 48% at 18% 28%, var(--s-blob-a), transparent 68%),
+      radial-gradient(ellipse 52% 42% at 78% 68%, var(--s-blob-b), transparent 62%);
+    pointer-events: none;
+  }
+
+  /* Card borders — 3 purple shade levels */
+  .card-student {
+    background: #ffffff;
+    border: 1.5px solid var(--s-border-light); /* #ddd6fe */
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.07);
+    border-radius: var(--radius);
+  }
+  .card-student-mid {
+    background: #ffffff;
+    border: 1.5px solid var(--s-border-mid); /* #c4b5fd */
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.11);
+    border-radius: var(--radius);
+  }
+  .card-student-strong {
+    background: #ffffff;
+    border: 1.5px solid var(--s-border-strong); /* #a78bfa */
+    box-shadow: 0 6px 26px rgba(124, 58, 237, 0.16);
+    border-radius: var(--radius);
+  }
+
+  /* Logo + Button — #7c3aed → #6366f1 */
+  .btn-student {
+    background: var(--gradient-student);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.38);
+    border-radius: var(--radius);
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+  }
+  .btn-student:hover:not(:disabled) {
+    box-shadow: 0 6px 24px rgba(124, 58, 237, 0.54);
+    transform: translateY(-1px);
+  }
+  .btn-student:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.28);
+  }
+
+  /* Gradient text — student */
+  .gradient-text-student {
+    background: var(--gradient-student);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Gradient border — student */
+  .gradient-border-student {
+    position: relative;
+    background: #ffffff;
+    border-radius: var(--radius);
+  }
+  .gradient-border-student::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1.5px;
+    border-radius: inherit;
+    background: var(--gradient-student);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  /* Upload zone — purple dashed */
+  .upload-zone-student {
+    background: rgba(124, 58, 237, 0.04);
+    border: 2px dashed rgba(124, 58, 237, 0.42);
+    border-radius: var(--radius);
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .upload-zone-student:hover {
+    background: rgba(124, 58, 237, 0.09);
+    border-color: rgba(124, 58, 237, 0.78);
+  }
+
+  /* Glow — student */
+  .glow-student {
+    box-shadow: var(--shadow-glow-student);
+  }
+
+  /* Pulse glow — student */
+  .animate-pulse-glow-student {
+    animation: pulse-glow-student 2s ease-in-out infinite;
+  }
+  @keyframes pulse-glow-student {
+    0%, 100% { box-shadow: 0 0 18px rgba(124, 58, 237, 0.18); opacity: 0.6; }
+    50%      { box-shadow: 0 0 46px rgba(124, 58, 237, 0.50); opacity: 1;   }
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     NEW — Institution (jungle green) utilities
+  ═══════════════════════════════════════════════════════════════ */
+
+  /* Background */
+  .bg-institution {
+    background-color: var(--i-bg); /* #f0faf4 */
+  }
+
+  /* Blobs — dual radial green tones */
+  .blob-institution {
+    background:
+      radial-gradient(ellipse 58% 48% at 18% 28%, var(--i-blob-a), transparent 68%),
+      radial-gradient(ellipse 52% 42% at 78% 68%, var(--i-blob-b), transparent 62%);
+    pointer-events: none;
+  }
+
+  /* Card borders — 3 green shade levels */
+  .card-institution {
+    background: #ffffff;
+    border: 1.5px solid var(--i-border-light); /* #bbf7d0 */
+    box-shadow: 0 4px 20px rgba(22, 163, 74, 0.07);
+    border-radius: var(--radius);
+  }
+  .card-institution-mid {
+    background: #ffffff;
+    border: 1.5px solid var(--i-border-mid); /* #86efac */
+    box-shadow: 0 4px 20px rgba(22, 163, 74, 0.11);
+    border-radius: var(--radius);
+  }
+  .card-institution-strong {
+    background: #ffffff;
+    border: 1.5px solid var(--i-border-strong); /* #4ade80 */
+    box-shadow: 0 6px 26px rgba(22, 163, 74, 0.16);
+    border-radius: var(--radius);
+  }
+
+  /* Logo + Button — #16a34a → #059669 */
+  .btn-institution {
+    background: var(--gradient-inst);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 14px rgba(22, 163, 74, 0.38);
+    border-radius: var(--radius);
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+  }
+  .btn-institution:hover:not(:disabled) {
+    box-shadow: 0 6px 24px rgba(22, 163, 74, 0.54);
+    transform: translateY(-1px);
+  }
+  .btn-institution:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(22, 163, 74, 0.28);
+  }
+
+  /* Gradient text — institution */
+  .gradient-text-institution {
+    background: var(--gradient-inst);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Gradient border — institution */
+  .gradient-border-institution {
+    position: relative;
+    background: #ffffff;
+    border-radius: var(--radius);
+  }
+  .gradient-border-institution::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1.5px;
+    border-radius: inherit;
+    background: var(--gradient-inst);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  /* Upload zone — green dashed */
+  .upload-zone-institution {
+    background: rgba(22, 163, 74, 0.04);
+    border: 2px dashed rgba(22, 163, 74, 0.42);
+    border-radius: var(--radius);
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .upload-zone-institution:hover {
+    background: rgba(22, 163, 74, 0.09);
+    border-color: rgba(22, 163, 74, 0.78);
+  }
+
+  /* Glow — institution */
+  .glow-institution {
+    box-shadow: var(--shadow-glow-inst);
+  }
+
+  /* Pulse glow — institution */
+  .animate-pulse-glow-institution {
+    animation: pulse-glow-institution 2s ease-in-out infinite;
+  }
+  @keyframes pulse-glow-institution {
+    0%, 100% { box-shadow: 0 0 18px rgba(22, 163, 74, 0.16); opacity: 0.6; }
+    50%      { box-shadow: 0 0 46px rgba(22, 163, 74, 0.46); opacity: 1;   }
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     NEW — Navbar: white floating box (same for both roles)
+  ═══════════════════════════════════════════════════════════════ */
+  .navbar-glass {
+    background: rgba(255, 255, 255, 0.93);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.70);
+    box-shadow:
+      0 2px 12px rgba(0, 0, 0, 0.08),
+      0 1px 3px  rgba(0, 0, 0, 0.04);
+    border-radius: 1rem;
   }
 }
