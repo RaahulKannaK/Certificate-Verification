@@ -155,23 +155,66 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
   /* ---------------- CAMERA UI ---------------- */
   if (showCamera) {
     return (
-      <div className="fixed inset-0 bg-background/95 backdrop-blur-xl z-50 flex items-center justify-center p-4">
-        <div className="glass rounded-3xl p-8 max-w-lg w-full relative">
+      <div
+        className="fixed inset-0 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+        style={{ backgroundColor: "rgba(245, 243, 255, 0.97)" }}
+      >
+        <div
+          className="rounded-3xl p-8 max-w-lg w-full relative"
+          style={{
+            background: "#ffffff",
+            border: "1.5px solid #ede9fe",
+            boxShadow:
+              "0 8px 32px rgba(124, 58, 237, 0.10), 0 2px 8px rgba(99, 102, 241, 0.07)",
+          }}
+        >
+          {/* Close button */}
           <button
             onClick={handleCancel}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center"
+            className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            style={{
+              background: "#f5f3ff",
+              border: "1px solid #ede9fe",
+              color: "#7c3aed",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "#ede9fe")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "#f5f3ff")
+            }
           >
             <X className="w-4 h-4" />
           </button>
 
-          <div className="aspect-video bg-secondary rounded-2xl mb-6 flex items-center justify-center relative overflow-hidden">
+          {/* Camera viewport */}
+          <div
+            className="aspect-video rounded-2xl mb-6 flex items-center justify-center relative overflow-hidden"
+            style={{
+              background: "#f5f3ff",
+              border: "1.5px solid #ede9fe",
+            }}
+          >
             {cameraError ? (
               <div className="text-center p-6">
-                <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-                <p className="text-sm text-destructive">{cameraError}</p>
-                <Button size="sm" className="mt-4" onClick={startCamera}>
+                <AlertCircle
+                  className="w-12 h-12 mx-auto mb-4"
+                  style={{ color: "#dc2626" }}
+                />
+                <p className="text-sm" style={{ color: "#dc2626" }}>
+                  {cameraError}
+                </p>
+                <button
+                  className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                  style={{
+                    background: "linear-gradient(135deg, #7c3aed, #6366f1)",
+                    color: "#ffffff",
+                    border: "none",
+                  }}
+                  onClick={startCamera}
+                >
                   Retry
-                </Button>
+                </button>
               </div>
             ) : (
               <>
@@ -182,8 +225,16 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
                   playsInline
                   className="w-full h-full object-cover scale-x-[-1]"
                 />
+                {/* Face oval overlay */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-64 border-2 border-primary/70 rounded-full animate-pulse" />
+                  <div
+                    className="w-48 h-64 rounded-full animate-pulse"
+                    style={{
+                      border: "2.5px solid rgba(124, 58, 237, 0.65)",
+                      boxShadow:
+                        "0 0 0 4px rgba(124, 58, 237, 0.10), 0 0 24px rgba(99, 102, 241, 0.18)",
+                    }}
+                  />
                 </div>
               </>
             )}
@@ -193,15 +244,34 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
 
           {!cameraError && (
             <div className="text-center">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-              <p className="font-medium">Verifying face...</p>
+              <Loader2
+                className="w-8 h-8 animate-spin mx-auto mb-3"
+                style={{ color: "#7c3aed" }}
+              />
+              <p className="font-semibold text-sm" style={{ color: "#4c1d95" }}>
+                Verifying face…
+              </p>
 
-              <div className="w-full h-2 bg-secondary rounded-full mt-4">
+              {/* Progress bar */}
+              <div
+                className="w-full h-2 rounded-full mt-4 overflow-hidden"
+                style={{ background: "#ede9fe" }}
+              >
                 <div
-                  className="h-full bg-primary"
-                  style={{ width: `${scanProgress}%` }}
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: `${scanProgress}%`,
+                    background: "linear-gradient(90deg, #7c3aed, #6366f1)",
+                  }}
                 />
               </div>
+
+              <p
+                className="text-xs mt-2 font-medium"
+                style={{ color: "#6d28d9" }}
+              >
+                {scanProgress}%
+              </p>
             </div>
           )}
         </div>
@@ -211,23 +281,114 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
 
   /* ---------------- MAIN UI ---------------- */
   return (
-    <div className="glass rounded-3xl p-8 max-w-md w-full text-center">
+    <div
+      className="rounded-3xl p-8 max-w-md w-full text-center"
+      style={{
+        background: "#ffffff",
+        border: "1.5px solid #ede9fe",
+        boxShadow:
+          "0 8px 32px rgba(124, 58, 237, 0.10), 0 2px 8px rgba(99, 102, 241, 0.07)",
+      }}
+    >
       {verified ? (
         <>
-          <Check className="w-12 h-12 text-green-600 mx-auto mb-4" />
-          <p className="font-semibold text-green-600">Face Verified</p>
+          {/* Success state — green tones */}
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{
+              background: "#f0faf4",
+              border: "1.5px solid #bbf7d0",
+              boxShadow: "0 4px 16px rgba(5, 150, 105, 0.13)",
+            }}
+          >
+            <Check className="w-8 h-8" style={{ color: "#059669" }} />
+          </div>
+          <p
+            className="font-bold text-lg tracking-tight"
+            style={{ color: "#065f46" }}
+          >
+            Face Verified
+          </p>
+          <p className="text-sm mt-1" style={{ color: "#059669" }}>
+            Identity confirmed successfully
+          </p>
         </>
       ) : (
         <>
-          <ScanFace className="w-10 h-10 mx-auto mb-4 text-primary" />
-          <h2 className="text-xl font-bold mb-2">Face Verification Required</h2>
-          <p className="text-sm text-muted-foreground mb-6">
+          {/* Icon */}
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
+            style={{
+              background: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
+              border: "1.5px solid #ddd6fe",
+              boxShadow: "0 4px 16px rgba(124, 58, 237, 0.13)",
+            }}
+          >
+            <ScanFace className="w-8 h-8" style={{ color: "#7c3aed" }} />
+          </div>
+
+          <h2
+            className="text-xl font-bold mb-2 tracking-tight"
+            style={{ color: "#1e1b4b" }}
+          >
+            Face Verification Required
+          </h2>
+          <p className="text-sm mb-6" style={{ color: "#6d28d9" }}>
             Please verify your identity to continue signing.
           </p>
 
-          <Button className="w-full" onClick={handleVerify} disabled={isProcessing}>
-            {isProcessing ? "Verifying..." : "Start Face Verification"}
-          </Button>
+          {/* CTA Button */}
+          <button
+            className="w-full py-3 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{
+              background: isProcessing
+                ? "#6366f1"
+                : "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)",
+              color: "#ffffff",
+              border: "none",
+              boxShadow: isProcessing
+                ? "none"
+                : "0 4px 14px rgba(124, 58, 237, 0.35)",
+              letterSpacing: "0.01em",
+            }}
+            onClick={handleVerify}
+            disabled={isProcessing}
+            onMouseEnter={(e) => {
+              if (!isProcessing) {
+                (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                  "0 6px 20px rgba(124, 58, 237, 0.45)";
+                (e.currentTarget as HTMLButtonElement).style.transform =
+                  "translateY(-1px)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                "0 4px 14px rgba(124, 58, 237, 0.35)";
+              (e.currentTarget as HTMLButtonElement).style.transform =
+                "translateY(0)";
+            }}
+          >
+            {isProcessing ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Verifying…
+              </span>
+            ) : (
+              "Start Face Verification"
+            )}
+          </button>
+
+          {/* Subtle trust badge */}
+          <div
+            className="mt-4 flex items-center justify-center gap-1.5 text-xs"
+            style={{ color: "#059669" }}
+          >
+            <div
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: "#059669" }}
+            />
+            Secured & encrypted
+          </div>
         </>
       )}
     </div>
