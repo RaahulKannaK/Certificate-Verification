@@ -149,7 +149,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               <FileSignature size={18} color="white" />
             </div>
             <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: '19px', fontWeight: 700, color: '#1e293b' }}>
-              SignChain
+              WeSign
             </span>
           </div>
 
