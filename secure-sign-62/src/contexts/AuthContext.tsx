@@ -14,6 +14,7 @@ import { User } from "@/types";
 ============================================================ */
 interface AuthContextType {
   user: User | null;
+  isLoading: boolean; // ✅ NEW
   login: (publicKey: string) => Promise<boolean>;
   logout: () => void;
   createAccount: (
@@ -39,6 +40,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // ✅ NEW — true until session restore done
 
   /* ============================================================
      💾 PERSIST USER
@@ -83,18 +85,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   /* ============================================================
      🔄 RESTORE USER ON PAGE REFRESH
   ============================================================ */
+  // ✅ NEW — async restore so isLoading blocks UI until session is ready
   useEffect(() => {
-    const storedUser = localStorage.getItem("auth_user");
+    const restore = async () => {
+      try {
+        const storedUser = localStorage.getItem("auth_user");
 
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      setUser(parsed);
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          setUser(parsed);
 
-      // 🔥 Always verify biometric from DB (trust backend)
-      if (parsed.email) {
-        refreshBiometricStatus(parsed.email);
+          // 🔥 Always verify biometric from DB (trust backend)
+          if (parsed.email) {
+            await refreshBiometricStatus(parsed.email);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to restore user session:", err);
+        // Corrupted storage — clear it safely
+        localStorage.removeItem("auth_user");
+        localStorage.removeItem("is_logged_in");
+      } finally {
+        setIsLoading(false); // ✅ NEW — unblock UI regardless of success/failure
       }
-    }
+    };
+
+    restore();
   }, []);
 
   /* ============================================================
@@ -252,6 +268,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     <AuthContext.Provider
       value={{
         user,
+        isLoading, // ✅ NEW — expose to PrivateRoute / Layout
         login,
         logout,
         createAccount,
