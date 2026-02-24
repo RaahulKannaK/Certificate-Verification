@@ -4,6 +4,7 @@ import { Type, MousePointer, RotateCcw } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 import { BiometricVerify } from "../dashboard/BiometricVerify";
+import { useAuth } from "@/contexts/AuthContext";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -35,11 +36,52 @@ const fontOptions = [
   { name: "Script", font: "italic 36px 'Brush Script MT', cursive" },
 ];
 
+/* ================= THEME ================= */
+const getTheme = (role: string) => {
+  if (role === "institution") {
+    return {
+      gradient: "linear-gradient(135deg, #16a34a, #059669)",
+      btnShadow: "0 4px 12px rgba(22,163,74,0.28)",
+      btnShadowHover: "0 8px 20px rgba(22,163,74,0.40)",
+      accentColor: "#16a34a",
+      cardBorder: "#bbf7d0",
+      cardBg: "#f0fdf4",
+      tabActiveBg: "linear-gradient(135deg, #16a34a, #059669)",
+      tabActiveColor: "white",
+      inputBorder: "#bbf7d0",
+      inputFocusBorder: "#16a34a",
+      fontBtnActiveBg: "linear-gradient(135deg, #16a34a, #059669)",
+      clearBtnHover: "#f0fdf4",
+      verifyBg: "#f0fdf4",
+      verifyBorder: "#86efac",
+    };
+  }
+  // Student — Purple
+  return {
+    gradient: "linear-gradient(135deg, #7c3aed, #6366f1)",
+    btnShadow: "0 4px 12px rgba(124,58,237,0.28)",
+    btnShadowHover: "0 8px 20px rgba(124,58,237,0.40)",
+    accentColor: "#7c3aed",
+    cardBorder: "#ddd6fe",
+    cardBg: "#f5f3ff",
+    tabActiveBg: "linear-gradient(135deg, #7c3aed, #6366f1)",
+    tabActiveColor: "white",
+    inputBorder: "#ddd6fe",
+    inputFocusBorder: "#7c3aed",
+    fontBtnActiveBg: "linear-gradient(135deg, #7c3aed, #6366f1)",
+    clearBtnHover: "#f5f3ff",
+    verifyBg: "#f5f3ff",
+    verifyBorder: "#c4b5fd",
+  };
+};
+
 export const CertificatePreview = ({
   certificate,
   myPublicKey,
   onSignatureChange,
 }: CertificatePreviewProps) => {
+  const { user } = useAuth();
+  const t = getTheme(user?.role || "student");
 
   const [pdfCanvasRef, setPdfCanvasRef] = useState<HTMLCanvasElement | null>(null);
   const [signCanvasRef, setSignCanvasRef] = useState<HTMLCanvasElement | null>(null);
@@ -89,16 +131,13 @@ export const CertificatePreview = ({
   /* ================= SIGNATURE BOX ================= */
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
-
     return certificate.signatureFields.find(
-      (b: SignatureField) =>
-        b.signerPublicKey === myPublicKey && !b.signed
+      (b: SignatureField) => b.signerPublicKey === myPublicKey && !b.signed
     );
   }, [myPublicKey, certificate.signatureFields]);
 
   const signatureBox = useMemo(() => {
     if (!myBox) return null;
-
     return {
       x: myBox.xRatio * pdfSize.width,
       y: myBox.yRatio * pdfSize.height,
@@ -114,7 +153,6 @@ export const CertificatePreview = ({
       const ctx = signCanvasRef.getContext("2d")!;
       ctx.clearRect(0, 0, signCanvasRef.width, signCanvasRef.height);
     }
-
     setTypedName("");
     setSignatureImage(null);
     setIsPostVerified(false);
@@ -137,13 +175,11 @@ export const CertificatePreview = ({
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#0f172a";
-
     ctx.fillText(typedName, canvas.width / 2, canvas.height / 2);
 
     const image = canvas.toDataURL("image/png");
     setSignatureImage(image);
     onSignatureChange({ image, ...signatureBox });
-
   }, [typedName, selectedFont, activeTab, signatureBox]);
 
   /* ================= DRAW SIGNATURE ================= */
@@ -154,10 +190,8 @@ export const CertificatePreview = ({
 
   const startDrawing = (e: React.MouseEvent) => {
     if (!signatureBox) return;
-
     const ctx = signCanvasRef!.getContext("2d")!;
     ctx.clearRect(0, 0, signCanvasRef!.width, signCanvasRef!.height);
-
     setSignatureImage(null);
     setIsPostVerified(false);
     setIsDrawing(true);
@@ -166,10 +200,8 @@ export const CertificatePreview = ({
 
   const draw = (e: React.MouseEvent) => {
     if (!isDrawing) return;
-
     const ctx = signCanvasRef!.getContext("2d")!;
     const pos = getCoords(e);
-
     ctx.beginPath();
     ctx.moveTo(lastPos.x, lastPos.y);
     ctx.lineTo(pos.x, pos.y);
@@ -177,14 +209,12 @@ export const CertificatePreview = ({
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.stroke();
-
     setLastPos(pos);
   };
 
   const stopDrawing = () => {
     if (!isDrawing) return;
     setIsDrawing(false);
-
     const image = signCanvasRef!.toDataURL("image/png");
     setSignatureImage(image);
     onSignatureChange({ image, ...signatureBox });
@@ -192,20 +222,17 @@ export const CertificatePreview = ({
 
   /* ================= RENDER ================= */
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
 
       {/* 🔐 Biometric Popup */}
       {showBiometric && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="w-[420px] max-w-full">
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: "420px", maxWidth: "100%" }}>
             <BiometricVerify
               credentialId={certificate.credentialId}
               onComplete={() => {
-                if (verifyMode === "pre") {
-                  setIsPreVerified(true);
-                } else {
-                  setIsPostVerified(true);
-                }
+                if (verifyMode === "pre") setIsPreVerified(true);
+                else setIsPostVerified(true);
                 setShowBiometric(false);
               }}
               onCancel={() => setShowBiometric(false)}
@@ -214,52 +241,54 @@ export const CertificatePreview = ({
         </div>
       )}
 
-      {/* 🔐 PRE VERIFY */}
+      {/* 🔐 PRE VERIFY BUTTON */}
       {!isPreVerified && (
-        <Button
-          className="w-full"
-          onClick={() => {
-            setVerifyMode("pre");
-            setShowBiometric(true);
+        <button
+          onClick={() => { setVerifyMode("pre"); setShowBiometric(true); }}
+          style={{
+            width: "100%", padding: "13px", borderRadius: "12px",
+            border: "none", background: t.gradient, color: "white",
+            fontSize: "15px", fontWeight: 600, cursor: "pointer",
+            boxShadow: t.btnShadow, transition: "all 0.2s",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
           }}
+          onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
+          onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
         >
           🔐 Verify Identity Before Signing
-        </Button>
+        </button>
       )}
 
-      {/* AFTER PRE VERIFY SHOW EVERYTHING */}
+      {/* AFTER PRE VERIFY */}
       {isPreVerified && (
         <>
           {/* PDF Preview */}
-          <div className="border rounded-xl bg-muted/20 overflow-auto relative">
-            <div
-              className="relative mx-auto bg-white shadow"
-              style={{ width: pdfSize.width, height: pdfSize.height }}
-            >
+          <div style={{ border: `1px solid ${t.cardBorder}`, borderRadius: "16px", background: t.cardBg, overflow: "auto", position: "relative" }}>
+            <div style={{ position: "relative", margin: "0 auto", background: "white", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", width: pdfSize.width, height: pdfSize.height }}>
               <canvas ref={setPdfCanvasRef} />
 
               {certificate.signatureFields?.map((field: SignatureField) => {
-                const isMine =
-                  field.signerPublicKey === myPublicKey && !field.signed;
-
+                const isMine = field.signerPublicKey === myPublicKey && !field.signed;
                 return (
                   <div
                     key={field.id}
-                    className="absolute rounded-lg"
                     style={{
+                      position: "absolute",
                       left: field.xRatio * pdfSize.width,
                       top: field.yRatio * pdfSize.height,
                       width: field.wRatio * pdfSize.width,
                       height: field.hRatio * pdfSize.height,
                       border: `2px dashed hsl(var(--${field.color}))`,
+                      borderRadius: "8px",
                       zIndex: isMine ? 10 : 1,
                     }}
                   >
                     {isMine && !signatureImage && (
-                      <div
-                        className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs font-semibold text-white"
-                        style={{ background: `hsl(var(--${field.color}))` }}
-                      >
+                      <div style={{
+                        position: "absolute", top: "-24px", left: "50%", transform: "translateX(-50%)",
+                        padding: "2px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                        color: "white", background: `hsl(var(--${field.color}))`, whiteSpace: "nowrap",
+                      }}>
                         Your Signature
                       </div>
                     )}
@@ -270,12 +299,10 @@ export const CertificatePreview = ({
               {signatureImage && signatureBox && (
                 <img
                   src={signatureImage}
-                  className="absolute"
                   style={{
-                    left: signatureBox.x,
-                    top: signatureBox.y,
-                    width: signatureBox.width,
-                    height: signatureBox.height,
+                    position: "absolute",
+                    left: signatureBox.x, top: signatureBox.y,
+                    width: signatureBox.width, height: signatureBox.height,
                     zIndex: 11,
                   }}
                 />
@@ -285,59 +312,95 @@ export const CertificatePreview = ({
 
           {/* SIGN TOOLS */}
           {signatureBox && (
-            <div className="bg-card border rounded-xl p-6 space-y-4">
+            <div style={{ background: "white", border: `1px solid ${t.cardBorder}`, borderRadius: "16px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
 
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold">Add Signature</h3>
-                <Button variant="ghost" onClick={clearSignature}>
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Clear
-                </Button>
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>Add Signature</h3>
+                <button
+                  onClick={clearSignature}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                    padding: "7px 14px", borderRadius: "8px",
+                    border: `1px solid ${t.cardBorder}`, background: "white",
+                    color: "#64748b", fontSize: "13px", fontWeight: 500,
+                    cursor: "pointer", transition: "all 0.2s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget.style.background = t.clearBtnHover); (e.currentTarget.style.color = t.accentColor); }}
+                  onMouseLeave={e => { (e.currentTarget.style.background = "white"); (e.currentTarget.style.color = "#64748b"); }}
+                >
+                  <RotateCcw size={14} /> Clear
+                </button>
               </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant={activeTab === "type" ? "default" : "outline"}
-                  onClick={() => setActiveTab("type")}
-                >
-                  <Type className="w-4 h-4 mr-2" /> Type
-                </Button>
-                <Button
-                  variant={activeTab === "draw" ? "default" : "outline"}
-                  onClick={() => setActiveTab("draw")}
-                >
-                  <MousePointer className="w-4 h-4 mr-2" /> Draw
-                </Button>
+              {/* Tab Toggle */}
+              <div style={{ display: "flex", gap: "8px" }}>
+                {(["type", "draw"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: "6px",
+                      padding: "8px 18px", borderRadius: "9px", border: "none",
+                      background: activeTab === tab ? t.gradient : "#f1f5f9",
+                      color: activeTab === tab ? "white" : "#64748b",
+                      fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                      boxShadow: activeTab === tab ? t.btnShadow : "none",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {tab === "type" ? <><Type size={14} /> Type</> : <><MousePointer size={14} /> Draw</>}
+                  </button>
+                ))}
               </div>
 
+              {/* Type Tab */}
               {activeTab === "type" && (
-                <>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   <input
-                    className="w-full p-3 border rounded-lg"
-                    placeholder="Type your institution name"
+                    style={{
+                      width: "100%", padding: "11px 14px", borderRadius: "10px",
+                      border: `1px solid ${t.inputBorder}`, background: "#f8fafc",
+                      fontSize: "14px", color: "#0f172a", outline: "none",
+                      transition: "border 0.2s", boxSizing: "border-box",
+                    }}
+                    placeholder="Type your name / institution name"
                     value={typedName}
                     onChange={(e) => setTypedName(e.target.value)}
+                    onFocus={e => (e.currentTarget.style.borderColor = t.inputFocusBorder)}
+                    onBlur={e => (e.currentTarget.style.borderColor = t.inputBorder)}
                   />
-                  <div className="flex gap-2 flex-wrap">
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                     {fontOptions.map((f, i) => (
-                      <Button
+                      <button
                         key={i}
-                        variant={selectedFont === i ? "default" : "outline"}
                         onClick={() => setSelectedFont(i)}
+                        style={{
+                          padding: "7px 16px", borderRadius: "8px", border: "none",
+                          background: selectedFont === i ? t.gradient : "#f1f5f9",
+                          color: selectedFont === i ? "white" : "#64748b",
+                          fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                          boxShadow: selectedFont === i ? t.btnShadow : "none",
+                          transition: "all 0.2s",
+                        }}
                       >
                         {f.name}
-                      </Button>
+                      </button>
                     ))}
                   </div>
-                </>
+                </div>
               )}
 
+              {/* Draw Tab */}
               {activeTab === "draw" && signatureBox && (
                 <canvas
                   ref={setSignCanvasRef}
                   width={signatureBox.width}
                   height={signatureBox.height}
-                  className="border rounded-lg cursor-crosshair"
+                  style={{
+                    border: `1px solid ${t.cardBorder}`, borderRadius: "10px",
+                    cursor: "crosshair", background: "#fafafa",
+                  }}
                   onMouseDown={startDrawing}
                   onMouseMove={draw}
                   onMouseUp={stopDrawing}
@@ -345,20 +408,30 @@ export const CertificatePreview = ({
                 />
               )}
 
+              {/* Post Verify Button */}
               {signatureImage && !isPostVerified && (
-                <Button
-                  className="w-full mt-4"
-                  onClick={() => {
-                    setVerifyMode("post");
-                    setShowBiometric(true);
+                <button
+                  onClick={() => { setVerifyMode("post"); setShowBiometric(true); }}
+                  style={{
+                    width: "100%", padding: "13px", borderRadius: "12px",
+                    border: "none", background: t.gradient, color: "white",
+                    fontSize: "15px", fontWeight: 600, cursor: "pointer",
+                    boxShadow: t.btnShadow, transition: "all 0.2s", marginTop: "8px",
                   }}
+                  onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
+                  onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
                 >
                   Verify & Confirm Signature
-                </Button>
+                </button>
               )}
 
+              {/* Success */}
               {isPostVerified && (
-                <div className="text-center text-green-600 font-semibold mt-2">
+                <div style={{
+                  textAlign: "center", padding: "12px 20px", borderRadius: "10px",
+                  background: "#f0fdf4", border: "1px solid #86efac",
+                  color: "#16a34a", fontSize: "15px", fontWeight: 600,
+                }}>
                   ✔ Signature Verified Successfully
                 </div>
               )}
