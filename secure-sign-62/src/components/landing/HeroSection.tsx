@@ -65,10 +65,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
               <FileSignature size={18} color="white" />
             </div>
             <span style={{
-              fontFamily: 'Space Grotesk, sans-serif',
-              fontSize: '19px', fontWeight: 700, color: '#1e293b',
+              fontFamily: 'Sansita Swashed',
+              fontSize: '20px', fontWeight: 900, color: '#1e293b',
             }}>
-              SignChain
+              WeSign 
             </span>
           </div>
 
@@ -76,12 +76,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
           <div style={{ display: 'flex', gap: '32px' }} className="hidden md:flex">
             {navLinks.map((link) => (
               <a key={link} href="#" style={{
-                fontSize: '14px', fontWeight: 500,
+                fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900,
                 color: '#64748b', textDecoration: 'none',
                 transition: 'color 0.2s',
               }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#1e293b')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#171718')}
               >
                 {link}
               </a>
@@ -95,7 +95,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
               style={{
                 padding: '8px 20px', borderRadius: '8px',
                 border: '1px solid #e2e8f0', background: 'white',
-                color: '#374151', fontSize: '14px', fontWeight: 500,
+                color: '#191919', fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900,
                 cursor: 'pointer', transition: 'all 0.2s',
               }}
               onMouseEnter={e => { (e.currentTarget.style.background = '#f8fafc'); (e.currentTarget.style.borderColor = '#c7d2fe'); (e.currentTarget.style.color = '#4f46e5'); }}
@@ -108,14 +108,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
               style={{
                 padding: '8px 20px', borderRadius: '8px', border: 'none',
                 background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                color: 'white', fontSize: '14px', fontWeight: 600,
+                color: 'white', fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900,
                 cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={e => { (e.currentTarget.style.opacity = '0.9'); (e.currentTarget.style.transform = 'translateY(-1px)'); }}
               onMouseLeave={e => { (e.currentTarget.style.opacity = '1'); (e.currentTarget.style.transform = 'translateY(0)'); }}
             >
-              Create Account
+              Register
             </button>
           </div>
 
@@ -142,18 +142,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
         }}>
           {navLinks.map((link) => (
             <a key={link} href="#" onClick={() => setMenuOpen(false)}
-              style={{ fontSize: '14px', fontWeight: 500, color: '#374151', textDecoration: 'none' }}>
+              style={{ fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900, color: '#374151', textDecoration: 'none' }}>
               {link}
             </a>
           ))}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
             <button onClick={() => { onLogin(); setMenuOpen(false); }}
-              style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 500, cursor: 'pointer', color: '#374151' }}>
+              style={{ padding: '10px', borderRadius: '18px', border: '1px solid #e2e8f0', background: 'white', fontFamily: 'Cabinet Grotesk', fontWeight: 900, cursor: 'pointer', color: '#374151' }}>
               Login
             </button>
             <button onClick={() => { onCreateAccount(); setMenuOpen(false); }}
-              style={{ padding: '10px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
-              Create Account
+              style={{ padding: '10px', borderRadius: '18px', border: 'none', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', color: 'white', fontFamily: 'Cabinet Grotesk', fontWeight: 900, cursor: 'pointer' }}>
+              Register
             </button>
           </div>
         </div>
@@ -168,15 +168,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
 
           {/* Heading */}
           <h1 style={{
-            fontFamily: 'Space Grotesk, sans-serif',
+            fontFamily: 'Poppins Semi-Bold',
             fontSize: 'clamp(2.6rem, 6vw, 4.8rem)',
-            fontWeight: 800, lineHeight: 1.1,
+            fontWeight: 900, lineHeight: 1.1,
             color: '#0f172a', marginBottom: '24px',
           }}>
             Digital Signatures
             <br />
             <span style={{
-              background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+              background: 'linear-gradient(135deg, #0a0a0a, #0d0d0e)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
@@ -186,7 +186,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
           </h1>
 
           {/* Subtext */}
-          <p style={{ fontSize: '17px', color: '#64748b', lineHeight: 1.75, maxWidth: '540px', margin: '0 auto 44px' }}>
+          <p style={{ fontFamily: 'Familjen Grotesk', fontSize: '18px', color: '#1d1d1e', lineHeight: 1.75, maxWidth: '600px', margin: '0 auto 44px' }}>
             Secure, verifiable, and tamper-proof document signing between students and institutions.
             Your keys, your identity, your signature.
           </p>
@@ -198,27 +198,27 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
               style={{
                 padding: '13px 32px', borderRadius: '10px', border: 'none',
                 background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                color: 'white', fontSize: '15px', fontWeight: 600,
+                color: 'white', fontFamily: 'Cabinet Grotesk', fontSize: '18px', fontWeight: 900,
                 cursor: 'pointer', boxShadow: '0 6px 20px rgba(99,102,241,0.35)',
                 transition: 'transform 0.2s, box-shadow 0.2s',
               }}
               onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-2px)'); (e.currentTarget.style.boxShadow = '0 10px 28px rgba(99,102,241,0.45)'); }}
               onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.35)'); }}
             >
-              Create Your Wallet
+              Get Started
             </button>
             <button
               onClick={onLogin}
               style={{
                 padding: '13px 32px', borderRadius: '10px',
                 border: '1.5px solid #cbd5e1', background: 'white',
-                color: '#374151', fontSize: '15px', fontWeight: 600,
+                color: '#374151', fontFamily: 'Cabinet Grotesk', fontSize: '18px', fontWeight: 900,
                 cursor: 'pointer', transition: 'all 0.2s',
               }}
               onMouseEnter={e => { (e.currentTarget.style.borderColor = '#6366f1'); (e.currentTarget.style.color = '#6366f1'); (e.currentTarget.style.background = '#fafaff'); }}
               onMouseLeave={e => { (e.currentTarget.style.borderColor = '#cbd5e1'); (e.currentTarget.style.color = '#374151'); (e.currentTarget.style.background = 'white'); }}
             >
-              Access Dashboard
+              Go to Dashboard
             </button>
           </div>
         </div>
@@ -250,10 +250,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
               }}>
                 {card.icon}
               </div>
-              <h3 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: '16px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+              <h3 style={{ fontFamily: 'Open Sans', fontSize: '18px', fontWeight: 900, color: '#0f172a', marginBottom: '8px' }}>
                 {card.title}
               </h3>
-              <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.65 }}>
+              <p style={{ fontFamily: 'Cabinet Grotesk', fontSize: '18px', color: '#1f2021', lineHeight: 1.73 }}>
                 {card.desc}
               </p>
             </div>
