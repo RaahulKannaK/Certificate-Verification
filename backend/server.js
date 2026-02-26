@@ -738,10 +738,14 @@ app.post("/institution/issueCredential", async (req, res) => {
     } = req.body;
 
     /* ================= VALIDATION ================= */
+    // Self-sign: only studentPublicKey required
+    // Sequential/Parallel: both studentPublicKey and institutionPublicKey required
+    const isSelfSign = signingType === "self";
+    
     if (
       !studentPublicKey ||
       !Array.isArray(institutionPublicKey) ||
-      institutionPublicKey.length === 0 ||
+      (!isSelfSign && institutionPublicKey.length === 0) || // Only require institution for non-self
       !credentialId ||
       !filePath ||
       !signingType
@@ -767,30 +771,34 @@ app.post("/institution/issueCredential", async (req, res) => {
       });
     }
 
-    /* ================= INSTITUTION CHECK ================= */
-    const placeholders = institutionPublicKey.map(() => "?").join(",");
-    const [institutions] = await db.query(
-      `SELECT walletPublicKey FROM institutions 
-       WHERE walletPublicKey IN (${placeholders})`,
-      institutionPublicKey
-    );
+    /* ================= INSTITUTION CHECK (Skip for self-sign) ================= */
+    if (!isSelfSign) {
+      const placeholders = institutionPublicKey.map(() => "?").join(",");
+      const [institutions] = await db.query(
+        `SELECT walletPublicKey FROM institutions 
+         WHERE walletPublicKey IN (${placeholders})`,
+        institutionPublicKey
+      );
 
-    if (institutions.length !== institutionPublicKey.length) {
-      return res.status(404).json({
-        success: false,
-        message: "One or more institution wallets not registered",
-      });
+      if (institutions.length !== institutionPublicKey.length) {
+        return res.status(404).json({
+          success: false,
+          message: "One or more institution wallets not registered",
+        });
+      }
     }
 
     /* ================= FLOW LOGIC ================= */
     let finalSigners = [];
 
     if (signingType === "self") {
-      // Institution signs itself
+      // Self-sign: Student signs their own document
+      // No institution involved - verify student exists in users table (already done above)
       finalSigners = [
         {
-          publicKey: institutionPublicKey[0],
+          publicKey: studentPublicKey,
           order: 1,
+          isStudent: true, // Flag to identify this is student self-sign
         },
       ];
     }
@@ -843,7 +851,7 @@ app.post("/institution/issueCredential", async (req, res) => {
       [
         credentialId,
         studentPublicKey,
-        JSON.stringify(institutionPublicKey),
+        JSON.stringify(institutionPublicKey), // Will be [] for self-sign
         signingType,
         title || "Credential",
         filePath,
@@ -857,14 +865,15 @@ app.post("/institution/issueCredential", async (req, res) => {
       await db.query(
         `INSERT INTO credential_signers
          (credentialId, studentPublicKey, institutionPublicKeys,
-          signerPublicKey, signerOrder, signed)
-         VALUES (?, ?, ?, ?, ?, 0)`,
+          signerPublicKey, signerOrder, signed, isStudent)
+         VALUES (?, ?, ?, ?, ?, 0, ?)`,
         [
           credentialId,
           studentPublicKey,
           JSON.stringify(institutionPublicKey),
           s.publicKey,
           s.order,
+          s.isStudent || false,
         ]
       );
     }
@@ -889,9 +898,10 @@ app.post("/institution/issueCredential", async (req, res) => {
            y_px,
            width_px,
            height_px,
-           color
+           color,
+           isStudent
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           credentialId,
           field.signerPublicKey,
@@ -904,6 +914,7 @@ app.post("/institution/issueCredential", async (req, res) => {
           0,
           0,
           field.color || "blue",
+          field.isStudent || false,
         ]
       );
     }
@@ -928,7 +939,6 @@ app.post("/institution/issueCredential", async (req, res) => {
     });
   }
 });
-
 
 // ==========================================================
 // 🧾 GET ISSUED CREDENTIALS (for student / publicKey)
