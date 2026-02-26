@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { CertificatePreview } from "@/components/signature/CertificatePreview";
 import { BiometricVerify } from "@/components/dashboard/BiometricVerify";
 import {
-  ArrowLeft, Shield, CheckCircle2, AlertCircle, Key, Clock,
+  ArrowLeft, Shield, CheckCircle2, AlertCircle, Key, Clock, User,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -55,6 +55,9 @@ const getTheme = (role: string) => {
       noticeIcon: "#16a34a",
       outlineBorder: "#bbf7d0",
       outlineHover: "#16a34a",
+      selfSignBg: "#fef3c7",
+      selfSignBorder: "#f59e0b",
+      selfSignIcon: "#f59e0b",
     };
   }
   // Student — Purple
@@ -76,6 +79,9 @@ const getTheme = (role: string) => {
     noticeIcon: "#7c3aed",
     outlineBorder: "#ddd6fe",
     outlineHover: "#7c3aed",
+    selfSignBg: "#fef3c7",
+    selfSignBorder: "#f59e0b",
+    selfSignIcon: "#f59e0b",
   };
 };
 
@@ -165,6 +171,10 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
   }, [user]);
 
   /* ================= SIGNER TURN ================= */
+  const isSelfSign = useMemo(() => {
+    return certificate?.signingType === "self";
+  }, [certificate]);
+
   const currentSignerPublicKey = useMemo(() => {
     if (!certificate || certificate.signingType !== "sequential") return null;
     const index = (certificate.signers?.findIndex(s => !s.signed) ?? 0);
@@ -173,15 +183,22 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
 
   const isMyTurn = useMemo(() => {
     if (!certificate || !user?.walletPublicKey) return false;
+    
+    // Self-sign: Only student public key exists, institutionPublicKeys is empty
     if (certificate.signingType === "self") {
-      // For self-sign, check if user is the student
-      return certificate.studentPublicKey === user.walletPublicKey;
+      const hasInstitution = certificate.institutionPublicKeys.length > 0;
+      const isStudent = certificate.studentPublicKey === user.walletPublicKey;
+      // True self-sign: no institution, only student
+      return !hasInstitution && isStudent;
     }
+    
+    // Parallel: Can sign if in institution list or in signers list
     if (certificate.signingType === "parallel") {
       return certificate.institutionPublicKeys.includes(user.walletPublicKey) ||
              certificate.signers?.some(s => s.signerPublicKey === user.walletPublicKey);
     }
-    // Sequential
+    
+    // Sequential: Must be current signer
     return user.walletPublicKey === currentSignerPublicKey;
   }, [certificate, user, currentSignerPublicKey]);
 
@@ -218,15 +235,11 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
     try {
       setIsSubmitting(true);
       
-      // Determine if this is self-sign or institution sign
+      // Use single endpoint with isSelfSign flag
       const isSelfSign = certificate?.signingType === "self" || 
                          activeBox?.isStudent === true;
       
-      const endpoint = isSelfSign 
-        ? `${import.meta.env.VITE_API_URL}/credential/selfSign`
-        : `${import.meta.env.VITE_API_URL}/credential/sign`;
-      
-      const res = await fetch(endpoint, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/credential/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -234,7 +247,7 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
           signerPublicKey: user?.walletPublicKey,
           faceImage, 
           signature,
-          isSelfSign,
+          isSelfSign, // Server uses this to determine flow
         }),
       });
       
@@ -303,9 +316,13 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
           color: "#0f172a", 
           marginBottom: "8px" 
         }}>
-          Signed Successfully
+          {isSelfSign ? "Self-Signed Successfully" : "Signed Successfully"}
         </h2>
-        <p style={{ fontSize: "15px", color: "#64748b" }}>Returning to dashboard…</p>
+        <p style={{ fontSize: "15px", color: "#64748b" }}>
+          {isSelfSign 
+            ? "Your self-signed credential is secured on blockchain" 
+            : "Returning to dashboard…"}
+        </p>
       </div>
     );
   }
@@ -488,27 +505,27 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
               color: "#0f172a", 
               marginBottom: "4px" 
             }}>
-              {certificate.signingType === "self" ? "Self-Sign Certificate" : "Sign Certificate"}
+              {isSelfSign ? "Self-Sign Certificate" : "Sign Certificate"}
             </h1>
             <p style={{ fontSize: "14px", color: "#64748b" }}>
-              {certificate.signingType === "self" 
-                ? "Sign your own credential" 
+              {isSelfSign 
+                ? "Sign your own credential (no institution required)" 
                 : "Review and digitally sign your credential"}
             </p>
           </div>
         </div>
 
         {/* Self-Sign Notice */}
-        {certificate.signingType === "self" && (
+        {isSelfSign && (
           <div style={{ 
             display: "flex", 
             gap: "12px", 
             padding: "16px 20px", 
             borderRadius: "14px", 
-            border: `1px solid ${t.waitingBorder}`, 
-            background: t.waitingBg 
+            border: `1px solid ${t.selfSignBorder}`, 
+            background: t.selfSignBg 
           }}>
-            <Shield size={20} color={t.waitingIcon} style={{ flexShrink: 0, marginTop: "2px" }} />
+            <User size={20} color={t.selfSignIcon} style={{ flexShrink: 0, marginTop: "2px" }} />
             <div>
               <p style={{ 
                 fontSize: "14px", 
@@ -519,7 +536,35 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
                 Self-Signing Mode
               </p>
               <p style={{ fontSize: "13px", color: "#64748b" }}>
-                You are signing your own document. No institution verification required.
+                You are the only signer. No institution verification required.
+                Institution list: {certificate.institutionPublicKeys.length === 0 ? "Empty" : certificate.institutionPublicKeys.join(", ")}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Institution Sign Notice */}
+        {!isSelfSign && certificate.institutionPublicKeys.length > 0 && (
+          <div style={{ 
+            display: "flex", 
+            gap: "12px", 
+            padding: "16px 20px", 
+            borderRadius: "14px", 
+            border: `1px solid ${t.noticeBorder}`, 
+            background: t.noticeBg 
+          }}>
+            <Shield size={20} color={t.noticeIcon} style={{ flexShrink: 0, marginTop: "2px" }} />
+            <div>
+              <p style={{ 
+                fontSize: "14px", 
+                fontWeight: 600, 
+                color: "#0f172a", 
+                marginBottom: "2px" 
+              }}>
+                {certificate.signingType === "sequential" ? "Sequential Signing" : "Parallel Signing"}
+              </p>
+              <p style={{ fontSize: "13px", color: "#64748b" }}>
+                Institutions: {certificate.institutionPublicKeys.length} signer(s) required
               </p>
             </div>
           </div>
@@ -547,6 +592,33 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
               </p>
               <p style={{ fontSize: "13px", color: "#64748b" }}>
                 This document is signed in sequence. Please wait for your turn.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Not My Turn - Self Sign Validation Failed */}
+        {certificate.signingType === "self" && !isMyTurn && (
+          <div style={{ 
+            display: "flex", 
+            gap: "12px", 
+            padding: "16px 20px", 
+            borderRadius: "14px", 
+            border: `1px solid #fca5a5`, 
+            background: "#fef2f2" 
+          }}>
+            <AlertCircle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: "2px" }} />
+            <div>
+              <p style={{ 
+                fontSize: "14px", 
+                fontWeight: 600, 
+                color: "#0f172a", 
+                marginBottom: "2px" 
+              }}>
+                Not Authorized
+              </p>
+              <p style={{ fontSize: "13px", color: "#64748b" }}>
+                You are not the student who created this self-signed credential.
               </p>
             </div>
           </div>
@@ -637,7 +709,7 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
             }}
           >
             {isSubmitting ? "Signing…" : 
-             certificate.signingType === "self" ? "Self-Sign & Verify" : "Verify & Submit Signature"}
+             isSelfSign ? "Self-Sign & Verify" : "Verify & Submit Signature"}
           </button>
         </div>
 
