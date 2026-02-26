@@ -929,7 +929,7 @@ app.post("/institution/issueCredential", async (req, res) => {
 
 app.post("/getIssuedCredentials", async (req, res) => {
   try {
-    const { walletPublicKey } = req.body;
+    const { walletPublicKey, signingType } = req.body; // Optional: filter by signingType
 
     if (!walletPublicKey) {
       return res.status(400).json({
@@ -938,23 +938,39 @@ app.post("/getIssuedCredentials", async (req, res) => {
       });
     }
 
-    // Get credentials where user is the student
+    // Build query based on signingType filter
+    let typeFilter = '';
+    if (signingType === 'self') {
+      // Self-sign: institutionPublicKeys is empty array
+      typeFilter = `AND (ic.institutionPublicKeys = '[]' OR ic.institutionPublicKeys = '' OR ic.institutionPublicKeys IS NULL)`;
+    } else if (signingType === 'sequential' || signingType === 'parallel') {
+      // Sequential/Parallel: institutionPublicKeys is not empty
+      typeFilter = `AND ic.institutionPublicKeys NOT IN ('[]', '', 'null') AND ic.institutionPublicKeys IS NOT NULL`;
+    }
+
+    // Get credentials where user is the student (with signing type filter)
     const [studentCredentials] = await db.query(
       `SELECT * FROM issued_credentials 
        WHERE studentPublicKey = ?
+       ${typeFilter}
        ORDER BY issuedAt DESC`,
       [walletPublicKey]
     );
 
-    // Get credentials where user is a signer (use BINARY to ignore collation)
-    const [signerRecords] = await db.query(
-      `SELECT DISTINCT ic.* 
-       FROM issued_credentials ic
-       JOIN credential_signers cs ON BINARY ic.credentialId = BINARY cs.credentialId
-       WHERE cs.signerPublicKey = ?
-       ORDER BY ic.issuedAt DESC`,
-      [walletPublicKey]
-    );
+    // Get credentials where user is a signer (only for sequential/parallel)
+    let signerRecords = [];
+    if (signingType !== 'self') {
+      const [signerData] = await db.query(
+        `SELECT DISTINCT ic.* 
+         FROM issued_credentials ic
+         JOIN credential_signers cs ON ic.credentialId = cs.credentialId COLLATE utf8mb4_unicode_ci
+         WHERE cs.signerPublicKey = ?
+         AND ic.signingType IN ('sequential', 'parallel')
+         ORDER BY ic.issuedAt DESC`,
+        [walletPublicKey]
+      );
+      signerRecords = signerData;
+    }
 
     // Merge and remove duplicates
     const allCredentials = [...studentCredentials, ...signerRecords];
