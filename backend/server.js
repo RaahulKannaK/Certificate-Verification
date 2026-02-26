@@ -929,7 +929,7 @@ app.post("/institution/issueCredential", async (req, res) => {
 
 app.post("/getIssuedCredentials", async (req, res) => {
   try {
-    const { walletPublicKey, signingType } = req.body; // Optional: filter by signingType
+    const { walletPublicKey, role } = req.body;
 
     if (!walletPublicKey) {
       return res.status(400).json({
@@ -938,51 +938,78 @@ app.post("/getIssuedCredentials", async (req, res) => {
       });
     }
 
-    // Build query based on signingType filter
-    let typeFilter = '';
-    if (signingType === 'self') {
-      // Self-sign: institutionPublicKeys is empty array
-      typeFilter = `AND (ic.institutionPublicKeys = '[]' OR ic.institutionPublicKeys = '' OR ic.institutionPublicKeys IS NULL)`;
-    } else if (signingType === 'sequential' || signingType === 'parallel') {
-      // Sequential/Parallel: institutionPublicKeys is not empty
-      typeFilter = `AND ic.institutionPublicKeys NOT IN ('[]', '', 'null') AND ic.institutionPublicKeys IS NOT NULL`;
-    }
+    let credentials = [];
 
-    // Get credentials where user is the student (with signing type filter)
-    const [studentCredentials] = await db.query(
-      `SELECT * FROM issued_credentials 
-       WHERE studentPublicKey = ?
-       ${typeFilter}
-       ORDER BY issuedAt DESC`,
-      [walletPublicKey]
-    );
+    if (role === "institution") {
+      // Institution: Get credentials where they need to sign
+      // 1. Credentials where institution is in institutionPublicKeys (sequential/parallel)
+      const [asInstitution] = await db.query(
+        `SELECT * FROM issued_credentials 
+         WHERE JSON_CONTAINS(institutionPublicKeys, JSON_QUOTE(?))
+         AND signingType IN ('sequential', 'parallel')
+         ORDER BY issuedAt DESC`,
+        [walletPublicKey]
+      );
 
-    // Get credentials where user is a signer (only for sequential/parallel)
-    let signerRecords = [];
-    if (signingType !== 'self') {
-      const [signerData] = await db.query(
+      // 2. Credentials where institution is already a signer
+      const [asSigner] = await db.query(
         `SELECT DISTINCT ic.* 
          FROM issued_credentials ic
          JOIN credential_signers cs ON ic.credentialId = cs.credentialId COLLATE utf8mb4_unicode_ci
          WHERE cs.signerPublicKey = ?
-         AND ic.signingType IN ('sequential', 'parallel')
          ORDER BY ic.issuedAt DESC`,
         [walletPublicKey]
       );
-      signerRecords = signerData;
+
+      // Merge and dedupe
+      const all = [...asInstitution, ...asSigner];
+      credentials = all.filter((v, i, a) => 
+        a.findIndex(t => t.credentialId === v.credentialId) === i
+      );
+
+    } else {
+      // Student (default): Get self-signed and institution-issued credentials
+      // 1. Self-signed credentials (student is the only signer)
+      const [selfSigned] = await db.query(
+        `SELECT * FROM issued_credentials 
+         WHERE studentPublicKey = ?
+         AND signingType = 'self'
+         AND (institutionPublicKeys = '[]' OR institutionPublicKeys = '' OR institutionPublicKeys IS NULL)
+         ORDER BY issuedAt DESC`,
+        [walletPublicKey]
+      );
+
+      // 2. Credentials issued to student by institutions
+      const [institutionIssued] = await db.query(
+        `SELECT * FROM issued_credentials 
+         WHERE studentPublicKey = ?
+         AND signingType IN ('sequential', 'parallel')
+         ORDER BY issuedAt DESC`,
+        [walletPublicKey]
+      );
+
+      // 3. Credentials where student is a signer (if any)
+      const [asSigner] = await db.query(
+        `SELECT DISTINCT ic.* 
+         FROM issued_credentials ic
+         JOIN credential_signers cs ON ic.credentialId = cs.credentialId COLLATE utf8mb4_unicode_ci
+         WHERE cs.signerPublicKey = ?
+         ORDER BY ic.issuedAt DESC`,
+        [walletPublicKey]
+      );
+
+      // Merge and dedupe
+      const all = [...selfSigned, ...institutionIssued, ...asSigner];
+      credentials = all.filter((v, i, a) => 
+        a.findIndex(t => t.credentialId === v.credentialId) === i
+      );
     }
 
-    // Merge and remove duplicates
-    const allCredentials = [...studentCredentials, ...signerRecords];
-    const uniqueCredentials = allCredentials.filter((v, i, a) => 
-      a.findIndex(t => t.credentialId === v.credentialId) === i
-    );
-
-    if (!uniqueCredentials.length) {
+    if (!credentials.length) {
       return res.json({ success: true, data: [] });
     }
 
-    const credentialIds = uniqueCredentials.map(c => c.credentialId);
+    const credentialIds = credentials.map(c => c.credentialId);
 
     // Get signature fields
     const [fields] = await db.query(
@@ -995,7 +1022,7 @@ app.post("/getIssuedCredentials", async (req, res) => {
     );
 
     // Parse JSON and format response
-    const data = uniqueCredentials.map(c => ({
+    const data = credentials.map(c => ({
       ...c,
       institutionPublicKeys: c.institutionPublicKeys ? JSON.parse(c.institutionPublicKeys) : [],
       signatureFields: fields.filter(f => f.credentialId === c.credentialId),
@@ -1004,7 +1031,7 @@ app.post("/getIssuedCredentials", async (req, res) => {
     res.json({ success: true, data });
   } catch (err) {
     console.error("❌ getIssuedCredentials error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
   }
 });
 
