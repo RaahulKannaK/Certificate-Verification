@@ -946,11 +946,11 @@ app.post("/getIssuedCredentials", async (req, res) => {
       [walletPublicKey]
     );
 
-    // Get credentials where user is a signer
+    // Get credentials where user is a signer (use BINARY to ignore collation)
     const [signerRecords] = await db.query(
       `SELECT DISTINCT ic.* 
        FROM issued_credentials ic
-       JOIN credential_signers cs ON ic.credentialId = cs.credentialId
+       JOIN credential_signers cs ON BINARY ic.credentialId = BINARY cs.credentialId
        WHERE cs.signerPublicKey = ?
        ORDER BY ic.issuedAt DESC`,
       [walletPublicKey]
