@@ -732,8 +732,8 @@ app.post("/institution/issueCredential", async (req, res) => {
       filePath,
       title,
       purpose,
-      signingType,
-      signers,
+      signingType, // self | sequential | parallel
+      signers = [],
       signatureFields = [],
     } = req.body;
 
@@ -782,6 +782,49 @@ app.post("/institution/issueCredential", async (req, res) => {
       });
     }
 
+    /* ================= FLOW LOGIC ================= */
+    let finalSigners = [];
+
+    if (signingType === "self") {
+      // Institution signs itself
+      finalSigners = [
+        {
+          publicKey: institutionPublicKey[0],
+          order: 1,
+        },
+      ];
+    }
+
+    else if (signingType === "sequential") {
+      if (!signers.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Sequential flow requires ordered signers",
+        });
+      }
+      finalSigners = signers.sort((a, b) => a.order - b.order);
+    }
+
+    else if (signingType === "parallel") {
+      if (!signers.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Parallel flow requires signers",
+        });
+      }
+      finalSigners = signers.map((s, index) => ({
+        publicKey: s.publicKey,
+        order: 0, // order not important
+      }));
+    }
+
+    else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid signingType",
+      });
+    }
+
     /* ================= BLOCKCHAIN ================= */
     const credentialHash = crypto
       .createHash("sha256")
@@ -809,8 +852,8 @@ app.post("/institution/issueCredential", async (req, res) => {
       ]
     );
 
-    /* ================= SIGNERS ================= */
-    for (const s of signers) {
+    /* ================= INSERT SIGNERS ================= */
+    for (const s of finalSigners) {
       await db.query(
         `INSERT INTO credential_signers
          (credentialId, studentPublicKey, institutionPublicKeys,
@@ -852,18 +895,14 @@ app.post("/institution/issueCredential", async (req, res) => {
         [
           credentialId,
           field.signerPublicKey,
-
-          // 🚨 NEVER INSERT NaN
           Number.isFinite(xRatio) ? xRatio : 0,
           Number.isFinite(yRatio) ? yRatio : 0,
           Number.isFinite(widthRatio) ? widthRatio : 0,
           Number.isFinite(heightRatio) ? heightRatio : 0,
-
           0,
           0,
           0,
           0,
-
           field.color || "blue",
         ]
       );
@@ -873,10 +912,13 @@ app.post("/institution/issueCredential", async (req, res) => {
     res.json({
       success: true,
       credentialId,
+      signingType,
+      totalSigners: finalSigners.length,
       txHash: blockchainTx.txHash,
       blockNumber: blockchainTx.blockNumber,
       etherscanLink: `https://sepolia.etherscan.io/tx/${blockchainTx.txHash}`,
     });
+
   } catch (error) {
     console.error("❌ issueCredential SERVER ERROR:", error);
     res.status(500).json({
@@ -886,7 +928,6 @@ app.post("/institution/issueCredential", async (req, res) => {
     });
   }
 });
-
 
 
 // ==========================================================
