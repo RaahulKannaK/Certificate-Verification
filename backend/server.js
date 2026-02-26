@@ -926,6 +926,7 @@ app.post("/institution/issueCredential", async (req, res) => {
 // ==========================================================
 // 🧾 GET ISSUED CREDENTIALS (for student / publicKey)
 // ==========================================================
+
 app.post("/getIssuedCredentials", async (req, res) => {
   try {
     const { walletPublicKey } = req.body;
@@ -937,32 +938,50 @@ app.post("/getIssuedCredentials", async (req, res) => {
       });
     }
 
-    const [credentials] = await db.query(
-      `SELECT id, credentialId, title, filePath, purpose, status,
-              signingType, txHash, institutionPublicKeys
-       FROM issued_credentials
-       WHERE JSON_CONTAINS(institutionPublicKeys, JSON_QUOTE(?))
+    // Get credentials where user is the student
+    const [studentCredentials] = await db.query(
+      `SELECT * FROM issued_credentials 
+       WHERE studentPublicKey = ?
        ORDER BY issuedAt DESC`,
       [walletPublicKey]
     );
 
-    if (!credentials.length) {
+    // Get credentials where user is a signer
+    const [signerRecords] = await db.query(
+      `SELECT DISTINCT ic.* 
+       FROM issued_credentials ic
+       JOIN credential_signers cs ON ic.credentialId = cs.credentialId
+       WHERE cs.signerPublicKey = ?
+       ORDER BY ic.issuedAt DESC`,
+      [walletPublicKey]
+    );
+
+    // Merge and remove duplicates
+    const allCredentials = [...studentCredentials, ...signerRecords];
+    const uniqueCredentials = allCredentials.filter((v, i, a) => 
+      a.findIndex(t => t.credentialId === v.credentialId) === i
+    );
+
+    if (!uniqueCredentials.length) {
       return res.json({ success: true, data: [] });
     }
 
-    const credentialIds = credentials.map(c => c.credentialId);
+    const credentialIds = uniqueCredentials.map(c => c.credentialId);
 
+    // Get signature fields
     const [fields] = await db.query(
       `SELECT credentialId, signerPublicKey,
               xRatio, yRatio, widthRatio, heightRatio,
-              color
+              color, isStudent
        FROM signature_fields
        WHERE credentialId IN (${credentialIds.map(() => "?").join(",")})`,
       credentialIds
     );
 
-    const data = credentials.map(c => ({
+    // Parse JSON and format response
+    const data = uniqueCredentials.map(c => ({
       ...c,
+      institutionPublicKeys: c.institutionPublicKeys ? JSON.parse(c.institutionPublicKeys) : [],
       signatureFields: fields.filter(f => f.credentialId === c.credentialId),
     }));
 
@@ -972,7 +991,6 @@ app.post("/getIssuedCredentials", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 // ==========================================================
 // 🧾 GET SINGLE ISSUED CREDENTIAL
@@ -985,6 +1003,7 @@ app.get("/issuedCredential/:credentialId", async (req, res) => {
     const { credentialId } = req.params;
     console.log("📥 Fetch issued credential:", credentialId);
 
+    // Get credential from issued_credentials (master table)
     const [[credential]] = await db.query(
       `SELECT * FROM issued_credentials WHERE credentialId = ?`,
       [credentialId]
@@ -997,29 +1016,46 @@ app.get("/issuedCredential/:credentialId", async (req, res) => {
       });
     }
 
+    // Get signature fields
     const [signatureFields] = await db.query(
       `SELECT signerPublicKey,
               xRatio, yRatio, widthRatio, heightRatio,
-              color
+              color, isStudent
        FROM signature_fields
        WHERE credentialId = ?`,
       [credentialId]
     );
 
+    // Get signers from credential_signers (clean schema - no duplicate columns)
     const [signers] = await db.query(
-      `SELECT signerPublicKey, signerOrder, signed
+      `SELECT signerPublicKey, signerOrder, signed, isStudent
        FROM credential_signers
        WHERE credentialId = ?
        ORDER BY signerOrder`,
       [credentialId]
     );
 
+    // Parse JSON fields if needed
+    const institutionPublicKeys = credential.institutionPublicKeys 
+      ? JSON.parse(credential.institutionPublicKeys) 
+      : [];
+
     res.json({
       success: true,
       data: {
-        ...credential,
+        credentialId: credential.credentialId,
+        title: credential.title,
+        filePath: credential.filePath,
+        purpose: credential.purpose,
+        status: credential.status,
+        signingType: credential.signingType,
+        studentPublicKey: credential.studentPublicKey,
+        institutionPublicKeys: institutionPublicKeys,
+        txHash: credential.txHash,
+        issuedAt: credential.issuedAt,
         signatureFields,
         signers,
+        // Add any other fields needed by frontend
       },
     });
   } catch (err) {
@@ -1027,7 +1063,6 @@ app.get("/issuedCredential/:credentialId", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 app.get("/credential/status/:credentialId", async (req, res) => {
   const { credentialId } = req.params;

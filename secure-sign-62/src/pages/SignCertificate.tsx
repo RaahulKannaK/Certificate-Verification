@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import { CertificatePreview } from "@/components/signature/CertificatePreview";
 import { BiometricVerify } from "@/components/dashboard/BiometricVerify";
 import {
@@ -16,18 +15,17 @@ type SigningStep = "signature" | "verification" | "complete";
 
 export interface CertificateData {
   credentialId: string;
-  name: string;
-  issuer: string;
-  studentName: string;
-  date: string;
-  type: string;
-  description?: string;
-  documentUrl?: string;
+  title: string;
   filePath?: string;
+  purpose?: string;
+  status: string;
   signingType: "self" | "sequential" | "parallel";
+  studentPublicKey: string;
   institutionPublicKeys: string[];
-  currentSignerOrder?: number;
+  txHash?: string;
+  issuedAt?: string;
   signatureFields?: any[];
+  signers?: any[];
 }
 
 /* ================= PROPS ================= */
@@ -92,23 +90,63 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSetupPrompt, setShowSetupPrompt] = useState(false);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   /* ================= FETCH CERTIFICATE ================= */
   useEffect(() => {
     const fetchCertificate = async () => {
+      if (!credentialId) return;
+      
+      setIsLoading(true);
+      console.log("🔍 Fetching credential:", credentialId);
+      
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/issuedCredential/${credentialId}`);
-        if (!res.ok) throw new Error("Failed to fetch certificate");
+        console.log("🔍 Response status:", res.status);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         const data = await res.json();
-        if (!data.success) { toast.error(data.message || "Certificate not found"); return; }
-        if (!data.data.credentialId) data.data.credentialId = credentialId;
-        setCertificate(data.data);
+        console.log("🔍 Response data:", data);
+        
+        if (!data.success) { 
+          toast.error(data.message || "Certificate not found"); 
+          setCertificate(null);
+          return; 
+        }
+        
+        // Ensure data structure is correct
+        const certData = data.data;
+        if (!certData.credentialId) certData.credentialId = credentialId;
+        
+        // Ensure institutionPublicKeys is always an array
+        if (!Array.isArray(certData.institutionPublicKeys)) {
+          certData.institutionPublicKeys = [];
+        }
+        
+        // Ensure signatureFields is always an array
+        if (!Array.isArray(certData.signatureFields)) {
+          certData.signatureFields = [];
+        }
+        
+        // Ensure signers is always an array
+        if (!Array.isArray(certData.signers)) {
+          certData.signers = [];
+        }
+        
+        setCertificate(certData);
       } catch (err) {
         console.error("❌ Fetch error:", err);
         toast.error("Failed to load certificate");
+        setCertificate(null);
+      } finally {
+        setIsLoading(false);
       }
     };
-    if (credentialId) fetchCertificate();
+    
+    fetchCertificate();
   }, [credentialId]);
 
   /* ================= BIOMETRIC STATUS ================= */
@@ -119,7 +157,9 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
         const res = await fetch(`${import.meta.env.VITE_API_URL}/biometric/status/${user.walletPublicKey}`);
         const data = await res.json();
         setIsSetupComplete(!!data.enrolled);
-      } catch { setIsSetupComplete(false); }
+      } catch { 
+        setIsSetupComplete(false); 
+      }
     };
     checkBiometricStatus();
   }, [user]);
@@ -127,28 +167,49 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
   /* ================= SIGNER TURN ================= */
   const currentSignerPublicKey = useMemo(() => {
     if (!certificate || certificate.signingType !== "sequential") return null;
-    const index = (certificate.currentSignerOrder || 1) - 1;
-    return certificate.institutionPublicKeys?.[index] || null;
+    const index = (certificate.signers?.findIndex(s => !s.signed) ?? 0);
+    return certificate.signers?.[index]?.signerPublicKey || null;
   }, [certificate]);
 
   const isMyTurn = useMemo(() => {
     if (!certificate || !user?.walletPublicKey) return false;
-    if (certificate.signingType === "self") return true;
-    if (certificate.signingType === "parallel") return certificate.institutionPublicKeys.includes(user.walletPublicKey);
+    if (certificate.signingType === "self") {
+      // For self-sign, check if user is the student
+      return certificate.studentPublicKey === user.walletPublicKey;
+    }
+    if (certificate.signingType === "parallel") {
+      return certificate.institutionPublicKeys.includes(user.walletPublicKey) ||
+             certificate.signers?.some(s => s.signerPublicKey === user.walletPublicKey);
+    }
+    // Sequential
     return user.walletPublicKey === currentSignerPublicKey;
   }, [certificate, user, currentSignerPublicKey]);
 
   /* ================= ACTIVE BOX ================= */
   const activeBox = useMemo(() => {
     if (!certificate?.signatureFields || !user?.walletPublicKey) return null;
-    return certificate.signatureFields.find((f) => !f.signed && f.signerPublicKey === user.walletPublicKey);
+    
+    // For self-sign, find the box marked as isStudent
+    if (certificate.signingType === "self") {
+      return certificate.signatureFields.find((f) => 
+        !f.signed && f.isStudent === true
+      );
+    }
+    
+    // For institution sign, find box matching user's key
+    return certificate.signatureFields.find((f) => 
+      !f.signed && f.signerPublicKey === user.walletPublicKey
+    );
   }, [certificate, user]);
 
   /* ================= VERIFY BUTTON ================= */
   const handleVerifyAndSign = () => {
     if (!isMyTurn) return toast.error("Not your signing turn");
     if (!signature) return toast.error("Please provide signature first");
-    if (!isSetupComplete) { setShowSetupPrompt(true); return; }
+    if (!isSetupComplete) { 
+      setShowSetupPrompt(true); 
+      return; 
+    }
     setCurrentStep("verification");
   };
 
@@ -156,29 +217,46 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
   const handleVerificationComplete = async (faceImage: string) => {
     try {
       setIsSubmitting(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/credential/sign`, {
+      
+      // Determine if this is self-sign or institution sign
+      const isSelfSign = certificate?.signingType === "self" || 
+                         activeBox?.isStudent === true;
+      
+      const endpoint = isSelfSign 
+        ? `${import.meta.env.VITE_API_URL}/credential/selfSign`
+        : `${import.meta.env.VITE_API_URL}/credential/sign`;
+      
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           credentialId: certificate?.credentialId,
           signerPublicKey: user?.walletPublicKey,
-          faceImage, signature,
+          faceImage, 
+          signature,
+          isSelfSign,
         }),
       });
+      
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
-      toast.success("Signed successfully");
+      
+      toast.success(isSelfSign ? "Self-signed successfully" : "Signed successfully");
       setCurrentStep("complete");
       setTimeout(onBack, 1800);
-    } catch (err) {
-      toast.error("Signing failed");
+    } catch (err: any) {
+      toast.error(err.message || "Signing failed");
       setCurrentStep("signature");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleVerificationFailed = () => { toast.error("Face not matched"); setCurrentStep("signature"); };
+  const handleVerificationFailed = () => { 
+    toast.error("Face not matched"); 
+    setCurrentStep("signature"); 
+  };
+  
   const handleVerificationCancel = () => setCurrentStep("signature");
 
   /* ================= VERIFICATION SCREEN ================= */
@@ -197,11 +275,34 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
   /* ================= SUCCESS ================= */
   if (currentStep === "complete") {
     return (
-      <div style={{ minHeight: "60vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: t.pageBg }}>
-        <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "#f0fdf4", border: "2px solid #86efac", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "20px" }}>
+      <div style={{ 
+        minHeight: "60vh", 
+        display: "flex", 
+        flexDirection: "column", 
+        alignItems: "center", 
+        justifyContent: "center", 
+        background: t.pageBg 
+      }}>
+        <div style={{ 
+          width: "80px", 
+          height: "80px", 
+          borderRadius: "50%", 
+          background: "#f0fdf4", 
+          border: "2px solid #86efac", 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          marginBottom: "20px" 
+        }}>
           <CheckCircle2 size={44} color="#16a34a" />
         </div>
-        <h2 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "24px", fontWeight: 800, color: "#0f172a", marginBottom: "8px" }}>
+        <h2 style={{ 
+          fontFamily: "Space Grotesk, sans-serif", 
+          fontSize: "24px", 
+          fontWeight: 800, 
+          color: "#0f172a", 
+          marginBottom: "8px" 
+        }}>
           Signed Successfully
         </h2>
         <p style={{ fontSize: "15px", color: "#64748b" }}>Returning to dashboard…</p>
@@ -209,21 +310,97 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
     );
   }
 
-  /* ================= EMPTY ================= */
+  /* ================= LOADING ================= */
+  if (isLoading) {
+    return (
+      <div style={{ 
+        minHeight: "60vh", 
+        display: "flex", 
+        flexDirection: "column", 
+        alignItems: "center", 
+        justifyContent: "center", 
+        background: t.pageBg 
+      }}>
+        <div style={{ 
+          width: "64px", 
+          height: "64px", 
+          borderRadius: "16px", 
+          background: t.cardBg, 
+          border: `1px solid ${t.cardBorder}`, 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          marginBottom: "16px" 
+        }}>
+          <Clock size={30} color={t.accentColor} />
+        </div>
+        <h2 style={{ 
+          fontFamily: "Space Grotesk, sans-serif", 
+          fontSize: "20px", 
+          fontWeight: 700, 
+          color: "#0f172a", 
+          marginBottom: "16px" 
+        }}>
+          Loading Certificate...
+        </h2>
+      </div>
+    );
+  }
+
+  /* ================= EMPTY / NOT FOUND ================= */
   if (!certificate) {
     return (
-      <div style={{ minHeight: "60vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: t.pageBg }}>
-        <div style={{ width: "64px", height: "64px", borderRadius: "16px", background: t.cardBg, border: `1px solid ${t.cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
+      <div style={{ 
+        minHeight: "60vh", 
+        display: "flex", 
+        flexDirection: "column", 
+        alignItems: "center", 
+        justifyContent: "center", 
+        background: t.pageBg 
+      }}>
+        <div style={{ 
+          width: "64px", 
+          height: "64px", 
+          borderRadius: "16px", 
+          background: t.cardBg, 
+          border: `1px solid ${t.cardBorder}`, 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          marginBottom: "16px" 
+        }}>
           <AlertCircle size={30} color={t.accentColor} />
         </div>
-        <h2 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "20px", fontWeight: 700, color: "#0f172a", marginBottom: "16px" }}>
+        <h2 style={{ 
+          fontFamily: "Space Grotesk, sans-serif", 
+          fontSize: "20px", 
+          fontWeight: 700, 
+          color: "#0f172a", 
+          marginBottom: "16px" 
+        }}>
           Certificate Not Found
         </h2>
         <button
           onClick={onBack}
-          style={{ padding: "10px 24px", borderRadius: "10px", border: `1px solid ${t.outlineBorder}`, background: "white", color: "#374151", fontSize: "14px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
-          onMouseEnter={e => { (e.currentTarget.style.borderColor = t.outlineHover); (e.currentTarget.style.color = t.accentColor); }}
-          onMouseLeave={e => { (e.currentTarget.style.borderColor = t.outlineBorder); (e.currentTarget.style.color = "#374151"); }}
+          style={{ 
+            padding: "10px 24px", 
+            borderRadius: "10px", 
+            border: `1px solid ${t.outlineBorder}`, 
+            background: "white", 
+            color: "#374151", 
+            fontSize: "14px", 
+            fontWeight: 600, 
+            cursor: "pointer", 
+            transition: "all 0.2s" 
+          }}
+          onMouseEnter={e => { 
+            (e.currentTarget.style.borderColor = t.outlineHover); 
+            (e.currentTarget.style.color = t.accentColor); 
+          }}
+          onMouseLeave={e => { 
+            (e.currentTarget.style.borderColor = t.outlineBorder); 
+            (e.currentTarget.style.color = "#374151"); 
+          }}
         >
           Go Back
         </button>
@@ -233,39 +410,144 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
 
   /* ================= MAIN UI ================= */
   return (
-    <div style={{ minHeight: "100vh", background: t.pageBg, position: "relative", overflow: "hidden" }}>
+    <div style={{ 
+      minHeight: "100vh", 
+      background: t.pageBg, 
+      position: "relative", 
+      overflow: "hidden" 
+    }}>
 
       {/* Background blobs */}
-      <div style={{ position: "fixed", top: "-100px", right: "-100px", width: "500px", height: "500px", borderRadius: "50%", background: t.blob1, zIndex: 0, pointerEvents: "none" }} />
-      <div style={{ position: "fixed", bottom: "-80px", left: "-80px", width: "420px", height: "420px", borderRadius: "50%", background: t.blob2, zIndex: 0, pointerEvents: "none" }} />
+      <div style={{ 
+        position: "fixed", 
+        top: "-100px", 
+        right: "-100px", 
+        width: "500px", 
+        height: "500px", 
+        borderRadius: "50%", 
+        background: t.blob1, 
+        zIndex: 0, 
+        pointerEvents: "none" 
+      }} />
+      <div style={{ 
+        position: "fixed", 
+        bottom: "-80px", 
+        left: "-80px", 
+        width: "420px", 
+        height: "420px", 
+        borderRadius: "50%", 
+        background: t.blob2, 
+        zIndex: 0, 
+        pointerEvents: "none" 
+      }} />
 
-      <div style={{ position: "relative", zIndex: 1, maxWidth: "900px", margin: "0 auto", padding: "40px 24px 60px", display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div style={{ 
+        position: "relative", 
+        zIndex: 1, 
+        maxWidth: "900px", 
+        margin: "0 auto", 
+        padding: "40px 24px 60px", 
+        display: "flex", 
+        flexDirection: "column", 
+        gap: "24px" 
+      }}>
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <button
             onClick={onBack}
-            style={{ width: "40px", height: "40px", borderRadius: "10px", border: `1px solid ${t.cardBorder}`, background: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", flexShrink: 0 }}
-            onMouseEnter={e => { (e.currentTarget.style.borderColor = t.accentColor); (e.currentTarget.style.background = t.cardBg); }}
-            onMouseLeave={e => { (e.currentTarget.style.borderColor = t.cardBorder); (e.currentTarget.style.background = "white"); }}
+            style={{ 
+              width: "40px", 
+              height: "40px", 
+              borderRadius: "10px", 
+              border: `1px solid ${t.cardBorder}`, 
+              background: "white", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center", 
+              cursor: "pointer", 
+              transition: "all 0.2s", 
+              flexShrink: 0 
+            }}
+            onMouseEnter={e => { 
+              (e.currentTarget.style.borderColor = t.accentColor); 
+              (e.currentTarget.style.background = t.cardBg); 
+            }}
+            onMouseLeave={e => { 
+              (e.currentTarget.style.borderColor = t.cardBorder); 
+              (e.currentTarget.style.background = "white"); 
+            }}
           >
             <ArrowLeft size={18} color="#374151" />
           </button>
           <div>
-            <h1 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "clamp(1.4rem, 3vw, 2rem)", fontWeight: 800, color: "#0f172a", marginBottom: "4px" }}>
-              Sign Certificate
+            <h1 style={{ 
+              fontFamily: "Space Grotesk, sans-serif", 
+              fontSize: "clamp(1.4rem, 3vw, 2rem)", 
+              fontWeight: 800, 
+              color: "#0f172a", 
+              marginBottom: "4px" 
+            }}>
+              {certificate.signingType === "self" ? "Self-Sign Certificate" : "Sign Certificate"}
             </h1>
-            <p style={{ fontSize: "14px", color: "#64748b" }}>Review and digitally sign your credential</p>
+            <p style={{ fontSize: "14px", color: "#64748b" }}>
+              {certificate.signingType === "self" 
+                ? "Sign your own credential" 
+                : "Review and digitally sign your credential"}
+            </p>
           </div>
         </div>
 
-        {/* Waiting Notice */}
+        {/* Self-Sign Notice */}
+        {certificate.signingType === "self" && (
+          <div style={{ 
+            display: "flex", 
+            gap: "12px", 
+            padding: "16px 20px", 
+            borderRadius: "14px", 
+            border: `1px solid ${t.waitingBorder}`, 
+            background: t.waitingBg 
+          }}>
+            <Shield size={20} color={t.waitingIcon} style={{ flexShrink: 0, marginTop: "2px" }} />
+            <div>
+              <p style={{ 
+                fontSize: "14px", 
+                fontWeight: 600, 
+                color: "#0f172a", 
+                marginBottom: "2px" 
+              }}>
+                Self-Signing Mode
+              </p>
+              <p style={{ fontSize: "13px", color: "#64748b" }}>
+                You are signing your own document. No institution verification required.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Waiting Notice (Sequential) */}
         {certificate.signingType === "sequential" && !isMyTurn && (
-          <div style={{ display: "flex", gap: "12px", padding: "16px 20px", borderRadius: "14px", border: `1px solid ${t.waitingBorder}`, background: t.waitingBg }}>
+          <div style={{ 
+            display: "flex", 
+            gap: "12px", 
+            padding: "16px 20px", 
+            borderRadius: "14px", 
+            border: `1px solid ${t.waitingBorder}`, 
+            background: t.waitingBg 
+          }}>
             <Clock size={20} color={t.waitingIcon} style={{ flexShrink: 0, marginTop: "2px" }} />
             <div>
-              <p style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginBottom: "2px" }}>Waiting for previous signer</p>
-              <p style={{ fontSize: "13px", color: "#64748b" }}>This document is signed in sequence</p>
+              <p style={{ 
+                fontSize: "14px", 
+                fontWeight: 600, 
+                color: "#0f172a", 
+                marginBottom: "2px" 
+              }}>
+                Waiting for previous signer
+              </p>
+              <p style={{ fontSize: "13px", color: "#64748b" }}>
+                This document is signed in sequence. Please wait for your turn.
+              </p>
             </div>
           </div>
         )}
@@ -278,11 +560,27 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
         />
 
         {/* Blockchain Notice */}
-        <div style={{ display: "flex", gap: "12px", padding: "16px 20px", borderRadius: "14px", border: `1px solid ${t.noticeBorder}`, background: t.noticeBg }}>
+        <div style={{ 
+          display: "flex", 
+          gap: "12px", 
+          padding: "16px 20px", 
+          borderRadius: "14px", 
+          border: `1px solid ${t.noticeBorder}`, 
+          background: t.noticeBg 
+        }}>
           <Shield size={20} color={t.noticeIcon} style={{ flexShrink: 0, marginTop: "2px" }} />
           <div>
-            <p style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginBottom: "2px" }}>Blockchain Secured</p>
-            <p style={{ fontSize: "13px", color: "#64748b" }}>Signature will be permanently stored on blockchain</p>
+            <p style={{ 
+              fontSize: "14px", 
+              fontWeight: 600, 
+              color: "#0f172a", 
+              marginBottom: "2px" 
+            }}>
+              Blockchain Secured
+            </p>
+            <p style={{ fontSize: "13px", color: "#64748b" }}>
+              Signature will be permanently stored on blockchain
+            </p>
           </div>
         </div>
 
@@ -290,9 +588,26 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
         <div style={{ display: "flex", gap: "12px" }}>
           <button
             onClick={onBack}
-            style={{ flex: 1, padding: "13px", borderRadius: "10px", border: `1px solid ${t.outlineBorder}`, background: "white", color: "#374151", fontSize: "15px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
-            onMouseEnter={e => { (e.currentTarget.style.borderColor = t.outlineHover); (e.currentTarget.style.color = t.accentColor); }}
-            onMouseLeave={e => { (e.currentTarget.style.borderColor = t.outlineBorder); (e.currentTarget.style.color = "#374151"); }}
+            style={{ 
+              flex: 1, 
+              padding: "13px", 
+              borderRadius: "10px", 
+              border: `1px solid ${t.outlineBorder}`, 
+              background: "white", 
+              color: "#374151", 
+              fontSize: "15px", 
+              fontWeight: 600, 
+              cursor: "pointer", 
+              transition: "all 0.2s" 
+            }}
+            onMouseEnter={e => { 
+              (e.currentTarget.style.borderColor = t.outlineHover); 
+              (e.currentTarget.style.color = t.accentColor); 
+            }}
+            onMouseLeave={e => { 
+              (e.currentTarget.style.borderColor = t.outlineBorder); 
+              (e.currentTarget.style.color = "#374151"); 
+            }}
           >
             Cancel
           </button>
@@ -300,18 +615,29 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
             onClick={handleVerifyAndSign}
             disabled={!signature || isSubmitting || !isMyTurn}
             style={{
-              flex: 1, padding: "13px", borderRadius: "10px", border: "none",
+              flex: 1, 
+              padding: "13px", 
+              borderRadius: "10px", 
+              border: "none",
               background: !signature || isSubmitting || !isMyTurn ? "#e2e8f0" : t.gradient,
               color: !signature || isSubmitting || !isMyTurn ? "#94a3b8" : "white",
-              fontSize: "15px", fontWeight: 600,
+              fontSize: "15px", 
+              fontWeight: 600,
               cursor: !signature || isSubmitting || !isMyTurn ? "not-allowed" : "pointer",
               boxShadow: !signature || isSubmitting || !isMyTurn ? "none" : t.btnShadow,
               transition: "all 0.2s",
             }}
-            onMouseEnter={e => { if (signature && !isSubmitting && isMyTurn) (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
-            onMouseLeave={e => { if (signature && !isSubmitting && isMyTurn) (e.currentTarget.style.boxShadow = t.btnShadow); }}
+            onMouseEnter={e => { 
+              if (signature && !isSubmitting && isMyTurn) 
+                (e.currentTarget.style.boxShadow = t.btnShadowHover); 
+            }}
+            onMouseLeave={e => { 
+              if (signature && !isSubmitting && isMyTurn) 
+                (e.currentTarget.style.boxShadow = t.btnShadow); 
+            }}
           >
-            {isSubmitting ? "Signing…" : "Verify & Submit Signature"}
+            {isSubmitting ? "Signing…" : 
+             certificate.signingType === "self" ? "Self-Sign & Verify" : "Verify & Submit Signature"}
           </button>
         </div>
 
@@ -319,13 +645,33 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
         <Dialog open={showSetupPrompt} onOpenChange={setShowSetupPrompt}>
           <DialogContent style={{ borderRadius: "20px", border: `1px solid ${t.cardBorder}` }}>
             <DialogHeader>
-              <DialogTitle style={{ display: "flex", alignItems: "center", gap: "10px", fontFamily: "Space Grotesk, sans-serif", fontSize: "18px", fontWeight: 700 }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: t.cardBg, border: `1px solid ${t.cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <DialogTitle style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "10px", 
+                fontFamily: "Space Grotesk, sans-serif", 
+                fontSize: "18px", 
+                fontWeight: 700 
+              }}>
+                <div style={{ 
+                  width: "36px", 
+                  height: "36px", 
+                  borderRadius: "10px", 
+                  background: t.cardBg, 
+                  border: `1px solid ${t.cardBorder}`, 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center" 
+                }}>
                   <Key size={18} color={t.accentColor} />
                 </div>
                 Biometric Setup Required
               </DialogTitle>
-              <DialogDescription style={{ fontSize: "14px", color: "#64748b", marginTop: "6px" }}>
+              <DialogDescription style={{ 
+                fontSize: "14px", 
+                color: "#64748b", 
+                marginTop: "6px" 
+              }}>
                 Complete biometric setup before signing certificates.
               </DialogDescription>
             </DialogHeader>
@@ -333,7 +679,19 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
             <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
               <button
                 onClick={onBack}
-                style={{ flex: 1, padding: "11px", borderRadius: "10px", border: "none", background: t.gradient, color: "white", fontSize: "14px", fontWeight: 600, cursor: "pointer", boxShadow: t.btnShadow, transition: "all 0.2s" }}
+                style={{ 
+                  flex: 1, 
+                  padding: "11px", 
+                  borderRadius: "10px", 
+                  border: "none", 
+                  background: t.gradient, 
+                  color: "white", 
+                  fontSize: "14px", 
+                  fontWeight: 600, 
+                  cursor: "pointer", 
+                  boxShadow: t.btnShadow, 
+                  transition: "all 0.2s" 
+                }}
                 onMouseEnter={e => (e.currentTarget.style.boxShadow = t.btnShadowHover)}
                 onMouseLeave={e => (e.currentTarget.style.boxShadow = t.btnShadow)}
               >
@@ -341,9 +699,26 @@ const SignCertificate: React.FC<SignCertificateProps> = ({ credentialId, onBack 
               </button>
               <button
                 onClick={() => setShowSetupPrompt(false)}
-                style={{ flex: 1, padding: "11px", borderRadius: "10px", border: `1px solid ${t.outlineBorder}`, background: "white", color: "#374151", fontSize: "14px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
-                onMouseEnter={e => { (e.currentTarget.style.borderColor = t.outlineHover); (e.currentTarget.style.color = t.accentColor); }}
-                onMouseLeave={e => { (e.currentTarget.style.borderColor = t.outlineBorder); (e.currentTarget.style.color = "#374151"); }}
+                style={{ 
+                  flex: 1, 
+                  padding: "11px", 
+                  borderRadius: "10px", 
+                  border: `1px solid ${t.outlineBorder}`, 
+                  background: "white", 
+                  color: "#374151", 
+                  fontSize: "14px", 
+                  fontWeight: 600, 
+                  cursor: "pointer", 
+                  transition: "all 0.2s" 
+                }}
+                onMouseEnter={e => { 
+                  (e.currentTarget.style.borderColor = t.outlineHover); 
+                  (e.currentTarget.style.color = t.accentColor); 
+                }}
+                onMouseLeave={e => { 
+                  (e.currentTarget.style.borderColor = t.outlineBorder); 
+                  (e.currentTarget.style.color = "#374151"); 
+                }}
               >
                 Cancel
               </button>
