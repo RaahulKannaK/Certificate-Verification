@@ -35,7 +35,7 @@ interface SignatureBox {
   heightRatio: number;
   page?: number;
   signed?: boolean;
-  isStudent?: boolean; // Flag to identify if this is student's self-signature
+  isStudent?: boolean;
 }
 
 /* ================= HELPERS ================= */
@@ -66,11 +66,10 @@ const getTheme = (role: string) => {
       signedColor: "#16a34a",
       pendingColor: "#64748b",
       docBorder: "#bbf7d0",
-      selfSignBg: "#fef3c7", // Amber for self-sign
+      selfSignBg: "#fef3c7",
       selfSignBorder: "#f59e0b",
     };
   }
-  // Student — Purple
   return {
     pageBg: "#f5f3ff",
     blob1: "radial-gradient(circle, #ddd6fe 0%, transparent 70%)",
@@ -93,7 +92,7 @@ const getTheme = (role: string) => {
     signedColor: "#16a34a",
     pendingColor: "#64748b",
     docBorder: "#ddd6fe",
-    selfSignBg: "#fef3c7", // Amber for self-sign
+    selfSignBg: "#fef3c7",
     selfSignBorder: "#f59e0b",
   };
 };
@@ -146,13 +145,11 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     let boxes: SignatureBox[] = [];
 
     if (signingType === "self") {
-      // Self-signing: Student signs their own document
-      // No institution involved, check user exists in users table
       if (user?.walletPublicKey) {
         boxes = [{
           id: crypto.randomUUID(),
           signerPublicKey: user.walletPublicKey,
-          color: "yellow", // Distinct color for self-sign
+          color: "yellow",
           xRatio: 0.35,
           yRatio: 0.55,
           widthRatio: clamp(220 / DOC_WIDTH),
@@ -163,7 +160,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         }];
       }
     } else {
-      // Sequential or Parallel: Institutions sign (not student)
       boxes = signers.map((signer, index) => ({
         id: crypto.randomUUID(),
         signerPublicKey: signer.publicKey,
@@ -231,13 +227,13 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         { headers: { "Content-Type": "multipart/form-data" } }
       );
 
-      // Prepare payload based on signing type
-      let payload: any = {
+      // Build payload - ensure signingType is correctly passed
+      const payload: any = {
         credentialId: `CRD-${Date.now()}`,
         filePath: uploadRes.data.filePath,
         title: file.name,
         purpose: "Digital document signing",
-        signingType,
+        signingType: signingType, // Explicitly use the prop value
         signatureFields: signatureBoxes.map((b) => ({
           signerPublicKey: b.signerPublicKey,
           xRatio: Number(b.xRatio), 
@@ -251,12 +247,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       };
 
       if (signingType === "self") {
-        // Self-sign: Only student public key, no institution
         payload.studentPublicKey = user.walletPublicKey;
-        payload.institutionPublicKey = []; // Empty array for self-sign
-        payload.signers = []; // No external signers for self
+        payload.institutionPublicKey = [];
+        payload.signers = [];
       } else {
-        // Sequential/Parallel: Student is recipient, institutions are signers
         payload.studentPublicKey = user.walletPublicKey;
         payload.institutionPublicKey = signers.map(s => s.publicKey);
         payload.signers = signers.map((s, idx) => ({
@@ -264,6 +258,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           order: signingType === "sequential" ? idx + 1 : 0,
         }));
       }
+
+      console.log("🔍 Sending payload:", payload); // Debug log
 
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL}/institution/issueCredential`, 
@@ -290,7 +286,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     try {
       setProcessing(true);
       
-      // Determine if this is a self-sign or institution sign
       const endpoint = box.isStudent 
         ? `${import.meta.env.VITE_API_URL}/credential/selfSign`
         : `${import.meta.env.VITE_API_URL}/credential/sign`;
@@ -469,7 +464,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {signingType === "self" ? (
-                  // Self-signing view
                   signatureBoxes.map((box) => (
                     <div
                       key={box.id}
@@ -495,7 +489,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     </div>
                   ))
                 ) : (
-                  // Institution signers view
                   signers.map((signer) => {
                     const box = signatureBoxes.find((b) => b.signerPublicKey === signer.publicKey);
                     const isSigned = box?.signed;

@@ -738,14 +738,12 @@ app.post("/institution/issueCredential", async (req, res) => {
     } = req.body;
 
     /* ================= VALIDATION ================= */
-    // Self-sign: only studentPublicKey required
-    // Sequential/Parallel: both studentPublicKey and institutionPublicKey required
     const isSelfSign = signingType === "self";
     
     if (
       !studentPublicKey ||
       !Array.isArray(institutionPublicKey) ||
-      (!isSelfSign && institutionPublicKey.length === 0) || // Only require institution for non-self
+      (!isSelfSign && institutionPublicKey.length === 0) ||
       !credentialId ||
       !filePath ||
       !signingType
@@ -756,7 +754,7 @@ app.post("/institution/issueCredential", async (req, res) => {
       });
     }
 
-    /* ================= STUDENT CHECK ================= */
+    /* ================= STUDENT CHECK (Always required) ================= */
     const [[student]] = await db.query(
       `SELECT id, COALESCE(walletAddress, walletPublicKey) AS wallet
        FROM users
@@ -767,7 +765,7 @@ app.post("/institution/issueCredential", async (req, res) => {
     if (!student) {
       return res.status(404).json({
         success: false,
-        message: "Student wallet not found",
+        message: "Student wallet not found in users table",
       });
     }
 
@@ -793,12 +791,12 @@ app.post("/institution/issueCredential", async (req, res) => {
 
     if (signingType === "self") {
       // Self-sign: Student signs their own document
-      // No institution involved - verify student exists in users table (already done above)
+      // Verify student exists in users table (already done above)
       finalSigners = [
         {
           publicKey: studentPublicKey,
           order: 1,
-          isStudent: true, // Flag to identify this is student self-sign
+          isStudent: true,
         },
       ];
     }
@@ -822,7 +820,7 @@ app.post("/institution/issueCredential", async (req, res) => {
       }
       finalSigners = signers.map((s, index) => ({
         publicKey: s.publicKey,
-        order: 0, // order not important
+        order: 0,
       }));
     }
 
@@ -851,7 +849,7 @@ app.post("/institution/issueCredential", async (req, res) => {
       [
         credentialId,
         studentPublicKey,
-        JSON.stringify(institutionPublicKey), // Will be [] for self-sign
+        JSON.stringify(institutionPublicKey),
         signingType,
         title || "Credential",
         filePath,
@@ -887,20 +885,8 @@ app.post("/institution/issueCredential", async (req, res) => {
 
       await db.query(
         `INSERT INTO signature_fields
-         (
-           credentialId,
-           signerPublicKey,
-           xRatio,
-           yRatio,
-           widthRatio,
-           heightRatio,
-           x_px,
-           y_px,
-           width_px,
-           height_px,
-           color,
-           isStudent
-         )
+         (credentialId, signerPublicKey, xRatio, yRatio, widthRatio, heightRatio,
+          x_px, y_px, width_px, height_px, color, isStudent)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           credentialId,
@@ -909,10 +895,7 @@ app.post("/institution/issueCredential", async (req, res) => {
           Number.isFinite(yRatio) ? yRatio : 0,
           Number.isFinite(widthRatio) ? widthRatio : 0,
           Number.isFinite(heightRatio) ? heightRatio : 0,
-          0,
-          0,
-          0,
-          0,
+          0, 0, 0, 0,
           field.color || "blue",
           field.isStudent || false,
         ]
