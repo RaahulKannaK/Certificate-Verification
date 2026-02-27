@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Type, MousePointer, RotateCcw } from "lucide-react";
+import { Type, MousePointer, RotateCcw, Shield, Users, Lock } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 import { BiometricVerify } from "../dashboard/BiometricVerify";
@@ -15,7 +15,7 @@ interface SignatureField {
   yRatio: number;
   wRatio: number;
   hRatio: number;
-  color: string; // e.g., "142.1 76.2% 36.3%" or "#16a34a"
+  color: string;
   signed?: boolean;
   isStudent?: boolean;
 }
@@ -54,6 +54,7 @@ const getTheme = (role: string) => {
       clearBtnHover: "#f0fdf4",
       verifyBg: "#f0fdf4",
       verifyBorder: "#86efac",
+      headerIcon: "#16a34a",
     };
   }
   // Student — Purple
@@ -72,19 +73,16 @@ const getTheme = (role: string) => {
     clearBtnHover: "#f5f3ff",
     verifyBg: "#f5f3ff",
     verifyBorder: "#c4b5fd",
+    headerIcon: "#7c3aed",
   };
 };
 
-// Helper to format color - handles both HSL strings and hex
+// Helper to format color
 const formatColor = (color: string): string => {
   if (!color) return "#16a34a";
-  // If it's already a hex, return it
   if (color.startsWith("#")) return color;
-  // If it's HSL format like "142.1 76.2% 36.3%", wrap in hsl()
   if (color.includes("%")) return `hsl(${color})`;
-  // If it starts with hsl( already, return as-is
   if (color.startsWith("hsl")) return color;
-  // Default fallback
   return color;
 };
 
@@ -116,6 +114,36 @@ export const CertificatePreview = ({
 
   const documentUrl = certificate.filePath;
 
+  // Determine if this is self-sign mode (student signing their own credential)
+  const isSelfSign = useMemo(() => {
+    if (!certificate || !myPublicKey) return false;
+    const isStudentCredential = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+    const hasNoInstitution = !certificate.institutionPublicKey || certificate.institutionPublicKey === "0x0000000000000000000000000000000000000000";
+    return isStudentCredential && hasNoInstitution;
+  }, [certificate, myPublicKey]);
+
+  // Get all signers for display (institutions + student if self-sign)
+  const signers = useMemo(() => {
+    if (!certificate?.signatureFields) return [];
+    
+    return certificate.signatureFields.map((field: SignatureField) => {
+      const isStudentBox = field.isStudent === true || field.isStudent === 1;
+      const isMine = !field.signed && (
+        field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase() ||
+        (isStudentBox && certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase())
+      );
+      
+      return {
+        ...field,
+        isMine,
+        name: isStudentBox ? "Student (You)" : `Institution ${field.id}`,
+        status: field.signed ? "Signed" : isMine ? "Waiting for you" : "Pending",
+      };
+    });
+  }, [certificate, myPublicKey]);
+
+  const mySignerCount = signers.filter(s => s.isMine && !s.signed).length;
+
   /* ================= LOAD PDF ================= */
   useEffect(() => {
     if (!documentUrl || !pdfCanvasRef) return;
@@ -141,7 +169,7 @@ export const CertificatePreview = ({
     renderPdf().catch(console.error);
   }, [documentUrl, pdfCanvasRef]);
 
-  /* ================= SIGNATURE BOX - FIXED ================= */
+  /* ================= SIGNATURE BOX ================= */
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
     
@@ -151,10 +179,9 @@ export const CertificatePreview = ({
       const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
       const notSigned = !b.signed;
       
-      // Match if: key matches directly OR it's student's self-sign box
       return notSigned && (matchesByKey || (isStudentBox && isCredentialStudent));
     });
-  }, [myPublicKey, certificate.signatureFields, certificate.studentPublicKey]);
+  }, [myPublicKey, certificate]);
 
   const signatureBox = useMemo(() => {
     if (!myBox) return null;
@@ -263,6 +290,158 @@ export const CertificatePreview = ({
         </div>
       )}
 
+      {/* UNIFIED HEADER - Same for both institution and self-sign */}
+      <div style={{ 
+        background: "white", 
+        border: `1px solid ${t.cardBorder}`, 
+        borderRadius: "16px", 
+        padding: "24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "12px",
+            background: t.cardBg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: t.headerIcon,
+          }}>
+            <Shield size={24} />
+          </div>
+          <div>
+            <h2 style={{ 
+              fontFamily: "Space Grotesk, sans-serif", 
+              fontSize: "20px", 
+              fontWeight: 700, 
+              color: "#0f172a",
+              margin: 0 
+            }}>
+              Sign Certificate
+            </h2>
+            <p style={{ 
+              fontSize: "14px", 
+              color: "#64748b", 
+              margin: "4px 0 0 0" 
+            }}>
+              Review and digitally sign your credential
+            </p>
+          </div>
+        </div>
+
+        {/* Sequential Signing Info - Shows for both modes */}
+        <div style={{
+          background: t.cardBg,
+          border: `1px solid ${t.cardBorder}`,
+          borderRadius: "12px",
+          padding: "16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", color: t.accentColor, fontWeight: 600, fontSize: "14px" }}>
+            <Users size={16} />
+            Sequential Signing
+          </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ fontSize: "13px", color: "#64748b" }}>
+              Institutions: <span style={{ color: "#0f172a", fontWeight: 600 }}>{signers.length} signer(s) required</span>
+            </div>
+            
+            {/* Signer List */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              {signers.map((signer, idx) => (
+                <div key={signer.id} style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 12px",
+                  background: signer.isMine ? "white" : "transparent",
+                  border: signer.isMine ? `1px solid ${t.cardBorder}` : "none",
+                  borderRadius: "8px",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                    <div style={{
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "50%",
+                      background: signer.signed ? "#16a34a" : signer.isMine ? t.accentColor : "#cbd5e1",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "white",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                    }}>
+                      {signer.signed ? "✓" : idx + 1}
+                    </div>
+                    <span style={{ 
+                      color: signer.isMine ? "#0f172a" : "#64748b",
+                      fontWeight: signer.isMine ? 600 : 400,
+                    }}>
+                      {signer.name}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: "12px",
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    background: signer.signed ? "#dcfce7" : signer.isMine ? t.cardBg : "#f1f5f9",
+                    color: signer.signed ? "#16a34a" : signer.isMine ? t.accentColor : "#64748b",
+                    fontWeight: 600,
+                  }}>
+                    {signer.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Status Message */}
+            <div style={{ 
+              marginTop: "8px",
+              padding: "10px 12px",
+              background: mySignerCount > 0 ? "#fef3c7" : "#f0fdf4",
+              border: `1px solid ${mySignerCount > 0 ? "#fcd34d" : "#86efac"}`,
+              borderRadius: "8px",
+              fontSize: "13px",
+              color: mySignerCount > 0 ? "#92400e" : "#16a34a",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}>
+              {mySignerCount > 0 ? (
+                <>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b", animation: "pulse 2s infinite" }} />
+                  Waiting for previous signer: You are signer #{signers.findIndex(s => s.isMine && !s.signed) + 1}
+                </>
+              ) : (
+                <>All signatures completed</>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Blockchain Security Badge */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "12px 16px",
+          background: "#f8fafc",
+          borderRadius: "8px",
+          fontSize: "13px",
+          color: "#64748b",
+        }}>
+          <Lock size={14} color={t.accentColor} />
+          <span>Blockchain Secured — Signature will be permanently stored on blockchain</span>
+        </div>
+      </div>
+
       {/* 🔐 PRE VERIFY BUTTON */}
       {!isPreVerified && (
         <button
@@ -277,7 +456,7 @@ export const CertificatePreview = ({
           onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
           onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
         >
-          🔐 Verify Identity Before Signing
+          <Lock size={18} /> 🔐 Verify Identity Before Signing
         </button>
       )}
 
@@ -290,13 +469,11 @@ export const CertificatePreview = ({
               <canvas ref={setPdfCanvasRef} />
 
               {certificate.signatureFields?.map((field: SignatureField) => {
-                // FIXED: Check if this field belongs to current user
                 const matchesByKey = field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
                 const isStudentBox = field.isStudent === true || field.isStudent === 1;
                 const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
                 const isMine = !field.signed && (matchesByKey || (isStudentBox && isCredentialStudent));
                 
-                // Format color properly for this field
                 const fieldColor = formatColor(field.color);
                 
                 return (
@@ -313,12 +490,21 @@ export const CertificatePreview = ({
                       zIndex: isMine ? 10 : 1,
                     }}
                   >
-                    {/* FIXED: Show "Your Signature" label for ALL unsigned boxes belonging to user */}
+                    {/* Your Signature Label - Now shows for both institution and self-sign */}
                     {isMine && !signatureImage && (
                       <div style={{
-                        position: "absolute", top: "-24px", left: "50%", transform: "translateX(-50%)",
-                        padding: "2px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
-                        color: "white", background: fieldColor, whiteSpace: "nowrap",
+                        position: "absolute", 
+                        top: "-28px", 
+                        left: "50%", 
+                        transform: "translateX(-50%)",
+                        padding: "4px 12px", 
+                        borderRadius: "6px", 
+                        fontSize: "12px", 
+                        fontWeight: 700,
+                        color: "white", 
+                        background: fieldColor, 
+                        whiteSpace: "nowrap",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                       }}>
                         Your Signature
                       </div>
@@ -439,7 +625,7 @@ export const CertificatePreview = ({
                 />
               )}
 
-              {/* Post Verify Button - UNIFIED: Same for both institution and self-sign */}
+              {/* Post Verify Button - UNIFIED: "Verify & Confirm Signature" for both modes */}
               {signatureImage && !isPostVerified && (
                 <button
                   onClick={() => { setVerifyMode("post"); setShowBiometric(true); }}
