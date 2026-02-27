@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ScanFace, Loader2, X, AlertCircle, Check } from "lucide-react";
 import { toast } from "sonner";
 
-
 function getTheme(role?: string) {
   const isInstitution = role === "institution";
 
@@ -121,13 +120,19 @@ function getTheme(role?: string) {
 
 interface BiometricVerifyProps {
   credentialId: string;
+  signerPublicKey?: string; // Optional - will use user.walletPublicKey if not provided
+  isSelfSign?: boolean; // NEW: Flag to indicate self-signing mode
   onComplete: (faceImage?: string) => void;
+  onFailed?: () => void; // NEW: Callback for failed verification
   onCancel?: () => void;
 }
 
 export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
   credentialId,
+  signerPublicKey: propSignerPublicKey,
+  isSelfSign = false, // Default to false
   onComplete,
+  onFailed,
   onCancel,
 }) => {
   const { user } = useAuth();
@@ -144,6 +149,9 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Use provided signerPublicKey or fallback to user's walletPublicKey
+  const signerPublicKey = propSignerPublicKey || user?.walletPublicKey;
 
   /* ---------------- Cleanup ---------------- */
   useEffect(() => {
@@ -213,7 +221,7 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
       return;
     }
 
-    if (!user?.walletPublicKey) {
+    if (!signerPublicKey) {
       toast.error("Missing wallet public key");
       return;
     }
@@ -239,13 +247,15 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
       stopCamera();
       setShowCamera(false);
 
+      // NEW: Call verify-face with isSelfSign flag
       const res = await fetch(`${import.meta.env.VITE_API_URL}/biometric/verify-face`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           credentialId: credentialId,
-          signerPublicKey: user.walletPublicKey,
+          signerPublicKey: signerPublicKey,
           faceImage: photo,
+          isSelfSign: isSelfSign, // NEW: Pass self-sign flag
         }),
       });
 
@@ -254,7 +264,7 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
       if (!data.success) throw new Error(data.message || "Face verification failed");
 
       setVerified(true);
-      toast.success("Face verified successfully");
+      toast.success(isSelfSign ? "Self-verification successful" : "Face verified successfully");
 
       setTimeout(() => {
         onComplete(photo);
@@ -262,6 +272,7 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
     } catch (err: any) {
       console.error("❌ Face verify error:", err);
       toast.error(err.message || "Verification failed");
+      if (onFailed) onFailed();
       handleCancel();
     } finally {
       setIsProcessing(false);
@@ -362,7 +373,7 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
                 style={{ color: theme.loaderColor }}
               />
               <p className="font-semibold text-sm" style={{ color: theme.verifyingText }}>
-                Verifying face…
+                {isSelfSign ? "Verifying identity for self-sign…" : "Verifying face…"}
               </p>
 
               {/* Progress bar */}
@@ -418,10 +429,12 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
             className="font-bold text-lg tracking-tight"
             style={{ color: theme.verifiedTitle }}
           >
-            Face Verified
+            {isSelfSign ? "Self-Verification Complete" : "Face Verified"}
           </p>
           <p className="text-sm mt-1" style={{ color: theme.verifiedSub }}>
-            Identity confirmed successfully
+            {isSelfSign 
+              ? "Your identity is confirmed for self-signing" 
+              : "Identity confirmed successfully"}
           </p>
         </>
       ) : (
@@ -443,10 +456,12 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
             className="text-xl font-bold mb-2 tracking-tight"
             style={{ color: theme.headingColor }}
           >
-            Face Verification Required
+            {isSelfSign ? "Self-Sign Verification" : "Face Verification Required"}
           </h2>
           <p className="text-sm mb-6" style={{ color: theme.subtitleColor }}>
-            Please verify your identity to continue signing.
+            {isSelfSign 
+              ? "Verify your identity to sign your own credential." 
+              : "Please verify your identity to continue signing."}
           </p>
 
           {/* CTA Button */}
@@ -478,7 +493,7 @@ export const BiometricVerify: React.FC<BiometricVerifyProps> = ({
                 Verifying…
               </span>
             ) : (
-              "Start Face Verification"
+              isSelfSign ? "Start Self-Verification" : "Start Face Verification"
             )}
           </button>
 

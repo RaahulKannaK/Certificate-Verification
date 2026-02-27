@@ -329,45 +329,81 @@ app.post("/biometric/face", async (req, res) => {
 
 
 app.post("/credential/sign", async (req, res) => {
-  const { credentialId, signerPublicKey, faceImage } = req.body;
+  const { credentialId, signerPublicKey, faceImage, isSelfSign } = req.body;
 
   // ---------------------- Validation ----------------------
   if (!credentialId || !signerPublicKey || !faceImage) {
-    return res.status(400).json({ success: false, message: "Missing data: credentialId, signerPublicKey, and faceImage are required" });
+    return res.status(400).json({ 
+      success: false, 
+      message: "Missing data: credentialId, signerPublicKey, and faceImage are required" 
+    });
   }
 
   try {
-    // ---------------------- 1️⃣ Fetch user's biometric ----------------------
-    const [[institution]] = await db.query(
-      `SELECT biometric_vector_encrypted, biometric_iv, biometric_salt
-      FROM institutions
-      WHERE walletPublicKey = ?`,
-      [signerPublicKey]
+    // ---------------------- 1️⃣ Fetch credential first ----------------------
+    const [[credential]] = await db.query(
+      `SELECT * FROM issued_credentials WHERE credentialId = ?`,
+      [credentialId]
     );
 
-    if (!institution || !institution.biometric_vector_encrypted) {
-      return res.status(403).json({
-        success: false,
-        message: "Biometric not enrolled for this institution",
-      });
+    if (!credential) {
+      return res.status(404).json({ success: false, message: "Credential not found" });
     }
 
+    // Determine if self-sign (from request or from credential)
+    const selfSign = isSelfSign || credential.signingType === "self";
 
-    if (!user || !user.biometric_vector_encrypted) {
-      return res.status(403).json({ success: false, message: "Biometric not enrolled for this user" });
+    // ---------------------- 2️⃣ Fetch user's biometric ----------------------
+    let biometricRecord;
+
+    if (selfSign) {
+      // Self-sign: Get from users table
+      const [[user]] = await db.query(
+        `SELECT biometric_vector_encrypted, biometric_iv, biometric_salt
+         FROM users
+         WHERE walletPublicKey = ?`,
+        [signerPublicKey]
+      );
+
+      if (!user || !user.biometric_vector_encrypted) {
+        return res.status(403).json({
+          success: false,
+          message: "Biometric not enrolled for this user",
+        });
+      }
+
+      biometricRecord = user;
+
+    } else {
+      // Institution sign: Get from institutions table
+      const [[institution]] = await db.query(
+        `SELECT biometric_vector_encrypted, biometric_iv, biometric_salt
+         FROM institutions
+         WHERE walletPublicKey = ?`,
+        [signerPublicKey]
+      );
+
+      if (!institution || !institution.biometric_vector_encrypted) {
+        return res.status(403).json({
+          success: false,
+          message: "Biometric not enrolled for this institution",
+        });
+      }
+
+      biometricRecord = institution;
     }
 
-    // ---------------------- 2️⃣ Decrypt biometric vector ----------------------
-    const salt = Buffer.from(user.biometric_salt, "hex");
-    const iv = Buffer.from(user.biometric_iv, "hex");
-    const encryptedVector = Buffer.from(user.biometric_vector_encrypted, "hex");
+    // ---------------------- 3️⃣ Decrypt biometric vector ----------------------
+    const salt = Buffer.from(biometricRecord.biometric_salt, "hex");
+    const iv = Buffer.from(biometricRecord.biometric_iv, "hex");
+    const encryptedVector = Buffer.from(biometricRecord.biometric_vector_encrypted, "hex");
 
     const key = crypto.scryptSync(process.env.BIOMETRIC_SECRET || "bio_secret", salt, 32);
     const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
     const decrypted = Buffer.concat([decipher.update(encryptedVector), decipher.final()]);
     const storedVector = Array.from(decrypted);
 
-    // ---------------------- 3️⃣ Face verification ----------------------
+    // ---------------------- 4️⃣ Face verification ----------------------
     const aiResponse = await axios.post(`${process.env.FACE_API_URL}/verify-face`, {
       image: faceImage,
       storedVector,
@@ -383,25 +419,51 @@ app.post("/credential/sign", async (req, res) => {
       });
     }
 
-    // ---------------------- 4️⃣ Fetch credential & signer ----------------------
-    const [[credential]] = await db.query(
-      `SELECT signingType FROM issued_credentials WHERE credentialId = ?`,
-      [credentialId]
-    );
+    // ---------------------- 5️⃣ Verify signer authorization ----------------------
+    if (selfSign) {
+      // Self-sign: Must be the student
+      if (credential.studentPublicKey !== signerPublicKey) {
+        return res.status(403).json({ 
+          success: false, 
+          message: "Not authorized to self-sign this credential" 
+        });
+      }
+    } else {
+      // Institution sign: Must be in institutionPublicKeys or credential_signers
+      const institutionKeys = JSON.parse(credential.institutionPublicKeys || "[]");
+      
+      if (!institutionKeys.includes(signerPublicKey)) {
+        return res.status(403).json({ 
+          success: false, 
+          message: "Not authorized institution signer" 
+        });
+      }
+    }
 
-    if (!credential) return res.status(404).json({ success: false, message: "Credential not found" });
-
+    // ---------------------- 6️⃣ Check credential_signers record ----------------------
     const [[signer]] = await db.query(
       `SELECT * FROM credential_signers
        WHERE credentialId = ? AND signerPublicKey = ?`,
       [credentialId, signerPublicKey]
     );
 
-    if (!signer) return res.status(403).json({ success: false, message: "Signer not authorized" });
-    if (signer.signed) return res.json({ success: false, message: "Already signed" });
+    if (!signer) {
+      // For self-sign, create signer record if not exists
+      if (selfSign) {
+        await db.query(
+          `INSERT INTO credential_signers (credentialId, signerPublicKey, signerOrder, signed, isStudent)
+           VALUES (?, ?, 1, 0, 1)`,
+          [credentialId, signerPublicKey]
+        );
+      } else {
+        return res.status(403).json({ success: false, message: "Signer not found" });
+      }
+    } else if (signer.signed) {
+      return res.json({ success: false, message: "Already signed" });
+    }
 
-    // ---------------------- 5️⃣ Sequential signing check ----------------------
-    if (credential.signingType === "sequential") {
+    // ---------------------- 7️⃣ Sequential signing check (skip for self-sign) ----------------------
+    if (!selfSign && credential.signingType === "sequential") {
       const [[nextSigner]] = await db.query(
         `SELECT signerOrder FROM credential_signers
          WHERE credentialId = ? AND signed = 0
@@ -409,12 +471,12 @@ app.post("/credential/sign", async (req, res) => {
         [credentialId]
       );
 
-      if (nextSigner.signerOrder !== signer.signerOrder) {
+      if (nextSigner && nextSigner.signerOrder !== signer.signerOrder) {
         return res.status(403).json({ success: false, message: "Not your turn to sign" });
       }
     }
 
-    // ---------------------- 6️⃣ Mark signer as signed ----------------------
+    // ---------------------- 8️⃣ Mark signer as signed ----------------------
     await db.query(
       `UPDATE credential_signers
        SET signed = 1, updatedAt = NOW()
@@ -422,6 +484,7 @@ app.post("/credential/sign", async (req, res) => {
       [credentialId, signerPublicKey]
     );
 
+    // ---------------------- 9️⃣ Check if all signed ----------------------
     const [[pending]] = await db.query(
       `SELECT COUNT(*) AS cnt
        FROM credential_signers
@@ -438,10 +501,12 @@ app.post("/credential/sign", async (req, res) => {
       );
     }
 
-    // ---------------------- 7️⃣ Success response ----------------------
+    // ---------------------- 🔟 Success response ----------------------
     res.json({
       success: true,
-      message: "Signed successfully with biometric face verification",
+      message: selfSign 
+        ? "Self-signed successfully with biometric verification" 
+        : "Signed successfully with biometric face verification",
       confidence,
     });
   } catch (err) {
@@ -455,12 +520,13 @@ app.post("/credential/sign", async (req, res) => {
 
 
 app.post("/biometric/verify-face", async (req, res) => {
-  const { credentialId, signerPublicKey, faceImage } = req.body;
+  const { credentialId, signerPublicKey, faceImage, isSelfSign } = req.body;
 
   console.log("📥 VERIFY FACE REQUEST:", {
     credentialId,
     signerPublicKey,
     faceImageLength: faceImage?.length,
+    isSelfSign,
   });
 
   if (!credentialId || !signerPublicKey || !faceImage) {
@@ -482,7 +548,7 @@ app.post("/biometric/verify-face", async (req, res) => {
     // 2️⃣ Validate credential
     // ===============================
     const [[credential]] = await db.query(
-      `SELECT id FROM issued_credentials WHERE credentialId = ?`,
+      `SELECT * FROM issued_credentials WHERE credentialId = ?`,
       [credentialId]
     );
 
@@ -493,38 +559,75 @@ app.post("/biometric/verify-face", async (req, res) => {
       });
     }
 
-    // ===============================
-    // 3️⃣ Fetch biometric record
-    // ===============================
-    const [[institution]] = await db.query(
-      `SELECT biometric_vector_encrypted,
-              biometric_iv,
-              biometric_salt
-       FROM institutions
-       WHERE walletPublicKey = ?`,
-      [signerPublicKey]
-    );
+    // Determine if self-sign
+    const selfSign = isSelfSign || credential.signingType === "self";
 
-    if (!institution) {
-      return res.status(404).json({
-        success: false,
-        message: "Institution not found",
-      });
-    }
+    // ===============================
+    // 3️⃣ Fetch biometric record (users or institutions)
+    // ===============================
+    let biometricRecord;
 
-    if (!institution.biometric_vector_encrypted) {
-      return res.status(403).json({
-        success: false,
-        message: "Face biometric not enrolled",
-      });
+    if (selfSign) {
+      // Self-sign: Get from users table
+      const [[user]] = await db.query(
+        `SELECT biometric_vector_encrypted,
+                biometric_iv,
+                biometric_salt
+         FROM users
+         WHERE walletPublicKey = ?`,
+        [signerPublicKey]
+      );
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      if (!user.biometric_vector_encrypted) {
+        return res.status(403).json({
+          success: false,
+          message: "Face biometric not enrolled for user",
+        });
+      }
+
+      biometricRecord = user;
+
+    } else {
+      // Institution sign: Get from institutions table
+      const [[institution]] = await db.query(
+        `SELECT biometric_vector_encrypted,
+                biometric_iv,
+                biometric_salt
+         FROM institutions
+         WHERE walletPublicKey = ?`,
+        [signerPublicKey]
+      );
+
+      if (!institution) {
+        return res.status(404).json({
+          success: false,
+          message: "Institution not found",
+        });
+      }
+
+      if (!institution.biometric_vector_encrypted) {
+        return res.status(403).json({
+          success: false,
+          message: "Face biometric not enrolled for institution",
+        });
+      }
+
+      biometricRecord = institution;
     }
 
     // ===============================
     // 4️⃣ Use RAW Buffers (IMPORTANT)
     // ===============================
-    const encryptedVector = institution.biometric_vector_encrypted;
-    const iv = institution.biometric_iv;
-    const salt = institution.biometric_salt;
+    const encryptedVector = biometricRecord.biometric_vector_encrypted;
+    const iv = biometricRecord.biometric_iv;
+    const salt = biometricRecord.biometric_salt;
 
     console.log("Is encrypted buffer:", Buffer.isBuffer(encryptedVector));
     console.log("Is IV buffer:", Buffer.isBuffer(iv));
@@ -652,7 +755,6 @@ app.post("/biometric/verify-face", async (req, res) => {
     });
   }
 });
-
 
 app.post("/biometric/fingerprint", async (req, res) => {
   const { email } = req.body;
@@ -929,7 +1031,7 @@ app.post("/institution/issueCredential", async (req, res) => {
 
 app.post("/getIssuedCredentials", async (req, res) => {
   try {
-    const { walletPublicKey, role, signingType } = req.body;
+    const { walletPublicKey, role } = req.body;
 
     if (!walletPublicKey) {
       return res.status(400).json({
@@ -941,27 +1043,24 @@ app.post("/getIssuedCredentials", async (req, res) => {
     let credentials = [];
 
     if (role === "institution") {
-      // ================= INSTITUTION LOGIC =================
-      // 1. Credentials where institution is in institutionPublicKeys (needs to sign)
+      // Institution: Get credentials where they need to sign
+      // 1. Credentials where institution is in institutionPublicKeys (sequential/parallel)
       const [asInstitution] = await db.query(
         `SELECT * FROM issued_credentials 
          WHERE JSON_CONTAINS(institutionPublicKeys, JSON_QUOTE(?))
          AND signingType IN ('sequential', 'parallel')
-         ${signingType ? `AND signingType = ?` : ''}
          ORDER BY issuedAt DESC`,
-        signingType ? [walletPublicKey, signingType] : [walletPublicKey]
+        [walletPublicKey]
       );
 
-      // 2. Credentials where institution already signed
+      // 2. Credentials where institution is already a signer
       const [asSigner] = await db.query(
         `SELECT DISTINCT ic.* 
          FROM issued_credentials ic
          JOIN credential_signers cs ON ic.credentialId = cs.credentialId COLLATE utf8mb4_unicode_ci
          WHERE cs.signerPublicKey = ?
-         AND ic.signingType IN ('sequential', 'parallel')
-         ${signingType ? `AND ic.signingType = ?` : ''}
          ORDER BY ic.issuedAt DESC`,
-        signingType ? [walletPublicKey, signingType] : [walletPublicKey]
+        [walletPublicKey]
       );
 
       // Merge and dedupe
@@ -971,55 +1070,35 @@ app.post("/getIssuedCredentials", async (req, res) => {
       );
 
     } else {
-      // ================= STUDENT LOGIC =================
-      // Build type filter based on signingType
-      let typeFilter = '';
-      if (signingType === 'self') {
-        // Self-sign: institutionPublicKeys is empty array
-        typeFilter = `AND (institutionPublicKeys = '[]' OR institutionPublicKeys = '' OR institutionPublicKeys IS NULL)`;
-      } else if (signingType === 'sequential' || signingType === 'parallel') {
-        // Sequential/Parallel: institutionPublicKeys is not empty
-        typeFilter = `AND institutionPublicKeys NOT IN ('[]', '', 'null') AND institutionPublicKeys IS NOT NULL`;
-      }
-
+      // Student (default): Get self-signed and institution-issued credentials
       // 1. Self-signed credentials (student is the only signer)
       const [selfSigned] = await db.query(
         `SELECT * FROM issued_credentials 
          WHERE studentPublicKey = ?
          AND signingType = 'self'
-         ${typeFilter}
+         AND (institutionPublicKeys = '[]' OR institutionPublicKeys = '' OR institutionPublicKeys IS NULL)
          ORDER BY issuedAt DESC`,
         [walletPublicKey]
       );
 
       // 2. Credentials issued to student by institutions
-      let institutionIssued = [];
-      if (!signingType || signingType !== 'self') {
-        const [issued] = await db.query(
-          `SELECT * FROM issued_credentials 
-           WHERE studentPublicKey = ?
-           AND signingType IN ('sequential', 'parallel')
-           ${signingType ? `AND signingType = ?` : ''}
-           ORDER BY issuedAt DESC`,
-          signingType ? [walletPublicKey, signingType] : [walletPublicKey]
-        );
-        institutionIssued = issued;
-      }
+      const [institutionIssued] = await db.query(
+        `SELECT * FROM issued_credentials 
+         WHERE studentPublicKey = ?
+         AND signingType IN ('sequential', 'parallel')
+         ORDER BY issuedAt DESC`,
+        [walletPublicKey]
+      );
 
       // 3. Credentials where student is a signer (if any)
-      let asSigner = [];
-      if (!signingType || signingType !== 'self') {
-        const [signer] = await db.query(
-          `SELECT DISTINCT ic.* 
-           FROM issued_credentials ic
-           JOIN credential_signers cs ON ic.credentialId = cs.credentialId COLLATE utf8mb4_unicode_ci
-           WHERE cs.signerPublicKey = ?
-           AND ic.signingType IN ('sequential', 'parallel')
-           ORDER BY ic.issuedAt DESC`,
-          [walletPublicKey]
-        );
-        asSigner = signer;
-      }
+      const [asSigner] = await db.query(
+        `SELECT DISTINCT ic.* 
+         FROM issued_credentials ic
+         JOIN credential_signers cs ON ic.credentialId = cs.credentialId COLLATE utf8mb4_unicode_ci
+         WHERE cs.signerPublicKey = ?
+         ORDER BY ic.issuedAt DESC`,
+        [walletPublicKey]
+      );
 
       // Merge and dedupe
       const all = [...selfSigned, ...institutionIssued, ...asSigner];
