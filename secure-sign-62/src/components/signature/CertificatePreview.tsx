@@ -15,9 +15,9 @@ interface SignatureField {
   yRatio: number;
   wRatio: number;
   hRatio: number;
-  color: string;
+  color: string; // e.g., "142.1 76.2% 36.3%" or "#16a34a"
   signed?: boolean;
-  isStudent?: boolean; // Added for self-sign detection
+  isStudent?: boolean;
 }
 
 interface CertificatePreviewProps {
@@ -73,6 +73,19 @@ const getTheme = (role: string) => {
     verifyBg: "#f5f3ff",
     verifyBorder: "#c4b5fd",
   };
+};
+
+// Helper to format color - handles both HSL strings and hex
+const formatColor = (color: string): string => {
+  if (!color) return "#16a34a";
+  // If it's already a hex, return it
+  if (color.startsWith("#")) return color;
+  // If it's HSL format like "142.1 76.2% 36.3%", wrap in hsl()
+  if (color.includes("%")) return `hsl(${color})`;
+  // If it starts with hsl( already, return as-is
+  if (color.startsWith("hsl")) return color;
+  // Default fallback
+  return color;
 };
 
 export const CertificatePreview = ({
@@ -132,9 +145,6 @@ export const CertificatePreview = ({
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
     
-    // Find box where:
-    // 1. signerPublicKey matches myPublicKey (for institution or self-sign), OR
-    // 2. For student self-sign: isStudent flag is true AND studentPublicKey matches
     return certificate.signatureFields.find((b: SignatureField) => {
       const matchesByKey = b.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
       const isStudentBox = b.isStudent === true || b.isStudent === 1;
@@ -154,6 +164,7 @@ export const CertificatePreview = ({
       width: myBox.wRatio * pdfSize.width || 200,
       height: myBox.hRatio * pdfSize.height || 64,
       color: myBox.color,
+      formattedColor: formatColor(myBox.color),
       isStudent: myBox.isStudent === true || myBox.isStudent === 1,
     };
   }, [myBox, pdfSize]);
@@ -285,6 +296,9 @@ export const CertificatePreview = ({
                 const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
                 const isMine = !field.signed && (matchesByKey || (isStudentBox && isCredentialStudent));
                 
+                // Format color properly for this field
+                const fieldColor = formatColor(field.color);
+                
                 return (
                   <div
                     key={field.id}
@@ -294,16 +308,17 @@ export const CertificatePreview = ({
                       top: field.yRatio * pdfSize.height,
                       width: field.wRatio * pdfSize.width,
                       height: field.hRatio * pdfSize.height,
-                      border: `2px dashed hsl(var(--${field.color}))`,
+                      border: `2px dashed ${fieldColor}`,
                       borderRadius: "8px",
                       zIndex: isMine ? 10 : 1,
                     }}
                   >
+                    {/* FIXED: Show "Your Signature" label for ALL unsigned boxes belonging to user */}
                     {isMine && !signatureImage && (
                       <div style={{
                         position: "absolute", top: "-24px", left: "50%", transform: "translateX(-50%)",
                         padding: "2px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
-                        color: "white", background: `hsl(var(--${field.color}))`, whiteSpace: "nowrap",
+                        color: "white", background: fieldColor, whiteSpace: "nowrap",
                       }}>
                         Your Signature
                       </div>
@@ -424,7 +439,7 @@ export const CertificatePreview = ({
                 />
               )}
 
-              {/* Post Verify Button */}
+              {/* Post Verify Button - UNIFIED: Same for both institution and self-sign */}
               {signatureImage && !isPostVerified && (
                 <button
                   onClick={() => { setVerifyMode("post"); setShowBiometric(true); }}
@@ -445,8 +460,8 @@ export const CertificatePreview = ({
               {isPostVerified && (
                 <div style={{
                   textAlign: "center", padding: "12px 20px", borderRadius: "10px",
-                  background: "#f0fdf4", border: "1px solid #86efac",
-                  color: "#16a34a", fontSize: "15px", fontWeight: 600,
+                  background: t.verifyBg, border: `1px solid ${t.verifyBorder}`,
+                  color: t.accentColor, fontSize: "15px", fontWeight: 600,
                 }}>
                   ✔ Signature Verified Successfully
                 </div>
