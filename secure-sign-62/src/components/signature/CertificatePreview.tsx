@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import { Type, MousePointer, RotateCcw } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
@@ -18,6 +17,7 @@ interface SignatureField {
   hRatio: number;
   color: string;
   signed?: boolean;
+  isStudent?: boolean; // Added for self-sign detection
 }
 
 interface CertificatePreviewProps {
@@ -128,13 +128,23 @@ export const CertificatePreview = ({
     renderPdf().catch(console.error);
   }, [documentUrl, pdfCanvasRef]);
 
-  /* ================= SIGNATURE BOX ================= */
+  /* ================= SIGNATURE BOX - FIXED ================= */
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
-    return certificate.signatureFields.find(
-      (b: SignatureField) => b.signerPublicKey === myPublicKey && !b.signed
-    );
-  }, [myPublicKey, certificate.signatureFields]);
+    
+    // Find box where:
+    // 1. signerPublicKey matches myPublicKey (for institution or self-sign), OR
+    // 2. For student self-sign: isStudent flag is true AND studentPublicKey matches
+    return certificate.signatureFields.find((b: SignatureField) => {
+      const matchesByKey = b.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+      const isStudentBox = b.isStudent === true || b.isStudent === 1;
+      const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+      const notSigned = !b.signed;
+      
+      // Match if: key matches directly OR it's student's self-sign box
+      return notSigned && (matchesByKey || (isStudentBox && isCredentialStudent));
+    });
+  }, [myPublicKey, certificate.signatureFields, certificate.studentPublicKey]);
 
   const signatureBox = useMemo(() => {
     if (!myBox) return null;
@@ -144,6 +154,7 @@ export const CertificatePreview = ({
       width: myBox.wRatio * pdfSize.width || 200,
       height: myBox.hRatio * pdfSize.height || 64,
       color: myBox.color,
+      isStudent: myBox.isStudent === true || myBox.isStudent === 1,
     };
   }, [myBox, pdfSize]);
 
@@ -268,7 +279,12 @@ export const CertificatePreview = ({
               <canvas ref={setPdfCanvasRef} />
 
               {certificate.signatureFields?.map((field: SignatureField) => {
-                const isMine = field.signerPublicKey === myPublicKey && !field.signed;
+                // FIXED: Check if this field belongs to current user
+                const matchesByKey = field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+                const isStudentBox = field.isStudent === true || field.isStudent === 1;
+                const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+                const isMine = !field.signed && (matchesByKey || (isStudentBox && isCredentialStudent));
+                
                 return (
                   <div
                     key={field.id}
