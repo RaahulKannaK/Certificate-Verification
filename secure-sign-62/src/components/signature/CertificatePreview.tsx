@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Button } from "@/components/ui/button";
 import { Type, MousePointer, RotateCcw } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
@@ -17,7 +18,6 @@ interface SignatureField {
   hRatio: number;
   color: string;
   signed?: boolean;
-  isStudent?: boolean; // NEW: Flag for self-sign
 }
 
 interface CertificatePreviewProps {
@@ -54,8 +54,6 @@ const getTheme = (role: string) => {
       clearBtnHover: "#f0fdf4",
       verifyBg: "#f0fdf4",
       verifyBorder: "#86efac",
-      selfSignBg: "#fef3c7",
-      selfSignBorder: "#f59e0b",
     };
   }
   // Student — Purple
@@ -74,8 +72,6 @@ const getTheme = (role: string) => {
     clearBtnHover: "#f5f3ff",
     verifyBg: "#f5f3ff",
     verifyBorder: "#c4b5fd",
-    selfSignBg: "#fef3c7",
-    selfSignBorder: "#f59e0b",
   };
 };
 
@@ -107,12 +103,6 @@ export const CertificatePreview = ({
 
   const documentUrl = certificate.filePath;
 
-  // NEW: Determine if this is self-sign mode
-  const isSelfSign = useMemo(() => {
-    return certificate?.signingType === "self" || 
-           (certificate?.institutionPublicKeys?.length === 0 && certificate?.studentPublicKey === myPublicKey);
-  }, [certificate, myPublicKey]);
-
   /* ================= LOAD PDF ================= */
   useEffect(() => {
     if (!documentUrl || !pdfCanvasRef) return;
@@ -141,19 +131,10 @@ export const CertificatePreview = ({
   /* ================= SIGNATURE BOX ================= */
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
-    
-    // For self-sign, find box with isStudent=true
-    if (isSelfSign) {
-      return certificate.signatureFields.find(
-        (b: SignatureField) => b.isStudent === true && !b.signed
-      );
-    }
-    
-    // For institution sign, find box matching myPublicKey
     return certificate.signatureFields.find(
       (b: SignatureField) => b.signerPublicKey === myPublicKey && !b.signed
     );
-  }, [myPublicKey, certificate.signatureFields, isSelfSign]);
+  }, [myPublicKey, certificate.signatureFields]);
 
   const signatureBox = useMemo(() => {
     if (!myBox) return null;
@@ -198,8 +179,8 @@ export const CertificatePreview = ({
 
     const image = canvas.toDataURL("image/png");
     setSignatureImage(image);
-    onSignatureChange({ image, ...signatureBox, isSelfSign });
-  }, [typedName, selectedFont, activeTab, signatureBox, isSelfSign]);
+    onSignatureChange({ image, ...signatureBox });
+  }, [typedName, selectedFont, activeTab, signatureBox]);
 
   /* ================= DRAW SIGNATURE ================= */
   const getCoords = (e: React.MouseEvent) => {
@@ -236,7 +217,7 @@ export const CertificatePreview = ({
     setIsDrawing(false);
     const image = signCanvasRef!.toDataURL("image/png");
     setSignatureImage(image);
-    onSignatureChange({ image, ...signatureBox, isSelfSign });
+    onSignatureChange({ image, ...signatureBox });
   };
 
   /* ================= RENDER ================= */
@@ -249,15 +230,9 @@ export const CertificatePreview = ({
           <div style={{ width: "420px", maxWidth: "100%" }}>
             <BiometricVerify
               credentialId={certificate.credentialId}
-              signerPublicKey={myPublicKey}
-              isSelfSign={isSelfSign} // NEW: Pass self-sign flag
               onComplete={() => {
                 if (verifyMode === "pre") setIsPreVerified(true);
                 else setIsPostVerified(true);
-                setShowBiometric(false);
-              }}
-              onFailed={() => {
-                // NEW: Handle failed verification
                 setShowBiometric(false);
               }}
               onCancel={() => setShowBiometric(false)}
@@ -272,40 +247,16 @@ export const CertificatePreview = ({
           onClick={() => { setVerifyMode("pre"); setShowBiometric(true); }}
           style={{
             width: "100%", padding: "13px", borderRadius: "12px",
-            border: "none", background: isSelfSign ? 'linear-gradient(135deg, #f59e0b, #d97706)' : t.gradient, 
-            color: "white",
+            border: "none", background: t.gradient, color: "white",
             fontSize: "15px", fontWeight: 600, cursor: "pointer",
-            boxShadow: isSelfSign ? '0 4px 12px rgba(245,158,11,0.28)' : t.btnShadow, 
-            transition: "all 0.2s",
+            boxShadow: t.btnShadow, transition: "all 0.2s",
             display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
           }}
-          onMouseEnter={e => { 
-            (e.currentTarget.style.transform = "translateY(-2px)"); 
-            (e.currentTarget.style.boxShadow = isSelfSign ? '0 8px 20px rgba(245,158,11,0.40)' : t.btnShadowHover); 
-          }}
-          onMouseLeave={e => { 
-            (e.currentTarget.style.transform = "translateY(0)"); 
-            (e.currentTarget.style.boxShadow = isSelfSign ? '0 4px 12px rgba(245,158,11,0.28)' : t.btnShadow); 
-          }}
+          onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
+          onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
         >
-          {isSelfSign ? "🔐 Verify Identity for Self-Sign" : "🔐 Verify Identity Before Signing"}
+          🔐 Verify Identity Before Signing
         </button>
-      )}
-
-      {/* Self-Sign Notice */}
-      {isSelfSign && isPreVerified && (
-        <div style={{
-          padding: "12px 16px", borderRadius: "10px",
-          background: t.selfSignBg, border: `1px solid ${t.selfSignBorder}`,
-          display: "flex", alignItems: "center", gap: "8px",
-        }}>
-          <span style={{ fontSize: "14px", fontWeight: 600, color: "#92400e" }}>
-            Self-Signing Mode
-          </span>
-          <span style={{ fontSize: "13px", color: "#a16207" }}>
-            — No institution verification required
-          </span>
-        </div>
       )}
 
       {/* AFTER PRE VERIFY */}
@@ -317,10 +268,7 @@ export const CertificatePreview = ({
               <canvas ref={setPdfCanvasRef} />
 
               {certificate.signatureFields?.map((field: SignatureField) => {
-                const isMine = isSelfSign 
-                  ? field.isStudent === true && !field.signed
-                  : field.signerPublicKey === myPublicKey && !field.signed;
-                  
+                const isMine = field.signerPublicKey === myPublicKey && !field.signed;
                 return (
                   <div
                     key={field.id}
@@ -330,7 +278,7 @@ export const CertificatePreview = ({
                       top: field.yRatio * pdfSize.height,
                       width: field.wRatio * pdfSize.width,
                       height: field.hRatio * pdfSize.height,
-                      border: `2px dashed ${isSelfSign && field.isStudent ? '#f59e0b' : `hsl(var(--${field.color}))`}`,
+                      border: `2px dashed hsl(var(--${field.color}))`,
                       borderRadius: "8px",
                       zIndex: isMine ? 10 : 1,
                     }}
@@ -339,10 +287,9 @@ export const CertificatePreview = ({
                       <div style={{
                         position: "absolute", top: "-24px", left: "50%", transform: "translateX(-50%)",
                         padding: "2px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
-                        color: "white", background: isSelfSign && field.isStudent ? '#f59e0b' : `hsl(var(--${field.color}))`, 
-                        whiteSpace: "nowrap",
+                        color: "white", background: `hsl(var(--${field.color}))`, whiteSpace: "nowrap",
                       }}>
-                        {isSelfSign ? "Self Signature" : "Your Signature"}
+                        Your Signature
                       </div>
                     )}
                   </div>
@@ -369,9 +316,7 @@ export const CertificatePreview = ({
 
               {/* Header */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>
-                  {isSelfSign ? "Add Self Signature" : "Add Signature"}
-                </h3>
+                <h3 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>Add Signature</h3>
                 <button
                   onClick={clearSignature}
                   style={{
@@ -419,7 +364,7 @@ export const CertificatePreview = ({
                       fontSize: "14px", color: "#0f172a", outline: "none",
                       transition: "border 0.2s", boxSizing: "border-box",
                     }}
-                    placeholder={isSelfSign ? "Type your name for self-sign" : "Type your name / institution name"}
+                    placeholder="Type your name / institution name"
                     value={typedName}
                     onChange={(e) => setTypedName(e.target.value)}
                     onFocus={e => (e.currentTarget.style.borderColor = t.inputFocusBorder)}
@@ -469,23 +414,14 @@ export const CertificatePreview = ({
                   onClick={() => { setVerifyMode("post"); setShowBiometric(true); }}
                   style={{
                     width: "100%", padding: "13px", borderRadius: "12px",
-                    border: "none", 
-                    background: isSelfSign ? 'linear-gradient(135deg, #f59e0b, #d97706)' : t.gradient, 
-                    color: "white",
+                    border: "none", background: t.gradient, color: "white",
                     fontSize: "15px", fontWeight: 600, cursor: "pointer",
-                    boxShadow: isSelfSign ? '0 4px 12px rgba(245,158,11,0.28)' : t.btnShadow, 
-                    transition: "all 0.2s", marginTop: "8px",
+                    boxShadow: t.btnShadow, transition: "all 0.2s", marginTop: "8px",
                   }}
-                  onMouseEnter={e => { 
-                    (e.currentTarget.style.transform = "translateY(-2px)"); 
-                    (e.currentTarget.style.boxShadow = isSelfSign ? '0 8px 20px rgba(245,158,11,0.40)' : t.btnShadowHover); 
-                  }}
-                  onMouseLeave={e => { 
-                    (e.currentTarget.style.transform = "translateY(0)"); 
-                    (e.currentTarget.style.boxShadow = isSelfSign ? '0 4px 12px rgba(245,158,11,0.28)' : t.btnShadow); 
-                  }}
+                  onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
+                  onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
                 >
-                  {isSelfSign ? "Self-Verify & Confirm" : "Verify & Confirm Signature"}
+                  Verify & Confirm Signature
                 </button>
               )}
 
@@ -496,7 +432,7 @@ export const CertificatePreview = ({
                   background: "#f0fdf4", border: "1px solid #86efac",
                   color: "#16a34a", fontSize: "15px", fontWeight: 600,
                 }}>
-                  ✔ {isSelfSign ? "Self-Signature Verified" : "Signature Verified Successfully"}
+                  ✔ Signature Verified Successfully
                 </div>
               )}
             </div>
