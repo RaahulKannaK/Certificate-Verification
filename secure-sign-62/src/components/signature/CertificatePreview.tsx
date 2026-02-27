@@ -37,8 +37,9 @@ const fontOptions = [
 ];
 
 /* ================= THEME ================= */
-const getTheme = (role: string) => {
-  if (role === "institution") {
+const getTheme = (role: string, isSelfSign: boolean) => {
+  // Self-sign uses purple (student theme), institution uses green
+  if (role === "institution" && !isSelfSign) {
     return {
       gradient: "linear-gradient(135deg, #16a34a, #059669)",
       btnShadow: "0 4px 12px rgba(22,163,74,0.28)",
@@ -57,7 +58,7 @@ const getTheme = (role: string) => {
       headerIcon: "#16a34a",
     };
   }
-  // Student — Purple
+  // Self-sign or student — Purple
   return {
     gradient: "linear-gradient(135deg, #7c3aed, #6366f1)",
     btnShadow: "0 4px 12px rgba(124,58,237,0.28)",
@@ -79,7 +80,7 @@ const getTheme = (role: string) => {
 
 // Helper to format color
 const formatColor = (color: string): string => {
-  if (!color) return "#16a34a";
+  if (!color) return "#7c3aed";
   if (color.startsWith("#")) return color;
   if (color.includes("%")) return `hsl(${color})`;
   if (color.startsWith("hsl")) return color;
@@ -92,7 +93,20 @@ export const CertificatePreview = ({
   onSignatureChange,
 }: CertificatePreviewProps) => {
   const { user } = useAuth();
-  const t = getTheme(user?.role || "student");
+
+  // Determine if this is self-sign mode (student signing their own credential without institution)
+  const isSelfSign = useMemo(() => {
+    if (!certificate || !myPublicKey) return false;
+    const isStudentCredential = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+    const hasNoInstitution = !certificate.institutionPublicKey || 
+      certificate.institutionPublicKey === "0x0000000000000000000000000000000000000000" ||
+      certificate.institutionPublicKey === "";
+    // Also check if signatureFields only contains student box
+    const onlyStudentFields = certificate.signatureFields?.every((f: SignatureField) => f.isStudent);
+    return (isStudentCredential && hasNoInstitution) || onlyStudentFields;
+  }, [certificate, myPublicKey]);
+
+  const t = getTheme(user?.role || "student", isSelfSign);
 
   const [pdfCanvasRef, setPdfCanvasRef] = useState<HTMLCanvasElement | null>(null);
   const [signCanvasRef, setSignCanvasRef] = useState<HTMLCanvasElement | null>(null);
@@ -114,19 +128,11 @@ export const CertificatePreview = ({
 
   const documentUrl = certificate.filePath;
 
-  // Determine if this is self-sign mode (student signing their own credential)
-  const isSelfSign = useMemo(() => {
-    if (!certificate || !myPublicKey) return false;
-    const isStudentCredential = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
-    const hasNoInstitution = !certificate.institutionPublicKey || certificate.institutionPublicKey === "0x0000000000000000000000000000000000000000";
-    return isStudentCredential && hasNoInstitution;
-  }, [certificate, myPublicKey]);
-
-  // Get all signers for display (institutions + student if self-sign)
+  // Get all signers for display
   const signers = useMemo(() => {
     if (!certificate?.signatureFields) return [];
     
-    return certificate.signatureFields.map((field: SignatureField) => {
+    return certificate.signatureFields.map((field: SignatureField, idx: number) => {
       const isStudentBox = field.isStudent === true || field.isStudent === 1;
       const isMine = !field.signed && (
         field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase() ||
@@ -136,13 +142,15 @@ export const CertificatePreview = ({
       return {
         ...field,
         isMine,
-        name: isStudentBox ? "Student (You)" : `Institution ${field.id}`,
+        name: isStudentBox ? "Student (You)" : `Institution ${idx + 1}`,
         status: field.signed ? "Signed" : isMine ? "Waiting for you" : "Pending",
       };
     });
   }, [certificate, myPublicKey]);
 
-  const mySignerCount = signers.filter(s => s.isMine && !s.signed).length;
+  const unsignedSigners = signers.filter(s => !s.signed);
+  const myUnsignedIndex = signers.findIndex(s => s.isMine && !s.signed);
+  const isMyTurn = myUnsignedIndex === 0; // First unsigned signer
 
   /* ================= LOAD PDF ================= */
   useEffect(() => {
@@ -269,7 +277,7 @@ export const CertificatePreview = ({
     onSignatureChange({ image, ...signatureBox });
   };
 
-  /* ================= RENDER ================= */
+  /* ================= RENDER - UNIFIED UI ================= */
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
 
@@ -290,7 +298,7 @@ export const CertificatePreview = ({
         </div>
       )}
 
-      {/* UNIFIED HEADER - Same for both institution and self-sign */}
+      {/* UNIFIED HEADER - Same layout for both self-sign and institution */}
       <div style={{ 
         background: "white", 
         border: `1px solid ${t.cardBorder}`, 
@@ -333,7 +341,7 @@ export const CertificatePreview = ({
           </div>
         </div>
 
-        {/* Sequential Signing Info - Shows for both modes */}
+        {/* Sequential Signing Info - Unified for both modes */}
         <div style={{
           background: t.cardBg,
           border: `1px solid ${t.cardBorder}`,
@@ -350,7 +358,7 @@ export const CertificatePreview = ({
           
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <div style={{ fontSize: "13px", color: "#64748b" }}>
-              Institutions: <span style={{ color: "#0f172a", fontWeight: 600 }}>{signers.length} signer(s) required</span>
+              {isSelfSign ? "Signers" : "Institutions"}: <span style={{ color: "#0f172a", fontWeight: 600 }}>{signers.length} signer(s) required</span>
             </div>
             
             {/* Signer List */}
@@ -405,22 +413,22 @@ export const CertificatePreview = ({
             <div style={{ 
               marginTop: "8px",
               padding: "10px 12px",
-              background: mySignerCount > 0 ? "#fef3c7" : "#f0fdf4",
-              border: `1px solid ${mySignerCount > 0 ? "#fcd34d" : "#86efac"}`,
+              background: isMyTurn ? "#fef3c7" : "#f0fdf4",
+              border: `1px solid ${isMyTurn ? "#fcd34d" : "#86efac"}`,
               borderRadius: "8px",
               fontSize: "13px",
-              color: mySignerCount > 0 ? "#92400e" : "#16a34a",
+              color: isMyTurn ? "#92400e" : "#16a34a",
               display: "flex",
               alignItems: "center",
               gap: "8px",
             }}>
-              {mySignerCount > 0 ? (
+              {isMyTurn ? (
                 <>
                   <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b", animation: "pulse 2s infinite" }} />
-                  Waiting for previous signer: You are signer #{signers.findIndex(s => s.isMine && !s.signed) + 1}
+                  {isSelfSign ? "Your turn to sign" : `Waiting for previous signer: You are signer #${myUnsignedIndex + 1}`}
                 </>
               ) : (
-                <>All signatures completed</>
+                <>Waiting for your turn...</>
               )}
             </div>
           </div>
@@ -443,7 +451,7 @@ export const CertificatePreview = ({
       </div>
 
       {/* 🔐 PRE VERIFY BUTTON */}
-      {!isPreVerified && (
+      {!isPreVerified && isMyTurn && (
         <button
           onClick={() => { setVerifyMode("pre"); setShowBiometric(true); }}
           style={{
@@ -460,8 +468,23 @@ export const CertificatePreview = ({
         </button>
       )}
 
+      {/* Waiting message if not your turn */}
+      {!isPreVerified && !isMyTurn && (
+        <div style={{
+          padding: "16px",
+          background: "#fef3c7",
+          border: "1px solid #fcd34d",
+          borderRadius: "12px",
+          textAlign: "center",
+          color: "#92400e",
+          fontSize: "14px",
+        }}>
+          Please wait for previous signers to complete their signatures.
+        </div>
+      )}
+
       {/* AFTER PRE VERIFY */}
-      {isPreVerified && (
+      {isPreVerified && isMyTurn && (
         <>
           {/* PDF Preview */}
           <div style={{ border: `1px solid ${t.cardBorder}`, borderRadius: "16px", background: t.cardBg, overflow: "auto", position: "relative" }}>
@@ -490,7 +513,7 @@ export const CertificatePreview = ({
                       zIndex: isMine ? 10 : 1,
                     }}
                   >
-                    {/* Your Signature Label - Now shows for both institution and self-sign */}
+                    {/* Your Signature Label - Shows for both modes */}
                     {isMine && !signatureImage && (
                       <div style={{
                         position: "absolute", 
