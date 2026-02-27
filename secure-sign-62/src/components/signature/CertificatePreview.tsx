@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Type, MousePointer, RotateCcw, Shield, Users, Lock, User } from "lucide-react";
+import { Type, MousePointer, RotateCcw, User, Lock } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 import { BiometricVerify } from "../dashboard/BiometricVerify";
@@ -54,7 +54,6 @@ const getTheme = (role: string) => {
       clearBtnHover: "#f0fdf4",
       verifyBg: "#f0fdf4",
       verifyBorder: "#86efac",
-      headerIcon: "#16a34a",
     };
   }
   // Student — Purple
@@ -73,17 +72,7 @@ const getTheme = (role: string) => {
     clearBtnHover: "#f5f3ff",
     verifyBg: "#f5f3ff",
     verifyBorder: "#c4b5fd",
-    headerIcon: "#7c3aed",
   };
-};
-
-// Helper to format color
-const formatColor = (color: string): string => {
-  if (!color) return "#7c3aed";
-  if (color.startsWith("#")) return color;
-  if (color.includes("%")) return `hsl(${color})`;
-  if (color.startsWith("hsl")) return color;
-  return color;
 };
 
 export const CertificatePreview = ({
@@ -93,18 +82,6 @@ export const CertificatePreview = ({
 }: CertificatePreviewProps) => {
   const { user } = useAuth();
   const t = getTheme(user?.role || "student");
-
-  // Determine mode: self-sign vs sequential/institution
-  const isSelfSign = useMemo(() => {
-    if (!certificate || !myPublicKey) return false;
-    // Check if this is student's own credential without institution
-    const isStudentCredential = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
-    const hasInstitution = certificate.institutionPublicKey && 
-      certificate.institutionPublicKey !== "0x0000000000000000000000000000000000000000" &&
-      certificate.institutionPublicKey !== "";
-    // Self-sign if student owns it and no institution involved
-    return isStudentCredential && !hasInstitution;
-  }, [certificate, myPublicKey]);
 
   const [pdfCanvasRef, setPdfCanvasRef] = useState<HTMLCanvasElement | null>(null);
   const [signCanvasRef, setSignCanvasRef] = useState<HTMLCanvasElement | null>(null);
@@ -126,28 +103,21 @@ export const CertificatePreview = ({
 
   const documentUrl = certificate.filePath;
 
-  // Get signers for sequential mode only
-  const signers = useMemo(() => {
-    if (!certificate?.signatureFields || isSelfSign) return [];
-    
-    return certificate.signatureFields.map((field: SignatureField, idx: number) => {
-      const isStudentBox = field.isStudent === true || field.isStudent === 1;
-      const isMine = !field.signed && (
-        field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase() ||
-        (isStudentBox && certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase())
-      );
-      
-      return {
-        ...field,
-        isMine,
-        name: isStudentBox ? "Student" : `Institution ${idx + 1}`,
-        status: field.signed ? "Signed" : isMine ? "Waiting for you" : "Pending",
-      };
-    });
-  }, [certificate, myPublicKey, isSelfSign]);
-
-  const myTurnIndex = signers.findIndex(s => s.isMine && !s.signed);
-  const isMyTurn = isSelfSign ? true : myTurnIndex === 0;
+  // Check if this is self-sign mode (student signing their own credential)
+  const isSelfSign = useMemo(() => {
+    if (!certificate?.signatureFields || !myPublicKey) return false;
+    // Check if the only unsigned field is a student field belonging to current user
+    const studentField = certificate.signatureFields.find((f: SignatureField) => 
+      (f.isStudent === true || f.isStudent === 1) && !f.signed
+    );
+    const isMyStudentField = studentField && 
+      certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+    // Check if no institution fields exist or are all signed
+    const hasUnsignedInstitution = certificate.signatureFields.some((f: SignatureField) => 
+      !(f.isStudent === true || f.isStudent === 1) && !f.signed
+    );
+    return isMyStudentField && !hasUnsignedInstitution;
+  }, [certificate, myPublicKey]);
 
   /* ================= LOAD PDF ================= */
   useEffect(() => {
@@ -174,7 +144,7 @@ export const CertificatePreview = ({
     renderPdf().catch(console.error);
   }, [documentUrl, pdfCanvasRef]);
 
-  /* ================= SIGNATURE BOX ================= */
+  /* ================= SIGNATURE BOX - FIXED ================= */
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
     
@@ -186,7 +156,7 @@ export const CertificatePreview = ({
       
       return notSigned && (matchesByKey || (isStudentBox && isCredentialStudent));
     });
-  }, [myPublicKey, certificate]);
+  }, [myPublicKey, certificate.signatureFields, certificate.studentPublicKey]);
 
   const signatureBox = useMemo(() => {
     if (!myBox) return null;
@@ -196,7 +166,6 @@ export const CertificatePreview = ({
       width: myBox.wRatio * pdfSize.width || 200,
       height: myBox.hRatio * pdfSize.height || 64,
       color: myBox.color,
-      formattedColor: formatColor(myBox.color),
       isStudent: myBox.isStudent === true || myBox.isStudent === 1,
     };
   }, [myBox, pdfSize]);
@@ -295,698 +264,288 @@ export const CertificatePreview = ({
         </div>
       )}
 
-      {/* ================= SELF-SIGN MODE UI ================= */}
-      {isSelfSign ? (
-        <>
-          {/* Self-Sign Header */}
-          <div style={{ 
-            background: "white", 
-            border: `1px solid ${t.cardBorder}`, 
-            borderRadius: "16px", 
-            padding: "24px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "16px"
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "12px",
-                background: t.cardBg,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: t.headerIcon,
-              }}>
-                <User size={24} />
-              </div>
-              <div>
-                <h2 style={{ 
-                  fontFamily: "Space Grotesk, sans-serif", 
-                  fontSize: "20px", 
-                  fontWeight: 700, 
-                  color: "#0f172a",
-                  margin: 0 
-                }}>
-                  Self-Sign Certificate
-                </h2>
-                <p style={{ 
-                  fontSize: "14px", 
-                  color: "#64748b", 
-                  margin: "4px 0 0 0" 
-                }}>
-                  Sign your own credential (no institution required)
-                </p>
-              </div>
-            </div>
-
-            {/* Self-Signing Mode Info */}
+      {/* SELF-SIGN HEADER - Only for self-sign mode */}
+      {isSelfSign && !isPreVerified && (
+        <div style={{ 
+          background: "white", 
+          border: `1px solid ${t.cardBorder}`, 
+          borderRadius: "16px", 
+          padding: "24px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{
-              background: t.cardBg,
-              border: `1px solid ${t.cardBorder}`,
+              width: "48px",
+              height: "48px",
               borderRadius: "12px",
-              padding: "16px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: t.accentColor, fontWeight: 600, fontSize: "14px" }}>
-                <User size={16} />
-                Self-Signing Mode
-              </div>
-              
-              <div style={{ fontSize: "13px", color: "#64748b", lineHeight: "1.5" }}>
-                You are the only signer. No institution verification required. This credential will be self-issued and stored on the blockchain.
-              </div>
-
-              {/* Empty Institution List */}
-              <div style={{ 
-                marginTop: "4px",
-                padding: "10px 12px",
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                borderRadius: "8px",
-                fontSize: "13px",
-                color: "#94a3b8",
-              }}>
-                Institution list: Empty
-              </div>
-            </div>
-
-            {/* Blockchain Security Badge */}
-            <div style={{
+              background: t.cardBg,
               display: "flex",
               alignItems: "center",
-              gap: "8px",
-              padding: "12px 16px",
-              background: "#f8fafc",
-              borderRadius: "8px",
-              fontSize: "13px",
-              color: "#64748b",
+              justifyContent: "center",
+              color: t.accentColor,
             }}>
-              <Lock size={14} color={t.accentColor} />
-              <span>Blockchain Secured — Signature will be permanently stored on blockchain</span>
+              <User size={24} />
+            </div>
+            <div>
+              <h2 style={{ 
+                fontFamily: "Space Grotesk, sans-serif", 
+                fontSize: "20px", 
+                fontWeight: 700, 
+                color: "#0f172a",
+                margin: 0 
+              }}>
+                Self-Sign Certificate
+              </h2>
+              <p style={{ 
+                fontSize: "14px", 
+                color: "#64748b", 
+                margin: "4px 0 0 0" 
+              }}>
+                Sign your own credential (no institution required)
+              </p>
             </div>
           </div>
 
-          {/* 🔐 PRE VERIFY BUTTON - Self Sign */}
-          {!isPreVerified && (
-            <button
-              onClick={() => { setVerifyMode("pre"); setShowBiometric(true); }}
-              style={{
-                width: "100%", padding: "13px", borderRadius: "12px",
-                border: "none", background: t.gradient, color: "white",
-                fontSize: "15px", fontWeight: 600, cursor: "pointer",
-                boxShadow: t.btnShadow, transition: "all 0.2s",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-              }}
-              onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
-              onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
-            >
-              <Lock size={18} /> 🔐 Verify Identity Before Signing
-            </button>
-          )}
-
-          {/* AFTER PRE VERIFY - Self Sign */}
-          {isPreVerified && (
-            <>
-              {/* PDF Preview */}
-              <div style={{ border: `1px solid ${t.cardBorder}`, borderRadius: "16px", background: t.cardBg, overflow: "auto", position: "relative" }}>
-                <div style={{ position: "relative", margin: "0 auto", background: "white", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", width: pdfSize.width, height: pdfSize.height }}>
-                  <canvas ref={setPdfCanvasRef} />
-
-                  {certificate.signatureFields?.map((field: SignatureField) => {
-                    const isStudentBox = field.isStudent === true || field.isStudent === 1;
-                    const isMine = !field.signed && isStudentBox;
-                    
-                    const fieldColor = formatColor(field.color);
-                    
-                    return (
-                      <div
-                        key={field.id}
-                        style={{
-                          position: "absolute",
-                          left: field.xRatio * pdfSize.width,
-                          top: field.yRatio * pdfSize.height,
-                          width: field.wRatio * pdfSize.width,
-                          height: field.hRatio * pdfSize.height,
-                          border: `2px dashed ${fieldColor}`,
-                          borderRadius: "8px",
-                          zIndex: isMine ? 10 : 1,
-                        }}
-                      >
-                        {/* Your Signature Label */}
-                        {isMine && !signatureImage && (
-                          <div style={{
-                            position: "absolute", 
-                            top: "-28px", 
-                            left: "50%", 
-                            transform: "translateX(-50%)",
-                            padding: "4px 12px", 
-                            borderRadius: "6px", 
-                            fontSize: "12px", 
-                            fontWeight: 700,
-                            color: "white", 
-                            background: fieldColor, 
-                            whiteSpace: "nowrap",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                          }}>
-                            Your Signature
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {signatureImage && signatureBox && (
-                    <img
-                      src={signatureImage}
-                      style={{
-                        position: "absolute",
-                        left: signatureBox.x, top: signatureBox.y,
-                        width: signatureBox.width, height: signatureBox.height,
-                        zIndex: 11,
-                      }}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* SIGN TOOLS - Self Sign */}
-              {signatureBox && (
-                <div style={{ background: "white", border: `1px solid ${t.cardBorder}`, borderRadius: "16px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-
-                  {/* Header */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>Add Signature</h3>
-                    <button
-                      onClick={clearSignature}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: "6px",
-                        padding: "7px 14px", borderRadius: "8px",
-                        border: `1px solid ${t.cardBorder}`, background: "white",
-                        color: "#64748b", fontSize: "13px", fontWeight: 500,
-                        cursor: "pointer", transition: "all 0.2s",
-                      }}
-                      onMouseEnter={e => { (e.currentTarget.style.background = t.clearBtnHover); (e.currentTarget.style.color = t.accentColor); }}
-                      onMouseLeave={e => { (e.currentTarget.style.background = "white"); (e.currentTarget.style.color = "#64748b"); }}
-                    >
-                      <RotateCcw size={14} /> Clear
-                    </button>
-                  </div>
-
-                  {/* Tab Toggle */}
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    {(["type", "draw"] as const).map((tab) => (
-                      <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        style={{
-                          display: "inline-flex", alignItems: "center", gap: "6px",
-                          padding: "8px 18px", borderRadius: "9px", border: "none",
-                          background: activeTab === tab ? t.gradient : "#f1f5f9",
-                          color: activeTab === tab ? "white" : "#64748b",
-                          fontSize: "13px", fontWeight: 600, cursor: "pointer",
-                          boxShadow: activeTab === tab ? t.btnShadow : "none",
-                          transition: "all 0.2s",
-                        }}
-                      >
-                        {tab === "type" ? <><Type size={14} /> Type</> : <><MousePointer size={14} /> Draw</>}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Type Tab */}
-                  {activeTab === "type" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                      <input
-                        style={{
-                          width: "100%", padding: "11px 14px", borderRadius: "10px",
-                          border: `1px solid ${t.inputBorder}`, background: "#f8fafc",
-                          fontSize: "14px", color: "#0f172a", outline: "none",
-                          transition: "border 0.2s", boxSizing: "border-box",
-                        }}
-                        placeholder="Type your name"
-                        value={typedName}
-                        onChange={(e) => setTypedName(e.target.value)}
-                        onFocus={e => (e.currentTarget.style.borderColor = t.inputFocusBorder)}
-                        onBlur={e => (e.currentTarget.style.borderColor = t.inputBorder)}
-                      />
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                        {fontOptions.map((f, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setSelectedFont(i)}
-                            style={{
-                              padding: "7px 16px", borderRadius: "8px", border: "none",
-                              background: selectedFont === i ? t.gradient : "#f1f5f9",
-                              color: selectedFont === i ? "white" : "#64748b",
-                              fontSize: "13px", fontWeight: 600, cursor: "pointer",
-                              boxShadow: selectedFont === i ? t.btnShadow : "none",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            {f.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Draw Tab */}
-                  {activeTab === "draw" && signatureBox && (
-                    <canvas
-                      ref={setSignCanvasRef}
-                      width={signatureBox.width}
-                      height={signatureBox.height}
-                      style={{
-                        border: `1px solid ${t.cardBorder}`, borderRadius: "10px",
-                        cursor: "crosshair", background: "#fafafa",
-                      }}
-                      onMouseDown={startDrawing}
-                      onMouseMove={draw}
-                      onMouseUp={stopDrawing}
-                      onMouseLeave={stopDrawing}
-                    />
-                  )}
-
-                  {/* Self-Sign Submit Button */}
-                  {signatureImage && !isPostVerified && (
-                    <button
-                      onClick={() => { setVerifyMode("post"); setShowBiometric(true); }}
-                      style={{
-                        width: "100%", padding: "13px", borderRadius: "12px",
-                        border: "none", background: t.gradient, color: "white",
-                        fontSize: "15px", fontWeight: 600, cursor: "pointer",
-                        boxShadow: t.btnShadow, transition: "all 0.2s", marginTop: "8px",
-                      }}
-                      onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
-                      onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
-                    >
-                      Self-Sign & Verify
-                    </button>
-                  )}
-
-                  {/* Success */}
-                  {isPostVerified && (
-                    <div style={{
-                      textAlign: "center", padding: "12px 20px", borderRadius: "10px",
-                      background: t.verifyBg, border: `1px solid ${t.verifyBorder}`,
-                      color: t.accentColor, fontSize: "15px", fontWeight: 600,
-                    }}>
-                      ✔ Self-Signed Successfully
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </>
-      ) : (
-        <>
-          {/* ================= SEQUENTIAL/INSTITUTION MODE UI ================= */}
-          
-          {/* Institution Header */}
-          <div style={{ 
-            background: "white", 
-            border: `1px solid ${t.cardBorder}`, 
-            borderRadius: "16px", 
-            padding: "24px",
+          {/* Self-Signing Mode Info */}
+          <div style={{
+            background: t.cardBg,
+            border: `1px solid ${t.cardBorder}`,
+            borderRadius: "12px",
+            padding: "16px",
             display: "flex",
             flexDirection: "column",
-            gap: "16px"
+            gap: "12px",
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "12px",
-                background: t.cardBg,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: t.headerIcon,
-              }}>
-                <Shield size={24} />
-              </div>
-              <div>
-                <h2 style={{ 
-                  fontFamily: "Space Grotesk, sans-serif", 
-                  fontSize: "20px", 
-                  fontWeight: 700, 
-                  color: "#0f172a",
-                  margin: 0 
-                }}>
-                  Sign Certificate
-                </h2>
-                <p style={{ 
-                  fontSize: "14px", 
-                  color: "#64748b", 
-                  margin: "4px 0 0 0" 
-                }}>
-                  Review and digitally sign your credential
-                </p>
-              </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: t.accentColor, fontWeight: 600, fontSize: "14px" }}>
+              <User size={16} />
+              Self-Signing Mode
             </div>
+            
+            <div style={{ fontSize: "13px", color: "#64748b", lineHeight: "1.5" }}>
+              You are the only signer. No institution verification required. Institution list: Empty
+            </div>
+          </div>
 
-            {/* Sequential Signing Info */}
-            <div style={{
-              background: t.cardBg,
-              border: `1px solid ${t.cardBorder}`,
-              borderRadius: "12px",
-              padding: "16px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: t.accentColor, fontWeight: 600, fontSize: "14px" }}>
-                <Users size={16} />
-                Sequential Signing
-              </div>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <div style={{ fontSize: "13px", color: "#64748b" }}>
-                  Institutions: <span style={{ color: "#0f172a", fontWeight: 600 }}>{signers.length} signer(s) required</span>
-                </div>
+          {/* Blockchain Security Badge */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "12px 16px",
+            background: "#f8fafc",
+            borderRadius: "8px",
+            fontSize: "13px",
+            color: "#64748b",
+          }}>
+            <Lock size={14} color={t.accentColor} />
+            <span>Blockchain Secured — Signature will be permanently stored on blockchain</span>
+          </div>
+        </div>
+      )}
+
+      {/* 🔐 PRE VERIFY BUTTON */}
+      {!isPreVerified && (
+        <button
+          onClick={() => { setVerifyMode("pre"); setShowBiometric(true); }}
+          style={{
+            width: "100%", padding: "13px", borderRadius: "12px",
+            border: "none", background: t.gradient, color: "white",
+            fontSize: "15px", fontWeight: 600, cursor: "pointer",
+            boxShadow: t.btnShadow, transition: "all 0.2s",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+          }}
+          onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
+          onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
+        >
+          🔐 Verify Identity Before Signing
+        </button>
+      )}
+
+      {/* AFTER PRE VERIFY */}
+      {isPreVerified && (
+        <>
+          {/* PDF Preview */}
+          <div style={{ border: `1px solid ${t.cardBorder}`, borderRadius: "16px", background: t.cardBg, overflow: "auto", position: "relative" }}>
+            <div style={{ position: "relative", margin: "0 auto", background: "white", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", width: pdfSize.width, height: pdfSize.height }}>
+              <canvas ref={setPdfCanvasRef} />
+
+              {certificate.signatureFields?.map((field: SignatureField) => {
+                const matchesByKey = field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+                const isStudentBox = field.isStudent === true || field.isStudent === 1;
+                const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+                const isMine = !field.signed && (matchesByKey || (isStudentBox && isCredentialStudent));
                 
-                {/* Signer List */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {signers.map((signer, idx) => (
-                    <div key={signer.id} style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "8px 12px",
-                      background: signer.isMine ? "white" : "transparent",
-                      border: signer.isMine ? `1px solid ${t.cardBorder}` : "none",
+                return (
+                  <div
+                    key={field.id}
+                    style={{
+                      position: "absolute",
+                      left: field.xRatio * pdfSize.width,
+                      top: field.yRatio * pdfSize.height,
+                      width: field.wRatio * pdfSize.width,
+                      height: field.hRatio * pdfSize.height,
+                      border: `2px dashed hsl(var(--${field.color}))`,
                       borderRadius: "8px",
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
-                        <div style={{
-                          width: "20px",
-                          height: "20px",
-                          borderRadius: "50%",
-                          background: signer.signed ? "#16a34a" : signer.isMine ? t.accentColor : "#cbd5e1",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "white",
-                          fontSize: "11px",
-                          fontWeight: 700,
-                        }}>
-                          {signer.signed ? "✓" : idx + 1}
-                        </div>
-                        <span style={{ 
-                          color: signer.isMine ? "#0f172a" : "#64748b",
-                          fontWeight: signer.isMine ? 600 : 400,
-                        }}>
-                          {signer.name}
-                        </span>
-                      </div>
-                      <span style={{
-                        fontSize: "12px",
-                        padding: "2px 8px",
-                        borderRadius: "4px",
-                        background: signer.signed ? "#dcfce7" : signer.isMine ? t.cardBg : "#f1f5f9",
-                        color: signer.signed ? "#16a34a" : signer.isMine ? t.accentColor : "#64748b",
-                        fontWeight: 600,
+                      zIndex: isMine ? 10 : 1,
+                    }}
+                  >
+                    {isMine && !signatureImage && (
+                      <div style={{
+                        position: "absolute", top: "-24px", left: "50%", transform: "translateX(-50%)",
+                        padding: "2px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                        color: "white", background: `hsl(var(--${field.color}))`, whiteSpace: "nowrap",
                       }}>
-                        {signer.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                        Your Signature
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
-                {/* Status Message */}
-                <div style={{ 
-                  marginTop: "8px",
-                  padding: "10px 12px",
-                  background: isMyTurn ? "#fef3c7" : "#f0fdf4",
-                  border: `1px solid ${isMyTurn ? "#fcd34d" : "#86efac"}`,
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                  color: isMyTurn ? "#92400e" : "#16a34a",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}>
-                  {isMyTurn ? (
-                    <>
-                      <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b", animation: "pulse 2s infinite" }} />
-                      Waiting for previous signer: You are signer #{myTurnIndex + 1}
-                    </>
-                  ) : (
-                    <>Please wait for your turn...</>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Blockchain Security Badge */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "12px 16px",
-              background: "#f8fafc",
-              borderRadius: "8px",
-              fontSize: "13px",
-              color: "#64748b",
-            }}>
-              <Lock size={14} color={t.accentColor} />
-              <span>Blockchain Secured — Signature will be permanently stored on blockchain</span>
+              {signatureImage && signatureBox && (
+                <img
+                  src={signatureImage}
+                  style={{
+                    position: "absolute",
+                    left: signatureBox.x, top: signatureBox.y,
+                    width: signatureBox.width, height: signatureBox.height,
+                    zIndex: 11,
+                  }}
+                />
+              )}
             </div>
           </div>
 
-          {/* 🔐 PRE VERIFY BUTTON - Institution */}
-          {!isPreVerified && isMyTurn && (
-            <button
-              onClick={() => { setVerifyMode("pre"); setShowBiometric(true); }}
-              style={{
-                width: "100%", padding: "13px", borderRadius: "12px",
-                border: "none", background: t.gradient, color: "white",
-                fontSize: "15px", fontWeight: 600, cursor: "pointer",
-                boxShadow: t.btnShadow, transition: "all 0.2s",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-              }}
-              onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
-              onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
-            >
-              <Lock size={18} /> 🔐 Verify Identity Before Signing
-            </button>
-          )}
+          {/* SIGN TOOLS */}
+          {signatureBox && (
+            <div style={{ background: "white", border: `1px solid ${t.cardBorder}`, borderRadius: "16px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
 
-          {/* Waiting message if not your turn */}
-          {!isPreVerified && !isMyTurn && (
-            <div style={{
-              padding: "16px",
-              background: "#fef3c7",
-              border: "1px solid #fcd34d",
-              borderRadius: "12px",
-              textAlign: "center",
-              color: "#92400e",
-              fontSize: "14px",
-            }}>
-              Please wait for previous signers to complete their signatures.
-            </div>
-          )}
-
-          {/* AFTER PRE VERIFY - Institution */}
-          {isPreVerified && isMyTurn && (
-            <>
-              {/* PDF Preview */}
-              <div style={{ border: `1px solid ${t.cardBorder}`, borderRadius: "16px", background: t.cardBg, overflow: "auto", position: "relative" }}>
-                <div style={{ position: "relative", margin: "0 auto", background: "white", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", width: pdfSize.width, height: pdfSize.height }}>
-                  <canvas ref={setPdfCanvasRef} />
-
-                  {certificate.signatureFields?.map((field: SignatureField) => {
-                    const matchesByKey = field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
-                    const isStudentBox = field.isStudent === true || field.isStudent === 1;
-                    const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
-                    const isMine = !field.signed && (matchesByKey || (isStudentBox && isCredentialStudent));
-                    
-                    const fieldColor = formatColor(field.color);
-                    
-                    return (
-                      <div
-                        key={field.id}
-                        style={{
-                          position: "absolute",
-                          left: field.xRatio * pdfSize.width,
-                          top: field.yRatio * pdfSize.height,
-                          width: field.wRatio * pdfSize.width,
-                          height: field.hRatio * pdfSize.height,
-                          border: `2px dashed ${fieldColor}`,
-                          borderRadius: "8px",
-                          zIndex: isMine ? 10 : 1,
-                        }}
-                      >
-                        {/* Your Signature Label */}
-                        {isMine && !signatureImage && (
-                          <div style={{
-                            position: "absolute", 
-                            top: "-28px", 
-                            left: "50%", 
-                            transform: "translateX(-50%)",
-                            padding: "4px 12px", 
-                            borderRadius: "6px", 
-                            fontSize: "12px", 
-                            fontWeight: 700,
-                            color: "white", 
-                            background: fieldColor, 
-                            whiteSpace: "nowrap",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                          }}>
-                            Your Signature
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {signatureImage && signatureBox && (
-                    <img
-                      src={signatureImage}
-                      style={{
-                        position: "absolute",
-                        left: signatureBox.x, top: signatureBox.y,
-                        width: signatureBox.width, height: signatureBox.height,
-                        zIndex: 11,
-                      }}
-                    />
-                  )}
-                </div>
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>Add Signature</h3>
+                <button
+                  onClick={clearSignature}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                    padding: "7px 14px", borderRadius: "8px",
+                    border: `1px solid ${t.cardBorder}`, background: "white",
+                    color: "#64748b", fontSize: "13px", fontWeight: 500,
+                    cursor: "pointer", transition: "all 0.2s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget.style.background = t.clearBtnHover); (e.currentTarget.style.color = t.accentColor); }}
+                  onMouseLeave={e => { (e.currentTarget.style.background = "white"); (e.currentTarget.style.color = "#64748b"); }}
+                >
+                  <RotateCcw size={14} /> Clear
+                </button>
               </div>
 
-              {/* SIGN TOOLS - Institution */}
-              {signatureBox && (
-                <div style={{ background: "white", border: `1px solid ${t.cardBorder}`, borderRadius: "16px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+              {/* Tab Toggle */}
+              <div style={{ display: "flex", gap: "8px" }}>
+                {(["type", "draw"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: "6px",
+                      padding: "8px 18px", borderRadius: "9px", border: "none",
+                      background: activeTab === tab ? t.gradient : "#f1f5f9",
+                      color: activeTab === tab ? "white" : "#64748b",
+                      fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                      boxShadow: activeTab === tab ? t.btnShadow : "none",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {tab === "type" ? <><Type size={14} /> Type</> : <><MousePointer size={14} /> Draw</>}
+                  </button>
+                ))}
+              </div>
 
-                  {/* Header */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>Add Signature</h3>
-                    <button
-                      onClick={clearSignature}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: "6px",
-                        padding: "7px 14px", borderRadius: "8px",
-                        border: `1px solid ${t.cardBorder}`, background: "white",
-                        color: "#64748b", fontSize: "13px", fontWeight: 500,
-                        cursor: "pointer", transition: "all 0.2s",
-                      }}
-                      onMouseEnter={e => { (e.currentTarget.style.background = t.clearBtnHover); (e.currentTarget.style.color = t.accentColor); }}
-                      onMouseLeave={e => { (e.currentTarget.style.background = "white"); (e.currentTarget.style.color = "#64748b"); }}
-                    >
-                      <RotateCcw size={14} /> Clear
-                    </button>
-                  </div>
-
-                  {/* Tab Toggle */}
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    {(["type", "draw"] as const).map((tab) => (
+              {/* Type Tab */}
+              {activeTab === "type" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <input
+                    style={{
+                      width: "100%", padding: "11px 14px", borderRadius: "10px",
+                      border: `1px solid ${t.inputBorder}`, background: "#f8fafc",
+                      fontSize: "14px", color: "#0f172a", outline: "none",
+                      transition: "border 0.2s", boxSizing: "border-box",
+                    }}
+                    placeholder={isSelfSign ? "Type your name" : "Type your name / institution name"}
+                    value={typedName}
+                    onChange={(e) => setTypedName(e.target.value)}
+                    onFocus={e => (e.currentTarget.style.borderColor = t.inputFocusBorder)}
+                    onBlur={e => (e.currentTarget.style.borderColor = t.inputBorder)}
+                  />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {fontOptions.map((f, i) => (
                       <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
+                        key={i}
+                        onClick={() => setSelectedFont(i)}
                         style={{
-                          display: "inline-flex", alignItems: "center", gap: "6px",
-                          padding: "8px 18px", borderRadius: "9px", border: "none",
-                          background: activeTab === tab ? t.gradient : "#f1f5f9",
-                          color: activeTab === tab ? "white" : "#64748b",
+                          padding: "7px 16px", borderRadius: "8px", border: "none",
+                          background: selectedFont === i ? t.gradient : "#f1f5f9",
+                          color: selectedFont === i ? "white" : "#64748b",
                           fontSize: "13px", fontWeight: 600, cursor: "pointer",
-                          boxShadow: activeTab === tab ? t.btnShadow : "none",
+                          boxShadow: selectedFont === i ? t.btnShadow : "none",
                           transition: "all 0.2s",
                         }}
                       >
-                        {tab === "type" ? <><Type size={14} /> Type</> : <><MousePointer size={14} /> Draw</>}
+                        {f.name}
                       </button>
                     ))}
                   </div>
-
-                  {/* Type Tab */}
-                  {activeTab === "type" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                      <input
-                        style={{
-                          width: "100%", padding: "11px 14px", borderRadius: "10px",
-                          border: `1px solid ${t.inputBorder}`, background: "#f8fafc",
-                          fontSize: "14px", color: "#0f172a", outline: "none",
-                          transition: "border 0.2s", boxSizing: "border-box",
-                        }}
-                        placeholder="Type your name / institution name"
-                        value={typedName}
-                        onChange={(e) => setTypedName(e.target.value)}
-                        onFocus={e => (e.currentTarget.style.borderColor = t.inputFocusBorder)}
-                        onBlur={e => (e.currentTarget.style.borderColor = t.inputBorder)}
-                      />
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                        {fontOptions.map((f, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setSelectedFont(i)}
-                            style={{
-                              padding: "7px 16px", borderRadius: "8px", border: "none",
-                              background: selectedFont === i ? t.gradient : "#f1f5f9",
-                              color: selectedFont === i ? "white" : "#64748b",
-                              fontSize: "13px", fontWeight: 600, cursor: "pointer",
-                              boxShadow: selectedFont === i ? t.btnShadow : "none",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            {f.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Draw Tab */}
-                  {activeTab === "draw" && signatureBox && (
-                    <canvas
-                      ref={setSignCanvasRef}
-                      width={signatureBox.width}
-                      height={signatureBox.height}
-                      style={{
-                        border: `1px solid ${t.cardBorder}`, borderRadius: "10px",
-                        cursor: "crosshair", background: "#fafafa",
-                      }}
-                      onMouseDown={startDrawing}
-                      onMouseMove={draw}
-                      onMouseUp={stopDrawing}
-                      onMouseLeave={stopDrawing}
-                    />
-                  )}
-
-                  {/* Institution Submit Button */}
-                  {signatureImage && !isPostVerified && (
-                    <button
-                      onClick={() => { setVerifyMode("post"); setShowBiometric(true); }}
-                      style={{
-                        width: "100%", padding: "13px", borderRadius: "12px",
-                        border: "none", background: t.gradient, color: "white",
-                        fontSize: "15px", fontWeight: 600, cursor: "pointer",
-                        boxShadow: t.btnShadow, transition: "all 0.2s", marginTop: "8px",
-                      }}
-                      onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
-                      onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
-                    >
-                      Verify & Confirm Signature
-                    </button>
-                  )}
-
-                  {/* Success */}
-                  {isPostVerified && (
-                    <div style={{
-                      textAlign: "center", padding: "12px 20px", borderRadius: "10px",
-                      background: t.verifyBg, border: `1px solid ${t.verifyBorder}`,
-                      color: t.accentColor, fontSize: "15px", fontWeight: 600,
-                    }}>
-                      ✔ Signature Verified Successfully
-                    </div>
-                  )}
                 </div>
               )}
-            </>
+
+              {/* Draw Tab */}
+              {activeTab === "draw" && signatureBox && (
+                <canvas
+                  ref={setSignCanvasRef}
+                  width={signatureBox.width}
+                  height={signatureBox.height}
+                  style={{
+                    border: `1px solid ${t.cardBorder}`, borderRadius: "10px",
+                    cursor: "crosshair", background: "#fafafa",
+                  }}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                />
+              )}
+
+              {/* Post Verify Button - Different text for self vs institution */}
+              {signatureImage && !isPostVerified && (
+                <button
+                  onClick={() => { setVerifyMode("post"); setShowBiometric(true); }}
+                  style={{
+                    width: "100%", padding: "13px", borderRadius: "12px",
+                    border: "none", background: t.gradient, color: "white",
+                    fontSize: "15px", fontWeight: 600, cursor: "pointer",
+                    boxShadow: t.btnShadow, transition: "all 0.2s", marginTop: "8px",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
+                  onLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
+                >
+                  {isSelfSign ? "Self-Sign & Verify" : "Verify & Confirm Signature"}
+                </button>
+              )}
+
+              {/* Success - Different message for self vs institution */}
+              {isPostVerified && (
+                <div style={{
+                  textAlign: "center", padding: "12px 20px", borderRadius: "10px",
+                  background: isSelfSign ? t.verifyBg : "#f0fdf4", 
+                  border: `1px solid ${isSelfSign ? t.verifyBorder : "#86efac"}`,
+                  color: isSelfSign ? t.accentColor : "#16a34a", 
+                  fontSize: "15px", fontWeight: 600,
+                }}>
+                  ✔ {isSelfSign ? "Self-Signed Successfully" : "Signature Verified Successfully"}
+                </div>
+              )}
+            </div>
           )}
         </>
       )}
