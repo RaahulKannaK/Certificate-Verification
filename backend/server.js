@@ -929,7 +929,7 @@ app.post("/institution/issueCredential", async (req, res) => {
 
 app.post("/getIssuedCredentials", async (req, res) => {
   try {
-    const { walletPublicKey, role } = req.body;
+    const { walletPublicKey, role, signingType } = req.body;
 
     if (!walletPublicKey) {
       return res.status(400).json({
@@ -941,24 +941,27 @@ app.post("/getIssuedCredentials", async (req, res) => {
     let credentials = [];
 
     if (role === "institution") {
-      // Institution: Get credentials where they need to sign
-      // 1. Credentials where institution is in institutionPublicKeys (sequential/parallel)
+      // ================= INSTITUTION LOGIC =================
+      // 1. Credentials where institution is in institutionPublicKeys (needs to sign)
       const [asInstitution] = await db.query(
         `SELECT * FROM issued_credentials 
          WHERE JSON_CONTAINS(institutionPublicKeys, JSON_QUOTE(?))
          AND signingType IN ('sequential', 'parallel')
+         ${signingType ? `AND signingType = ?` : ''}
          ORDER BY issuedAt DESC`,
-        [walletPublicKey]
+        signingType ? [walletPublicKey, signingType] : [walletPublicKey]
       );
 
-      // 2. Credentials where institution is already a signer
+      // 2. Credentials where institution already signed
       const [asSigner] = await db.query(
         `SELECT DISTINCT ic.* 
          FROM issued_credentials ic
          JOIN credential_signers cs ON ic.credentialId = cs.credentialId COLLATE utf8mb4_unicode_ci
          WHERE cs.signerPublicKey = ?
+         AND ic.signingType IN ('sequential', 'parallel')
+         ${signingType ? `AND ic.signingType = ?` : ''}
          ORDER BY ic.issuedAt DESC`,
-        [walletPublicKey]
+        signingType ? [walletPublicKey, signingType] : [walletPublicKey]
       );
 
       // Merge and dedupe
@@ -968,35 +971,55 @@ app.post("/getIssuedCredentials", async (req, res) => {
       );
 
     } else {
-      // Student (default): Get self-signed and institution-issued credentials
+      // ================= STUDENT LOGIC =================
+      // Build type filter based on signingType
+      let typeFilter = '';
+      if (signingType === 'self') {
+        // Self-sign: institutionPublicKeys is empty array
+        typeFilter = `AND (institutionPublicKeys = '[]' OR institutionPublicKeys = '' OR institutionPublicKeys IS NULL)`;
+      } else if (signingType === 'sequential' || signingType === 'parallel') {
+        // Sequential/Parallel: institutionPublicKeys is not empty
+        typeFilter = `AND institutionPublicKeys NOT IN ('[]', '', 'null') AND institutionPublicKeys IS NOT NULL`;
+      }
+
       // 1. Self-signed credentials (student is the only signer)
       const [selfSigned] = await db.query(
         `SELECT * FROM issued_credentials 
          WHERE studentPublicKey = ?
          AND signingType = 'self'
-         AND (institutionPublicKeys = '[]' OR institutionPublicKeys = '' OR institutionPublicKeys IS NULL)
+         ${typeFilter}
          ORDER BY issuedAt DESC`,
         [walletPublicKey]
       );
 
       // 2. Credentials issued to student by institutions
-      const [institutionIssued] = await db.query(
-        `SELECT * FROM issued_credentials 
-         WHERE studentPublicKey = ?
-         AND signingType IN ('sequential', 'parallel')
-         ORDER BY issuedAt DESC`,
-        [walletPublicKey]
-      );
+      let institutionIssued = [];
+      if (!signingType || signingType !== 'self') {
+        const [issued] = await db.query(
+          `SELECT * FROM issued_credentials 
+           WHERE studentPublicKey = ?
+           AND signingType IN ('sequential', 'parallel')
+           ${signingType ? `AND signingType = ?` : ''}
+           ORDER BY issuedAt DESC`,
+          signingType ? [walletPublicKey, signingType] : [walletPublicKey]
+        );
+        institutionIssued = issued;
+      }
 
       // 3. Credentials where student is a signer (if any)
-      const [asSigner] = await db.query(
-        `SELECT DISTINCT ic.* 
-         FROM issued_credentials ic
-         JOIN credential_signers cs ON ic.credentialId = cs.credentialId COLLATE utf8mb4_unicode_ci
-         WHERE cs.signerPublicKey = ?
-         ORDER BY ic.issuedAt DESC`,
-        [walletPublicKey]
-      );
+      let asSigner = [];
+      if (!signingType || signingType !== 'self') {
+        const [signer] = await db.query(
+          `SELECT DISTINCT ic.* 
+           FROM issued_credentials ic
+           JOIN credential_signers cs ON ic.credentialId = cs.credentialId COLLATE utf8mb4_unicode_ci
+           WHERE cs.signerPublicKey = ?
+           AND ic.signingType IN ('sequential', 'parallel')
+           ORDER BY ic.issuedAt DESC`,
+          [walletPublicKey]
+        );
+        asSigner = signer;
+      }
 
       // Merge and dedupe
       const all = [...selfSigned, ...institutionIssued, ...asSigner];
