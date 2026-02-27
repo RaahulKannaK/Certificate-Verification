@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Type, MousePointer, RotateCcw, User, Lock } from "lucide-react";
+import { Type, MousePointer, RotateCcw } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 import { BiometricVerify } from "../dashboard/BiometricVerify";
@@ -17,7 +17,7 @@ interface SignatureField {
   hRatio: number;
   color: string;
   signed?: boolean;
-  isStudent?: boolean;
+  isStudent?: boolean; // Added for self-sign detection
 }
 
 interface CertificatePreviewProps {
@@ -103,22 +103,6 @@ export const CertificatePreview = ({
 
   const documentUrl = certificate.filePath;
 
-  // Check if this is self-sign mode (student signing their own credential)
-  const isSelfSign = useMemo(() => {
-    if (!certificate?.signatureFields || !myPublicKey) return false;
-    // Check if the only unsigned field is a student field belonging to current user
-    const studentField = certificate.signatureFields.find((f: SignatureField) => 
-      (f.isStudent === true || f.isStudent === 1) && !f.signed
-    );
-    const isMyStudentField = studentField && 
-      certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
-    // Check if no institution fields exist or are all signed
-    const hasUnsignedInstitution = certificate.signatureFields.some((f: SignatureField) => 
-      !(f.isStudent === true || f.isStudent === 1) && !f.signed
-    );
-    return isMyStudentField && !hasUnsignedInstitution;
-  }, [certificate, myPublicKey]);
-
   /* ================= LOAD PDF ================= */
   useEffect(() => {
     if (!documentUrl || !pdfCanvasRef) return;
@@ -148,12 +132,16 @@ export const CertificatePreview = ({
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
     
+    // Find box where:
+    // 1. signerPublicKey matches myPublicKey (for institution or self-sign), OR
+    // 2. For student self-sign: isStudent flag is true AND studentPublicKey matches
     return certificate.signatureFields.find((b: SignatureField) => {
       const matchesByKey = b.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
       const isStudentBox = b.isStudent === true || b.isStudent === 1;
       const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
       const notSigned = !b.signed;
       
+      // Match if: key matches directly OR it's student's self-sign box
       return notSigned && (matchesByKey || (isStudentBox && isCredentialStudent));
     });
   }, [myPublicKey, certificate.signatureFields, certificate.studentPublicKey]);
@@ -264,87 +252,6 @@ export const CertificatePreview = ({
         </div>
       )}
 
-      {/* SELF-SIGN HEADER - Only for self-sign mode */}
-      {isSelfSign && !isPreVerified && (
-        <div style={{ 
-          background: "white", 
-          border: `1px solid ${t.cardBorder}`, 
-          borderRadius: "16px", 
-          padding: "24px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "16px"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "12px",
-              background: t.cardBg,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: t.accentColor,
-            }}>
-              <User size={24} />
-            </div>
-            <div>
-              <h2 style={{ 
-                fontFamily: "Space Grotesk, sans-serif", 
-                fontSize: "20px", 
-                fontWeight: 700, 
-                color: "#0f172a",
-                margin: 0 
-              }}>
-                Self-Sign Certificate
-              </h2>
-              <p style={{ 
-                fontSize: "14px", 
-                color: "#64748b", 
-                margin: "4px 0 0 0" 
-              }}>
-                Sign your own credential (no institution required)
-              </p>
-            </div>
-          </div>
-
-          {/* Self-Signing Mode Info */}
-          <div style={{
-            background: t.cardBg,
-            border: `1px solid ${t.cardBorder}`,
-            borderRadius: "12px",
-            padding: "16px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: t.accentColor, fontWeight: 600, fontSize: "14px" }}>
-              <User size={16} />
-              Self-Signing Mode
-            </div>
-            
-            <div style={{ fontSize: "13px", color: "#64748b", lineHeight: "1.5" }}>
-              You are the only signer. No institution verification required. Institution list: Empty
-            </div>
-          </div>
-
-          {/* Blockchain Security Badge */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "12px 16px",
-            background: "#f8fafc",
-            borderRadius: "8px",
-            fontSize: "13px",
-            color: "#64748b",
-          }}>
-            <Lock size={14} color={t.accentColor} />
-            <span>Blockchain Secured — Signature will be permanently stored on blockchain</span>
-          </div>
-        </div>
-      )}
-
       {/* 🔐 PRE VERIFY BUTTON */}
       {!isPreVerified && (
         <button
@@ -372,6 +279,7 @@ export const CertificatePreview = ({
               <canvas ref={setPdfCanvasRef} />
 
               {certificate.signatureFields?.map((field: SignatureField) => {
+                // FIXED: Check if this field belongs to current user
                 const matchesByKey = field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
                 const isStudentBox = field.isStudent === true || field.isStudent === 1;
                 const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
@@ -472,7 +380,7 @@ export const CertificatePreview = ({
                       fontSize: "14px", color: "#0f172a", outline: "none",
                       transition: "border 0.2s", boxSizing: "border-box",
                     }}
-                    placeholder={isSelfSign ? "Type your name" : "Type your name / institution name"}
+                    placeholder="Type your name / institution name"
                     value={typedName}
                     onChange={(e) => setTypedName(e.target.value)}
                     onFocus={e => (e.currentTarget.style.borderColor = t.inputFocusBorder)}
@@ -516,7 +424,7 @@ export const CertificatePreview = ({
                 />
               )}
 
-              {/* Post Verify Button - Different text for self vs institution */}
+              {/* Post Verify Button */}
               {signatureImage && !isPostVerified && (
                 <button
                   onClick={() => { setVerifyMode("post"); setShowBiometric(true); }}
@@ -527,22 +435,20 @@ export const CertificatePreview = ({
                     boxShadow: t.btnShadow, transition: "all 0.2s", marginTop: "8px",
                   }}
                   onMouseEnter={e => { (e.currentTarget.style.transform = "translateY(-2px)"); (e.currentTarget.style.boxShadow = t.btnShadowHover); }}
-                  onLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
+                  onMouseLeave={e => { (e.currentTarget.style.transform = "translateY(0)"); (e.currentTarget.style.boxShadow = t.btnShadow); }}
                 >
-                  {isSelfSign ? "Self-Sign & Verify" : "Verify & Confirm Signature"}
+                  Verify & Confirm Signature
                 </button>
               )}
 
-              {/* Success - Different message for self vs institution */}
+              {/* Success */}
               {isPostVerified && (
                 <div style={{
                   textAlign: "center", padding: "12px 20px", borderRadius: "10px",
-                  background: isSelfSign ? t.verifyBg : "#f0fdf4", 
-                  border: `1px solid ${isSelfSign ? t.verifyBorder : "#86efac"}`,
-                  color: isSelfSign ? t.accentColor : "#16a34a", 
-                  fontSize: "15px", fontWeight: 600,
+                  background: "#f0fdf4", border: "1px solid #86efac",
+                  color: "#16a34a", fontSize: "15px", fontWeight: 600,
                 }}>
-                  ✔ {isSelfSign ? "Self-Signed Successfully" : "Signature Verified Successfully"}
+                  ✔ Signature Verified Successfully
                 </div>
               )}
             </div>
