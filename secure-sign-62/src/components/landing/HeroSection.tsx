@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileSignature, Menu, X, Shield, Link2, Pen } from 'lucide-react';
+import { FileSignature, Menu, X, Shield, Link2 } from 'lucide-react';
 
 interface HeroSectionProps {
   onCreateAccount: () => void;
@@ -20,12 +20,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [isSigning, setIsSigning] = useState(false);
+  const [animationComplete, setAnimationComplete] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimationComplete(true), 3000);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleStudentClick = () => {
@@ -52,14 +57,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       alert('Please log in as an institution to access the institution dashboard');
       onLogin();
     }
-  };
-
-  const handleEnterClick = () => {
-    setIsSigning(true);
-    setTimeout(() => {
-      setIsSigning(false);
-      onLogin();
-    }, 1500);
   };
 
   const navLinks = [
@@ -229,187 +226,348 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         </div>
       )}
 
-      {/* ===== HERO CONTENT ===== */}
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '1100px', margin: '0 auto', padding: '160px 24px 80px' }}>
-        <div style={{ textAlign: 'center', maxWidth: '760px', margin: '0 auto' }}>
-
-          {/* Heading */}
-          <h1 style={{
-            fontFamily: 'Poppins Semi-Bold',
-            fontSize: 'clamp(2.6rem, 6vw, 4.8rem)',
-            fontWeight: 900, lineHeight: 1.1,
-            color: '#0f172a', marginBottom: '24px',
-          }}>
-            Digital Signatures
-            <br />
-            <span style={{
-              background: 'linear-gradient(135deg, #0a0a0a, #0d0d0e)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}>
-              Powered by Trust
-            </span>
-          </h1>
-
-          {/* Subtext */}
-          <p style={{ fontFamily: 'Familjen Grotesk', fontSize: '18px', color: '#1d1d1e', lineHeight: 1.75, maxWidth: '600px', margin: '0 auto 44px' }}>
-            Secure, verifiable, and tamper-proof document signing between students and institutions.
-            Your keys, your identity, your signature.
-          </p>
-
-          {/* CTA Buttons */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '14px' }}>
-            <button
-              onClick={onCreateAccount}
-              style={{
-                padding: '13px 32px', borderRadius: '10px', border: 'none',
-                background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                color: 'white', fontFamily: 'Cabinet Grotesk', fontSize: '18px', fontWeight: 900,
-                cursor: 'pointer', boxShadow: '0 6px 20px rgba(99,102,241,0.35)',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-              }}
-              onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-2px)'); (e.currentTarget.style.boxShadow = '0 10px 28px rgba(99,102,241,0.45)'); }}
-              onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.35)'); }}
-            >
-              Get Started
-            </button>
-            
-            {/* Animated Enter Button with Pen Signing */}
-            <button
-              onClick={handleEnterClick}
-              disabled={isSigning}
-              style={{
-                padding: '13px 32px', borderRadius: '10px',
-                border: '1.5px solid #cbd5e1', background: 'white',
-                color: '#374151', fontFamily: 'Cabinet Grotesk', fontSize: '18px', fontWeight: 900,
-                cursor: isSigning ? 'wait' : 'pointer', 
-                transition: 'all 0.2s',
-                position: 'relative',
-                overflow: 'hidden',
-                minWidth: '140px',
-                height: '54px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onMouseEnter={e => { 
-                if (!isSigning) {
-                  (e.currentTarget.style.borderColor = '#6366f1'); 
-                  (e.currentTarget.style.color = '#6366f1'); 
-                  (e.currentTarget.style.background = '#fafaff'); 
-                }
-              }}
-              onMouseLeave={e => { 
-                if (!isSigning) {
-                  (e.currentTarget.style.borderColor = '#cbd5e1'); 
-                  (e.currentTarget.style.color = '#374151'); 
-                  (e.currentTarget.style.background = 'white'); 
-                }
-              }}
-            >
-              {isSigning ? (
-                <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {/* Signature Line Animation */}
-                  <svg 
-                    width="80" 
-                    height="30" 
-                    viewBox="0 0 80 30" 
-                    style={{ position: 'absolute' }}
-                  >
-                    <path
-                      d="M5,20 Q15,5 25,20 T45,20 T65,15 T75,20"
-                      fill="none"
-                      stroke="#6366f1"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      style={{
-                        strokeDasharray: 100,
-                        strokeDashoffset: 100,
-                        animation: 'signAnimation 1s ease-out forwards',
-                      }}
-                    />
-                    <style>{`
-                      @keyframes signAnimation {
-                        to {
-                          stroke-dashoffset: 0;
-                        }
-                      }
-                    `}</style>
-                  </svg>
-                  
-                  {/* Pen Animation */}
-                  <div 
-                    style={{
-                      position: 'absolute',
-                      animation: 'penMove 1s ease-out forwards',
-                      transformOrigin: 'bottom center',
-                    }}
-                  >
-                    <style>{`
-                      @keyframes penMove {
-                        0% {
-                          transform: translate(-30px, 10px) rotate(-45deg);
-                          opacity: 0;
-                        }
-                        20% {
-                          opacity: 1;
-                        }
-                        100% {
-                          transform: translate(30px, -5px) rotate(-15deg);
-                          opacity: 1;
-                        }
-                      }
-                    `}</style>
-                    <Pen size={20} color="#6366f1" style={{ transform: 'rotate(-45deg)' }} />
-                  </div>
-                </div>
-              ) : (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  Enter
-                  <Pen size={18} style={{ opacity: 0.6 }} />
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* ===== FEATURE CARDS ===== */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '22px', marginTop: '90px',
+      {/* ===== HERO CONTENT - SIGNING ANIMATION ===== */}
+      <div style={{ 
+        position: 'relative', 
+        zIndex: 1, 
+        maxWidth: '1100px', 
+        margin: '0 auto', 
+        padding: '160px 24px 80px',
+        minHeight: 'calc(100vh - 160px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <div style={{ 
+          position: 'relative',
+          width: '100%',
+          maxWidth: '600px',
+          height: '300px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}>
-          {[
-            { icon: <Shield size={22} color="#3b82f6" />, title: 'Biometric Security', desc: 'Access your private key securely using fingerprint or face recognition', bg: '#eff6ff', border: '#bfdbfe' },
-            { icon: <FileSignature size={22} color="#6366f1" />, title: 'Multi-Party Signing', desc: 'Sequential or parallel signing workflows with deadline tracking', bg: '#eef2ff', border: '#c7d2fe' },
-            { icon: <Link2 size={22} color="#10b981" />, title: 'Blockchain Verified', desc: 'Every signature is cryptographically verified and immutable', bg: '#f0fdf4', border: '#a7f3d0' },
-          ].map((card, i) => (
-            <div key={i} style={{
-              background: 'white', borderRadius: '16px',
-              border: `1px solid ${card.border}`,
-              padding: '28px',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-            }}
-              onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-4px)'); (e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'); }}
-              onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.05)'); }}
+          
+          {/* Paper Background Effect */}
+          <div style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '12px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)',
+            transform: 'rotate(-2deg)',
+          }} />
+          
+          <div style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '12px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)',
+            transform: 'rotate(1deg)',
+          }} />
+
+          {/* Signature Container */}
+          <div style={{
+            position: 'relative',
+            zIndex: 10,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            overflow: 'hidden',
+          }}>
+            
+            {/* Grid Lines */}
+            <div style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 39px, #e2e8f0 39px, #e2e8f0 40px)',
+              opacity: 0.5,
+            }} />
+
+            {/* Signature SVG */}
+            <svg 
+              width="400" 
+              height="120" 
+              viewBox="0 0 400 120" 
+              style={{ position: 'relative', zIndex: 5 }}
             >
+              <defs>
+                <linearGradient id="inkGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#1e293b" />
+                  <stop offset="50%" stopColor="#334155" />
+                  <stop offset="100%" stopColor="#1e293b" />
+                </linearGradient>
+              </defs>
+              
+              {/* The Signature Path - "WeSign" in cursive style */}
+              <path
+                id="signaturePath"
+                d="M 40,80 
+                   C 40,80 45,60 50,55 
+                   C 55,50 60,55 60,65 
+                   C 60,75 55,85 50,90
+                   M 65,70
+                   C 65,70 70,50 75,45
+                   C 80,40 85,45 85,55
+                   C 85,65 80,75 75,80
+                   C 70,85 75,85 80,82
+                   M 95,60
+                   C 95,60 100,40 105,35
+                   C 110,30 115,35 115,45
+                   C 115,55 110,65 105,70
+                   C 100,75 105,75 110,72
+                   M 125,50
+                   L 125,85
+                   M 125,55
+                   C 125,55 135,45 140,50
+                   C 145,55 140,65 135,70
+                   C 130,75 140,75 145,72
+                   M 160,60
+                   C 160,60 165,40 170,35
+                   C 175,30 180,35 180,45
+                   C 180,55 175,65 170,70
+                   C 165,75 170,75 175,72
+                   M 190,50
+                   C 190,50 195,30 200,25
+                   C 205,20 210,25 210,35
+                   C 210,45 205,55 200,60
+                   C 195,65 200,65 205,62
+                   M 220,40
+                   C 220,40 225,20 230,15
+                   C 235,10 240,15 240,25
+                   C 240,35 235,45 230,50
+                   C 225,55 230,55 235,52
+                   M 250,30
+                   C 250,30 255,10 260,5
+                   C 265,0 270,5 270,15
+                   C 270,25 265,35 260,40
+                   C 255,45 260,45 265,42
+                   M 280,20
+                   C 280,20 285,0 290,-5
+                   C 295,-10 300,-5 300,5
+                   C 300,15 295,25 290,30
+                   C 285,35 290,35 295,32
+                   M 310,10
+                   C 310,10 315,-10 320,-15
+                   C 325,-20 330,-15 330,-5
+                   C 330,5 325,15 320,20
+                   C 315,25 320,25 325,22
+                   M 340,0
+                   C 340,0 345,-20 350,-25
+                   C 355,-30 360,-25 360,-15
+                   C 360,-5 355,5 350,10
+                   C 345,15 350,15 355,12"
+                fill="none"
+                stroke="url(#inkGradient)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  strokeDasharray: 2000,
+                  strokeDashoffset: 2000,
+                  animation: 'drawSignature 3s ease-in-out forwards',
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                }}
+              />
+              
+              <style>{`
+                @keyframes drawSignature {
+                  0% {
+                    stroke-dashoffset: 2000;
+                    opacity: 0;
+                  }
+                  10% {
+                    opacity: 1;
+                  }
+                  100% {
+                    stroke-dashoffset: 0;
+                    opacity: 1;
+                  }
+                }
+              `}</style>
+            </svg>
+
+            {/* Realistic Pen */}
+            <div 
+              style={{
+                position: 'absolute',
+                zIndex: 20,
+                animation: 'penWrite 3s ease-in-out forwards',
+                transformOrigin: 'bottom center',
+                filter: 'drop-shadow(2px 4px 8px rgba(0,0,0,0.3))',
+              }}
+            >
+              <style>{`
+                @keyframes penWrite {
+                  0% {
+                    transform: translate(-180px, 40px) rotate(-45deg);
+                    opacity: 0;
+                  }
+                  5% {
+                    opacity: 1;
+                  }
+                  100% {
+                    transform: translate(180px, -60px) rotate(-15deg);
+                    opacity: 1;
+                  }
+                }
+              `}</style>
+              
+              {/* Pen Body */}
               <div style={{
-                width: '46px', height: '46px', borderRadius: '12px',
-                background: card.bg, display: 'flex',
-                alignItems: 'center', justifyContent: 'center', marginBottom: '16px',
+                width: '120px',
+                height: '12px',
+                background: 'linear-gradient(180deg, #1e293b 0%, #334155 50%, #1e293b 100%)',
+                borderRadius: '6px',
+                position: 'relative',
+                transform: 'rotate(-90deg)',
               }}>
-                {card.icon}
+                {/* Pen Tip */}
+                <div style={{
+                  position: 'absolute',
+                  left: '-8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '0',
+                  height: '0',
+                  borderTop: '6px solid transparent',
+                  borderBottom: '6px solid transparent',
+                  borderRight: '10px solid #0f172a',
+                }} />
+                
+                {/* Pen Cap */}
+                <div style={{
+                  position: 'absolute',
+                  right: '-4px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '20px',
+                  height: '14px',
+                  background: 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)',
+                  borderRadius: '0 6px 6px 0',
+                  boxShadow: 'inset -2px 0 4px rgba(0,0,0,0.2)',
+                }} />
+                
+                {/* Clip */}
+                <div style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '-4px',
+                  width: '4px',
+                  height: '20px',
+                  background: '#4f46e5',
+                  borderRadius: '2px',
+                }} />
               </div>
-              <h3 style={{ fontFamily: 'Open Sans', fontSize: '18px', fontWeight: 900, color: '#0f172a', marginBottom: '8px' }}>
-                {card.title}
-              </h3>
-              <p style={{ fontFamily: 'Cabinet Grotesk', fontSize: '18px', color: '#1f2021', lineHeight: 1.73 }}>
-                {card.desc}
-              </p>
             </div>
-          ))}
+
+            {/* Ink Dots/Effects */}
+            <div style={{
+              position: 'absolute',
+              width: '4px',
+              height: '4px',
+              background: '#1e293b',
+              borderRadius: '50%',
+              left: '20%',
+              top: '45%',
+              opacity: 0,
+              animation: 'inkDrop 0.3s ease-out 2.8s forwards',
+            }}>
+              <style>{`
+                @keyframes inkDrop {
+                  0% { opacity: 0; transform: scale(0); }
+                  100% { opacity: 0.6; transform: scale(1); }
+                }
+              `}</style>
+            </div>
+          </div>
+
+          {/* Click to Enter Text - Shows after animation */}
+          {animationComplete && (
+            <div 
+              style={{
+                position: 'absolute',
+                bottom: '40px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                opacity: 0,
+                animation: 'fadeInUp 0.5s ease-out forwards',
+                cursor: 'pointer',
+              }}
+              onClick={onLogin}
+            >
+              <style>{`
+                @keyframes fadeInUp {
+                  from {
+                    opacity: 0;
+                    transform: translateX(-50%) translateY(10px);
+                  }
+                  to {
+                    opacity: 1;
+                    transform: translateX(-50%) translateY(0);
+                  }
+                }
+              `}</style>
+              <span style={{
+                fontFamily: 'Cabinet Grotesk',
+                fontSize: '14px',
+                color: '#64748b',
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+                transition: 'color 0.2s',
+              }}>
+                Click to Enter
+              </span>
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* ===== FEATURE CARDS ===== */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+        gap: '22px', marginTop: '0', padding: '0 24px 80px',
+        maxWidth: '1100px', marginLeft: 'auto', marginRight: 'auto',
+      }}>
+        {[
+          { icon: <Shield size={22} color="#3b82f6" />, title: 'Biometric Security', desc: 'Access your private key securely using fingerprint or face recognition', bg: '#eff6ff', border: '#bfdbfe' },
+          { icon: <FileSignature size={22} color="#6366f1" />, title: 'Multi-Party Signing', desc: 'Sequential or parallel signing workflows with deadline tracking', bg: '#eef2ff', border: '#c7d2fe' },
+          { icon: <Link2 size={22} color="#10b981" />, title: 'Blockchain Verified', desc: 'Every signature is cryptographically verified and immutable', bg: '#f0fdf4', border: '#a7f3d0' },
+        ].map((card, i) => (
+          <div key={i} style={{
+            background: 'white', borderRadius: '16px',
+            border: `1px solid ${card.border}`,
+            padding: '28px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+            onMouseEnter={e => { (e.currentTarget.style.transform = 'translateY(-4px)'); (e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'); }}
+            onMouseLeave={e => { (e.currentTarget.style.transform = 'translateY(0)'); (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.05)'); }}
+          >
+            <div style={{
+              width: '46px', height: '46px', borderRadius: '12px',
+              background: card.bg, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', marginBottom: '16px',
+            }}>
+              {card.icon}
+            </div>
+            <h3 style={{ fontFamily: 'Open Sans', fontSize: '18px', fontWeight: 900, color: '#0f172a', marginBottom: '8px' }}>
+              {card.title}
+            </h3>
+            <p style={{ fontFamily: 'Cabinet Grotesk', fontSize: '18px', color: '#1f2021', lineHeight: 1.73 }}>
+              {card.desc}
+            </p>
+          </div>
+        ))}
       </div>
     </div>
   );
