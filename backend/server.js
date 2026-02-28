@@ -21,7 +21,7 @@ const app = express();
 // 🔧 Middleware
 // ========================
 app.use(cors({
-  origin: "https://w-sign.onrender.com",
+  origin: ["https://w-sign.onrender.com","http://localhost:8080"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
