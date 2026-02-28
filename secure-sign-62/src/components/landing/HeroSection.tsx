@@ -29,7 +29,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setAnimationComplete(true), 3000);
+    const timer = setTimeout(() => setAnimationComplete(true), 3500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -241,8 +241,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         <div style={{ 
           position: 'relative',
           width: '100%',
-          maxWidth: '600px',
-          height: '300px',
+          maxWidth: '700px',
+          height: '400px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -254,9 +254,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             width: '100%',
             height: '100%',
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '12px',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)',
-            transform: 'rotate(-2deg)',
+            borderRadius: '16px',
+            boxShadow: '0 25px 80px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05)',
+            transform: 'rotate(-1.5deg)',
           }} />
           
           <div style={{
@@ -264,9 +264,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             width: '100%',
             height: '100%',
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '12px',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)',
-            transform: 'rotate(1deg)',
+            borderRadius: '16px',
+            boxShadow: '0 25px 80px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05)',
+            transform: 'rotate(0.5deg)',
           }} />
 
           {/* Signature Container */}
@@ -279,8 +279,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             background: 'white',
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            borderRadius: '16px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
             overflow: 'hidden',
           }}>
             
@@ -289,103 +289,93 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               position: 'absolute',
               width: '100%',
               height: '100%',
-              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 39px, #e2e8f0 39px, #e2e8f0 40px)',
-              opacity: 0.5,
+              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 59px, #e2e8f0 59px, #e2e8f0 60px)',
+              opacity: 0.4,
             }} />
 
-            {/* Signature SVG */}
+            {/* Signature SVG - "Sinemic" */}
             <svg 
-              width="400" 
-              height="120" 
-              viewBox="0 0 400 120" 
+              width="500" 
+              height="160" 
+              viewBox="0 0 500 160" 
               style={{ position: 'relative', zIndex: 5 }}
             >
               <defs>
                 <linearGradient id="inkGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#1e293b" />
-                  <stop offset="50%" stopColor="#334155" />
-                  <stop offset="100%" stopColor="#1e293b" />
+                  <stop offset="0%" stopColor="#0f172a" />
+                  <stop offset="30%" stopColor="#1e293b" />
+                  <stop offset="60%" stopColor="#334155" />
+                  <stop offset="100%" stopColor="#0f172a" />
                 </linearGradient>
+                <filter id="inkShadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="1" dy="2" stdDeviation="1" floodColor="#000000" floodOpacity="0.15"/>
+                </filter>
               </defs>
               
-              {/* The Signature Path - "WeSign" in cursive style */}
+              {/* "Sinemic" Signature Path - Elegant cursive */}
               <path
                 id="signaturePath"
-                d="M 40,80 
-                   C 40,80 45,60 50,55 
-                   C 55,50 60,55 60,65 
-                   C 60,75 55,85 50,90
-                   M 65,70
-                   C 65,70 70,50 75,45
-                   C 80,40 85,45 85,55
-                   C 85,65 80,75 75,80
-                   C 70,85 75,85 80,82
-                   M 95,60
-                   C 95,60 100,40 105,35
-                   C 110,30 115,35 115,45
-                   C 115,55 110,65 105,70
-                   C 100,75 105,75 110,72
-                   M 125,50
-                   L 125,85
-                   M 125,55
-                   C 125,55 135,45 140,50
-                   C 145,55 140,65 135,70
-                   C 130,75 140,75 145,72
+                d="M 50,100 
+                   C 50,100 45,80 50,70 
+                   C 55,60 65,55 75,60
+                   C 85,65 90,75 85,85
+                   C 80,95 70,100 60,95
+                   C 50,90 55,80 65,75
+                   M 100,85
+                   L 100,50
+                   C 100,50 105,45 110,50
+                   C 115,55 110,60 105,65
+                   M 125,70
+                   C 125,70 130,50 135,45
+                   C 140,40 145,45 145,55
+                   C 145,65 140,75 135,80
+                   C 130,85 135,85 140,82
                    M 160,60
                    C 160,60 165,40 170,35
                    C 175,30 180,35 180,45
                    C 180,55 175,65 170,70
                    C 165,75 170,75 175,72
-                   M 190,50
-                   C 190,50 195,30 200,25
-                   C 205,20 210,25 210,35
-                   C 210,45 205,55 200,60
-                   C 195,65 200,65 205,62
-                   M 220,40
-                   C 220,40 225,20 230,15
-                   C 235,10 240,15 240,25
-                   C 240,35 235,45 230,50
-                   C 225,55 230,55 235,52
-                   M 250,30
-                   C 250,30 255,10 260,5
-                   C 265,0 270,5 270,15
-                   C 270,25 265,35 260,40
-                   C 255,45 260,45 265,42
-                   M 280,20
-                   C 280,20 285,0 290,-5
-                   C 295,-10 300,-5 300,5
-                   C 300,15 295,25 290,30
-                   C 285,35 290,35 295,32
-                   M 310,10
-                   C 310,10 315,-10 320,-15
-                   C 325,-20 330,-15 330,-5
-                   C 330,5 325,15 320,20
-                   C 315,25 320,25 325,22
-                   M 340,0
-                   C 340,0 345,-20 350,-25
-                   C 355,-30 360,-25 360,-15
-                   C 360,-5 355,5 350,10
-                   C 345,15 350,15 355,12"
+                   M 195,50
+                   C 195,50 200,30 205,25
+                   C 210,20 215,25 215,35
+                   C 215,45 210,55 205,60
+                   C 200,65 205,65 210,62
+                   M 230,40
+                   C 230,40 235,20 240,15
+                   C 245,10 250,15 250,25
+                   C 250,35 245,45 240,50
+                   C 235,55 240,55 245,52
+                   M 265,30
+                   L 265,75
+                   M 265,35
+                   C 265,35 275,25 280,30
+                   C 285,35 280,45 275,50
+                   C 270,55 275,55 280,52
+                   M 300,45
+                   C 300,45 305,25 310,20
+                   C 315,15 320,20 320,30
+                   C 320,40 315,50 310,55
+                   C 305,60 310,60 315,57"
                 fill="none"
                 stroke="url(#inkGradient)"
-                strokeWidth="3"
+                strokeWidth="4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                filter="url(#inkShadow)"
                 style={{
-                  strokeDasharray: 2000,
-                  strokeDashoffset: 2000,
-                  animation: 'drawSignature 3s ease-in-out forwards',
-                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                  strokeDasharray: 1500,
+                  strokeDashoffset: 1500,
+                  animation: 'drawSignature 3.5s ease-in-out forwards',
                 }}
               />
               
               <style>{`
                 @keyframes drawSignature {
                   0% {
-                    stroke-dashoffset: 2000;
+                    stroke-dashoffset: 1500;
                     opacity: 0;
                   }
-                  10% {
+                  5% {
                     opacity: 1;
                   }
                   100% {
@@ -396,99 +386,261 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               `}</style>
             </svg>
 
-            {/* Realistic Pen */}
+            {/* Luxury Pen - 2000 Rupee Style */}
             <div 
               style={{
                 position: 'absolute',
                 zIndex: 20,
-                animation: 'penWrite 3s ease-in-out forwards',
-                transformOrigin: 'bottom center',
-                filter: 'drop-shadow(2px 4px 8px rgba(0,0,0,0.3))',
+                animation: 'penWrite 3.5s ease-in-out forwards',
+                transformOrigin: 'center center',
+                filter: 'drop-shadow(4px 8px 16px rgba(0,0,0,0.4))',
               }}
             >
               <style>{`
                 @keyframes penWrite {
                   0% {
-                    transform: translate(-180px, 40px) rotate(-45deg);
+                    transform: translate(-200px, 50px) rotate(-35deg);
                     opacity: 0;
                   }
-                  5% {
+                  8% {
                     opacity: 1;
                   }
                   100% {
-                    transform: translate(180px, -60px) rotate(-15deg);
+                    transform: translate(200px, -40px) rotate(-10deg);
                     opacity: 1;
                   }
                 }
               `}</style>
               
-              {/* Pen Body */}
+              {/* Pen Container */}
               <div style={{
-                width: '120px',
-                height: '12px',
-                background: 'linear-gradient(180deg, #1e293b 0%, #334155 50%, #1e293b 100%)',
-                borderRadius: '6px',
+                width: '180px',
+                height: '24px',
                 position: 'relative',
                 transform: 'rotate(-90deg)',
               }}>
-                {/* Pen Tip */}
+                
+                {/* Pen Tip - Iridium Point */}
                 <div style={{
                   position: 'absolute',
-                  left: '-8px',
+                  left: '0',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   width: '0',
                   height: '0',
-                  borderTop: '6px solid transparent',
-                  borderBottom: '6px solid transparent',
-                  borderRight: '10px solid #0f172a',
-                }} />
-                
-                {/* Pen Cap */}
+                  borderTop: '8px solid transparent',
+                  borderBottom: '8px solid transparent',
+                  borderRight: '12px solid #1a1a1a',
+                  zIndex: 10,
+                }}>
+                  {/* Iridium Ball */}
+                  <div style={{
+                    position: 'absolute',
+                    left: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '4px',
+                    height: '4px',
+                    background: 'radial-gradient(circle at 30% 30%, #silver, #666)',
+                    borderRadius: '50%',
+                  }} />
+                </div>
+
+                {/* Nib Section - Gold Plated */}
                 <div style={{
                   position: 'absolute',
-                  right: '-4px',
+                  left: '12px',
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  width: '20px',
-                  height: '14px',
-                  background: 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)',
-                  borderRadius: '0 6px 6px 0',
-                  boxShadow: 'inset -2px 0 4px rgba(0,0,0,0.2)',
-                }} />
-                
-                {/* Clip */}
+                  width: '25px',
+                  height: '16px',
+                  background: 'linear-gradient(180deg, #d4af37 0%, #b8860b 50%, #d4af37 100%)',
+                  borderRadius: '2px',
+                  boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.3), inset 0 -1px 2px rgba(0,0,0,0.3)',
+                }}>
+                  {/* Engraving Lines */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '20%',
+                    left: '10%',
+                    right: '10%',
+                    height: '1px',
+                    background: 'rgba(255,255,255,0.4)',
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '10%',
+                    right: '10%',
+                    height: '1px',
+                    background: 'rgba(255,255,255,0.4)',
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: '80%',
+                    left: '10%',
+                    right: '10%',
+                    height: '1px',
+                    background: 'rgba(255,255,255,0.4)',
+                  }} />
+                </div>
+
+                {/* Grip Section - Black Lacquer */}
                 <div style={{
                   position: 'absolute',
-                  right: '8px',
-                  top: '-4px',
-                  width: '4px',
+                  left: '37px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '50px',
                   height: '20px',
-                  background: '#4f46e5',
-                  borderRadius: '2px',
-                }} />
+                  background: 'linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 30%, #0a0a0a 50%, #1a1a1a 70%, #0a0a0a 100%)',
+                  borderRadius: '3px',
+                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.1), inset 0 -2px 4px rgba(0,0,0,0.5)',
+                }}>
+                  {/* Grip Texture Rings */}
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} style={{
+                      position: 'absolute',
+                      left: `${10 + i * 10}px`,
+                      top: '0',
+                      width: '2px',
+                      height: '100%',
+                      background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',
+                    }} />
+                  ))}
+                </div>
+
+                {/* Barrel - Premium Metal with Gold Accent */}
+                <div style={{
+                  position: 'absolute',
+                  left: '87px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '70px',
+                  height: '22px',
+                  background: 'linear-gradient(180deg, #1a1a1a 0%, #2a2a2a 20%, #1a1a1a 40%, #2a2a2a 60%, #1a1a1a 80%, #2a2a2a 100%)',
+                  borderRadius: '3px',
+                  boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.15), inset 0 -1px 3px rgba(0,0,0,0.4)',
+                }}>
+                  {/* Gold Ring */}
+                  <div style={{
+                    position: 'absolute',
+                    left: '20px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '8px',
+                    height: '24px',
+                    background: 'linear-gradient(180deg, #d4af37 0%, #ffd700 50%, #b8860b 100%)',
+                    borderRadius: '2px',
+                    boxShadow: '0 0 4px rgba(212,175,55,0.5)',
+                  }} />
+                  
+                  {/* Brand Engraving Area */}
+                  <div style={{
+                    position: 'absolute',
+                    left: '35px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '25px',
+                    height: '12px',
+                    background: 'rgba(0,0,0,0.3)',
+                    borderRadius: '2px',
+                  }} />
+                </div>
+
+                {/* Cap - Premium Finish */}
+                <div style={{
+                  position: 'absolute',
+                  left: '157px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '35px',
+                  height: '24px',
+                  background: 'linear-gradient(180deg, #d4af37 0%, #ffd700 30%, #d4af37 50%, #b8860b 70%, #d4af37 100%)',
+                  borderRadius: '0 6px 6px 0',
+                  boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.4), inset 0 -1px 2px rgba(0,0,0,0.3), 2px 0 8px rgba(0,0,0,0.3)',
+                }}>
+                  {/* Clip */}
+                  <div style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '-8px',
+                    width: '6px',
+                    height: '40px',
+                    background: 'linear-gradient(90deg, #d4af37 0%, #ffd700 50%, #b8860b 100%)',
+                    borderRadius: '3px 3px 0 0',
+                    boxShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                    transform: 'rotate(-5deg)',
+                  }} />
+                  
+                  {/* Top Jewel */}
+                  <div style={{
+                    position: 'absolute',
+                    right: '-4px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '8px',
+                    height: '8px',
+                    background: 'radial-gradient(circle at 30% 30%, #1a1a1a, #000)',
+                    borderRadius: '50%',
+                    boxShadow: '0 0 4px rgba(0,0,0,0.5)',
+                  }} />
+                </div>
               </div>
             </div>
 
-            {/* Ink Dots/Effects */}
+            {/* Ink Splatter Effect */}
             <div style={{
               position: 'absolute',
-              width: '4px',
-              height: '4px',
-              background: '#1e293b',
+              width: '6px',
+              height: '6px',
+              background: '#0f172a',
               borderRadius: '50%',
-              left: '20%',
-              top: '45%',
+              left: '15%',
+              top: '55%',
               opacity: 0,
-              animation: 'inkDrop 0.3s ease-out 2.8s forwards',
+              animation: 'inkDrop 0.4s ease-out 3.2s forwards',
+              filter: 'blur(0.5px)',
             }}>
               <style>{`
                 @keyframes inkDrop {
-                  0% { opacity: 0; transform: scale(0); }
-                  100% { opacity: 0.6; transform: scale(1); }
+                  0% { 
+                    opacity: 0; 
+                    transform: scale(0) translateY(-10px); 
+                  }
+                  50% {
+                    opacity: 0.8;
+                    transform: scale(1.5) translateY(0);
+                  }
+                  100% { 
+                    opacity: 0.4; 
+                    transform: scale(1) translateY(2px); 
+                  }
                 }
               `}</style>
             </div>
+
+            {/* Secondary Ink Drops */}
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={{
+                position: 'absolute',
+                width: `${3 + i}px`,
+                height: `${3 + i}px`,
+                background: '#1e293b',
+                borderRadius: '50%',
+                left: `${20 + i * 5}%`,
+                top: `${50 + i * 3}%`,
+                opacity: 0,
+                animation: `inkDrop${i} 0.3s ease-out ${3.3 + i * 0.1}s forwards`,
+              }}>
+                <style>{`
+                  @keyframes inkDrop${i} {
+                    0% { opacity: 0; transform: scale(0); }
+                    100% { opacity: ${0.3 - i * 0.1}; transform: scale(1); }
+                  }
+                `}</style>
+              </div>
+            ))}
           </div>
 
           {/* Click to Enter Text - Shows after animation */}
@@ -496,11 +648,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div 
               style={{
                 position: 'absolute',
-                bottom: '40px',
+                bottom: '30px',
                 left: '50%',
                 transform: 'translateX(-50%)',
                 opacity: 0,
-                animation: 'fadeInUp 0.5s ease-out forwards',
+                animation: 'fadeInUp 0.6s ease-out forwards',
                 cursor: 'pointer',
               }}
               onClick={onLogin}
@@ -509,7 +661,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 @keyframes fadeInUp {
                   from {
                     opacity: 0;
-                    transform: translateX(-50%) translateY(10px);
+                    transform: translateX(-50%) translateY(15px);
                   }
                   to {
                     opacity: 1;
@@ -519,9 +671,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               `}</style>
               <span style={{
                 fontFamily: 'Cabinet Grotesk',
-                fontSize: '14px',
+                fontSize: '13px',
                 color: '#64748b',
-                letterSpacing: '2px',
+                letterSpacing: '3px',
                 textTransform: 'uppercase',
                 transition: 'color 0.2s',
               }}>
