@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileSignature, Menu, X, Shield, Link2, Pen } from 'lucide-react';
+import { FileSignature, Menu, X, Shield, Link2 } from 'lucide-react';
 
 interface HeroSectionProps {
   onCreateAccount: () => void;
@@ -20,7 +20,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [isSigning, setIsSigning] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -52,14 +51,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       alert('Please log in as an institution to access the institution dashboard');
       onLogin();
     }
-  };
-
-  const handleEnterClick = () => {
-    setIsSigning(true);
-    setTimeout(() => {
-      setIsSigning(false);
-      onLogin();
-    }, 1500);
   };
 
   const navLinks = [
@@ -274,102 +265,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             >
               Get Started
             </button>
-            
-            {/* Animated Enter Button with Pen Signing */}
             <button
-              onClick={handleEnterClick}
-              disabled={isSigning}
+              onClick={onLogin}
               style={{
                 padding: '13px 32px', borderRadius: '10px',
                 border: '1.5px solid #cbd5e1', background: 'white',
                 color: '#374151', fontFamily: 'Cabinet Grotesk', fontSize: '18px', fontWeight: 900,
-                cursor: isSigning ? 'wait' : 'pointer', 
-                transition: 'all 0.2s',
-                position: 'relative',
-                overflow: 'hidden',
-                minWidth: '140px',
-                height: '54px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                cursor: 'pointer', transition: 'all 0.2s',
               }}
-              onMouseEnter={e => { 
-                if (!isSigning) {
-                  (e.currentTarget.style.borderColor = '#6366f1'); 
-                  (e.currentTarget.style.color = '#6366f1'); 
-                  (e.currentTarget.style.background = '#fafaff'); 
-                }
-              }}
-              onMouseLeave={e => { 
-                if (!isSigning) {
-                  (e.currentTarget.style.borderColor = '#cbd5e1'); 
-                  (e.currentTarget.style.color = '#374151'); 
-                  (e.currentTarget.style.background = 'white'); 
-                }
-              }}
+              onMouseEnter={e => { (e.currentTarget.style.borderColor = '#6366f1'); (e.currentTarget.style.color = '#6366f1'); (e.currentTarget.style.background = '#fafaff'); }}
+              onMouseLeave={e => { (e.currentTarget.style.borderColor = '#cbd5e1'); (e.currentTarget.style.color = '#374151'); (e.currentTarget.style.background = 'white'); }}
             >
-              {isSigning ? (
-                <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {/* Signature Line Animation */}
-                  <svg 
-                    width="80" 
-                    height="30" 
-                    viewBox="0 0 80 30" 
-                    style={{ position: 'absolute' }}
-                  >
-                    <path
-                      d="M5,20 Q15,5 25,20 T45,20 T65,15 T75,20"
-                      fill="none"
-                      stroke="#6366f1"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      style={{
-                        strokeDasharray: 100,
-                        strokeDashoffset: 100,
-                        animation: 'signAnimation 1s ease-out forwards',
-                      }}
-                    />
-                    <style>{`
-                      @keyframes signAnimation {
-                        to {
-                          stroke-dashoffset: 0;
-                        }
-                      }
-                    `}</style>
-                  </svg>
-                  
-                  {/* Pen Animation */}
-                  <div 
-                    style={{
-                      position: 'absolute',
-                      animation: 'penMove 1s ease-out forwards',
-                      transformOrigin: 'bottom center',
-                    }}
-                  >
-                    <style>{`
-                      @keyframes penMove {
-                        0% {
-                          transform: translate(-30px, 10px) rotate(-45deg);
-                          opacity: 0;
-                        }
-                        20% {
-                          opacity: 1;
-                        }
-                        100% {
-                          transform: translate(30px, -5px) rotate(-15deg);
-                          opacity: 1;
-                        }
-                      }
-                    `}</style>
-                    <Pen size={20} color="#6366f1" style={{ transform: 'rotate(-45deg)' }} />
-                  </div>
-                </div>
-              ) : (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  Enter
-                  <Pen size={18} style={{ opacity: 0.6 }} />
-                </span>
-              )}
+              Go to Dashboard
             </button>
           </div>
         </div>
