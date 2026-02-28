@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { FileSignature, Menu, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { FileSignature, Menu, X, Shield, Link2 } from 'lucide-react';
 
 interface HeroSectionProps {
   onCreateAccount: () => void;
   onLogin: () => void;
+  onNavigateToStudent?: () => void;
+  onNavigateToInstitution?: () => void;
+  isAuthenticated?: boolean;
+  userRole?: string | null;
 }
 
-export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLogin }) => {
+export const HeroSection: React.FC<HeroSectionProps> = ({ 
+  onCreateAccount, 
+  onLogin,
+  onNavigateToStudent,
+  onNavigateToInstitution,
+  isAuthenticated = false,
+  userRole = null,
+}) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -25,10 +32,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
       onLogin();
       return;
     }
-    if (user?.role === 'student') {
-      navigate('/student-dashboard');
+    if (userRole === 'student') {
+      onNavigateToStudent?.();
     } else {
-      // If logged in as institution, show message or redirect appropriately
       alert('Please log in as a student to access the student dashboard');
       onLogin();
     }
@@ -39,19 +45,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
       onLogin();
       return;
     }
-    if (user?.role === 'institution') {
-      navigate('/institution-dashboard');
+    if (userRole === 'institution') {
+      onNavigateToInstitution?.();
     } else {
-      // If logged in as student, show message or redirect appropriately
       alert('Please log in as an institution to access the institution dashboard');
       onLogin();
     }
   };
 
   const navLinks = [
-    { label: 'Home', href: '#', onClick: undefined },
-    { label: 'Student', href: '#', onClick: handleStudentClick },
-    { label: 'Institution', href: '#', onClick: handleInstitutionClick },
+    { label: 'Home', onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+    { label: 'Student', onClick: handleStudentClick },
+    { label: 'Institution', onClick: handleInstitutionClick },
   ];
 
   return (
@@ -110,26 +115,23 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
           {/* Desktop Nav Links */}
           <div style={{ display: 'flex', gap: '32px' }} className="hidden md:flex">
             {navLinks.map((link) => (
-              <a 
+              <button 
                 key={link.label} 
-                href={link.href} 
-                onClick={(e) => {
-                  if (link.onClick) {
-                    e.preventDefault();
-                    link.onClick();
-                  }
-                }}
+                onClick={link.onClick}
                 style={{
                   fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900,
                   color: '#64748b', textDecoration: 'none',
                   transition: 'color 0.2s',
                   cursor: 'pointer',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
                 }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#1e293b')}
                 onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
               >
                 {link.label}
-              </a>
+              </button>
             ))}
           </div>
 
@@ -186,20 +188,24 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
           display: 'flex', flexDirection: 'column', gap: '14px',
         }}>
           {navLinks.map((link) => (
-            <a 
+            <button 
               key={link.label} 
-              href={link.href} 
-              onClick={(e) => {
-                setMenuOpen(false);
-                if (link.onClick) {
-                  e.preventDefault();
-                  link.onClick();
-                }
+              onClick={() => { link.onClick(); setMenuOpen(false); }}
+              style={{ 
+                fontFamily: 'Cabinet Grotesk', 
+                fontSize: '16px', 
+                fontWeight: 900, 
+                color: '#374151', 
+                textDecoration: 'none', 
+                cursor: 'pointer',
+                background: 'none',
+                border: 'none',
+                textAlign: 'left',
+                padding: 0,
               }}
-              style={{ fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900, color: '#374151', textDecoration: 'none', cursor: 'pointer' }}
             >
               {link.label}
-            </a>
+            </button>
           ))}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
             <button onClick={() => { onLogin(); setMenuOpen(false); }}
