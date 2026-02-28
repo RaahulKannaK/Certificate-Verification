@@ -469,7 +469,8 @@ export const CertificatePreview = ({
                       transition: "border-color 0.2s",
                       display: "block",
                       width: "100%",
-                      maxWidth: signatureBox.width,
+                      maxWidth: "100%",
+                      height: "200px",
                     }}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
