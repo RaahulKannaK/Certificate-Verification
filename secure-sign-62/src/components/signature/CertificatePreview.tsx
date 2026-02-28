@@ -459,6 +459,7 @@ export const CertificatePreview = ({
                   <canvas
                     ref={setSignCanvasRef}
                     width={signatureBox.width}
+                    width={Math.max(signatureBox.width,500)}
                     height={signatureBox.height}
                     height={Math.max(signatureBox.height,120)}
                     style={{
