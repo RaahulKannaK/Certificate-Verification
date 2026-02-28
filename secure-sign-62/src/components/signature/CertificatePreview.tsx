@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Type, MousePointer, RotateCcw } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
@@ -17,7 +17,7 @@ interface SignatureField {
   hRatio: number;
   color: string;
   signed?: boolean;
-  isStudent?: boolean; // Added for self-sign detection
+  isStudent?: boolean;
 }
 
 interface CertificatePreviewProps {
@@ -56,7 +56,6 @@ const getTheme = (role: string) => {
       verifyBorder: "#86efac",
     };
   }
-  // Student — Purple
   return {
     gradient: "linear-gradient(135deg, #7c3aed, #6366f1)",
     btnShadow: "0 4px 12px rgba(124,58,237,0.28)",
@@ -92,8 +91,9 @@ export const CertificatePreview = ({
   const [selectedFont, setSelectedFont] = useState(0);
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
 
+  const isDrawingRef = useRef(false);
+  const lastPosRef = useRef({ x: 0, y: 0 });
   const [isDrawing, setIsDrawing] = useState(false);
-  const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
 
   /* 🔐 SECURITY STATES */
   const [isPreVerified, setIsPreVerified] = useState(false);
@@ -128,24 +128,32 @@ export const CertificatePreview = ({
     renderPdf().catch(console.error);
   }, [documentUrl, pdfCanvasRef]);
 
-  /* ================= SIGNATURE BOX - FIXED ================= */
-  // FIX 1: Added noSignerKey fallback for self-sign where signerPublicKey may be empty
+  /* ================= SIGNATURE BOX ================= */
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
 
     return certificate.signatureFields.find((b: SignatureField) => {
-      if (b.signed) return false;
-
       const matchesByKey = b.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
       const isStudentBox = b.isStudent === true || b.isStudent === 1;
       const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+      const notSigned = !b.signed;
+
+      // ONLY for self-sign: also match noSignerKey fallback
+      const isSelfSign = certificate.signingType === "self";
       const noSignerKey = !b.signerPublicKey || b.signerPublicKey === "";
 
-      return matchesByKey ||
-             (isStudentBox && isCredentialStudent) ||
-             (noSignerKey && isCredentialStudent); // self-sign fallback
+      if (isSelfSign) {
+        return notSigned && (
+          matchesByKey ||
+          (isStudentBox && isCredentialStudent) ||
+          (noSignerKey && isCredentialStudent)
+        );
+      }
+
+      // Sequential / Parallel — original logic, no change
+      return notSigned && (matchesByKey || (isStudentBox && isCredentialStudent));
     });
-  }, [myPublicKey, certificate.signatureFields, certificate.studentPublicKey]);
+  }, [myPublicKey, certificate.signatureFields, certificate.studentPublicKey, certificate.signingType]);
 
   const signatureBox = useMemo(() => {
     if (!myBox) return null;
@@ -194,43 +202,60 @@ export const CertificatePreview = ({
     onSignatureChange({ image, ...signatureBox });
   }, [typedName, selectedFont, activeTab, signatureBox]);
 
-  /* ================= DRAW SIGNATURE ================= */
-  const getCoords = (e: React.MouseEvent) => {
-    const rect = signCanvasRef!.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  /* ================= DRAW SIGNATURE - FIXED ================= */
+  const getCoords = (e: React.MouseEvent, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
   };
 
   const startDrawing = (e: React.MouseEvent) => {
-    if (!signatureBox) return;
-    const ctx = signCanvasRef!.getContext("2d")!;
-    ctx.clearRect(0, 0, signCanvasRef!.width, signCanvasRef!.height);
-    setSignatureImage(null);
-    setIsPostVerified(false);
+    if (!signCanvasRef || !signatureBox) return;
+    const pos = getCoords(e, signCanvasRef);
+    isDrawingRef.current = true;
+    lastPosRef.current = pos;
     setIsDrawing(true);
-    setLastPos(getCoords(e));
+    setIsPostVerified(false);
   };
 
   const draw = (e: React.MouseEvent) => {
-    if (!isDrawing) return;
-    const ctx = signCanvasRef!.getContext("2d")!;
-    const pos = getCoords(e);
+    if (!isDrawingRef.current || !signCanvasRef) return;
+    const ctx = signCanvasRef.getContext("2d")!;
+    const pos = getCoords(e, signCanvasRef);
+
     ctx.beginPath();
-    ctx.moveTo(lastPos.x, lastPos.y);
+    ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
     ctx.lineTo(pos.x, pos.y);
     ctx.strokeStyle = "#0f172a";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.stroke();
-    setLastPos(pos);
+
+    lastPosRef.current = pos;
   };
 
   const stopDrawing = () => {
-    if (!isDrawing) return;
+    if (!isDrawingRef.current || !signCanvasRef || !signatureBox) return;
+    isDrawingRef.current = false;
     setIsDrawing(false);
-    const image = signCanvasRef!.toDataURL("image/png");
+    const image = signCanvasRef.toDataURL("image/png");
     setSignatureImage(image);
     onSignatureChange({ image, ...signatureBox });
   };
+
+  useEffect(() => {
+    if (activeTab === "draw" && signCanvasRef) {
+      const ctx = signCanvasRef.getContext("2d")!;
+      ctx.clearRect(0, 0, signCanvasRef.width, signCanvasRef.height);
+      setSignatureImage(null);
+      onSignatureChange(null);
+    }
+  }, [activeTab, signCanvasRef]);
 
   /* ================= RENDER ================= */
   return (
@@ -283,12 +308,15 @@ export const CertificatePreview = ({
                 const matchesByKey = field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
                 const isStudentBox = field.isStudent === true || field.isStudent === 1;
                 const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
+                const isSelfSign = certificate.signingType === "self";
                 const noSignerKey = !field.signerPublicKey || field.signerPublicKey === "";
-                // FIX 2: isMine includes noSignerKey fallback (same logic as myBox)
+
+                // Self-sign: green box with noSignerKey fallback
+                // Sequential/Parallel: original logic unchanged
                 const isMine = !field.signed && (
-                  matchesByKey ||
-                  (isStudentBox && isCredentialStudent) ||
-                  (noSignerKey && isCredentialStudent)
+                  isSelfSign
+                    ? (matchesByKey || (isStudentBox && isCredentialStudent) || (noSignerKey && isCredentialStudent))
+                    : (matchesByKey || (isStudentBox && isCredentialStudent))
                 );
 
                 return (
@@ -300,24 +328,25 @@ export const CertificatePreview = ({
                       top: field.yRatio * pdfSize.height,
                       width: field.wRatio * pdfSize.width,
                       height: field.hRatio * pdfSize.height,
-                      // FIX 3: green solid border for mine, grey dashed for others
+                      // Self-sign isMine = green, Sequential/Parallel isMine = original hsl color
                       border: isMine
-                        ? "2px solid #16a34a"
+                        ? (isSelfSign ? "2px solid #16a34a" : `2px dashed hsl(var(--${field.color}))`)
                         : "2px dashed #cbd5e1",
                       background: isMine
-                        ? "rgba(22,163,74,0.08)"
+                        ? (isSelfSign ? "rgba(22,163,74,0.08)" : "transparent")
                         : "transparent",
                       borderRadius: "8px",
                       zIndex: isMine ? 10 : 1,
-                      transition: "all 0.3s",
                     }}
                   >
                     {isMine && !signatureImage && (
                       <div style={{
                         position: "absolute", top: "-24px", left: "50%", transform: "translateX(-50%)",
                         padding: "2px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
-                        // FIX 4: hardcoded green instead of broken hsl(var(--...))
-                        color: "white", background: "#16a34a", whiteSpace: "nowrap",
+                        color: "white",
+                        // Self-sign = green label, Sequential/Parallel = original hsl color label
+                        background: isSelfSign ? "#16a34a" : `hsl(var(--${field.color}))`,
+                        whiteSpace: "nowrap",
                       }}>
                         Your Signature
                       </div>
@@ -423,19 +452,31 @@ export const CertificatePreview = ({
 
               {/* Draw Tab */}
               {activeTab === "draw" && signatureBox && (
-                <canvas
-                  ref={setSignCanvasRef}
-                  width={signatureBox.width}
-                  height={signatureBox.height}
-                  style={{
-                    border: `1px solid ${t.cardBorder}`, borderRadius: "10px",
-                    cursor: "crosshair", background: "#fafafa",
-                  }}
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
-                />
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <p style={{ fontSize: "12px", color: "#94a3b8", margin: 0 }}>
+                    ✏️ Draw your signature below
+                  </p>
+                  <canvas
+                    ref={setSignCanvasRef}
+                    width={signatureBox.width}
+                    height={signatureBox.height}
+                    style={{
+                      border: `2px solid ${isDrawing ? t.accentColor : t.cardBorder}`,
+                      borderRadius: "10px",
+                      cursor: "crosshair",
+                      background: "#fafafa",
+                      touchAction: "none",
+                      transition: "border-color 0.2s",
+                      display: "block",
+                      width: "100%",
+                      maxWidth: signatureBox.width,
+                    }}
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                  />
+                </div>
               )}
 
               {/* Post Verify Button */}
