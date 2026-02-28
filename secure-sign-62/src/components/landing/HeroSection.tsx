@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Shield, FileSignature, Link2, Menu, X } from 'lucide-react';
+import { FileSignature, Menu, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface HeroSectionProps {
   onCreateAccount: () => void;
@@ -10,6 +11,8 @@ interface HeroSectionProps {
 export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLogin }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -17,7 +20,39 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navLinks = ['Home', 'About', 'Features'];
+  const handleStudentClick = () => {
+    if (!isAuthenticated) {
+      onLogin();
+      return;
+    }
+    if (user?.role === 'student') {
+      navigate('/student-dashboard');
+    } else {
+      // If logged in as institution, show message or redirect appropriately
+      alert('Please log in as a student to access the student dashboard');
+      onLogin();
+    }
+  };
+
+  const handleInstitutionClick = () => {
+    if (!isAuthenticated) {
+      onLogin();
+      return;
+    }
+    if (user?.role === 'institution') {
+      navigate('/institution-dashboard');
+    } else {
+      // If logged in as student, show message or redirect appropriately
+      alert('Please log in as an institution to access the institution dashboard');
+      onLogin();
+    }
+  };
+
+  const navLinks = [
+    { label: 'Home', href: '#', onClick: undefined },
+    { label: 'Student', href: '#', onClick: handleStudentClick },
+    { label: 'Institution', href: '#', onClick: handleInstitutionClick },
+  ];
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: '#f0f4f8' }}>
@@ -75,15 +110,25 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
           {/* Desktop Nav Links */}
           <div style={{ display: 'flex', gap: '32px' }} className="hidden md:flex">
             {navLinks.map((link) => (
-              <a key={link} href="#" style={{
-                fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900,
-                color: '#64748b', textDecoration: 'none',
-                transition: 'color 0.2s',
-              }}
+              <a 
+                key={link.label} 
+                href={link.href} 
+                onClick={(e) => {
+                  if (link.onClick) {
+                    e.preventDefault();
+                    link.onClick();
+                  }
+                }}
+                style={{
+                  fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900,
+                  color: '#64748b', textDecoration: 'none',
+                  transition: 'color 0.2s',
+                  cursor: 'pointer',
+                }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#1e293b')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#171718')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
               >
-                {link}
+                {link.label}
               </a>
             ))}
           </div>
@@ -141,9 +186,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
           display: 'flex', flexDirection: 'column', gap: '14px',
         }}>
           {navLinks.map((link) => (
-            <a key={link} href="#" onClick={() => setMenuOpen(false)}
-              style={{ fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900, color: '#374151', textDecoration: 'none' }}>
-              {link}
+            <a 
+              key={link.label} 
+              href={link.href} 
+              onClick={(e) => {
+                setMenuOpen(false);
+                if (link.onClick) {
+                  e.preventDefault();
+                  link.onClick();
+                }
+              }}
+              style={{ fontFamily: 'Cabinet Grotesk', fontSize: '16px', fontWeight: 900, color: '#374151', textDecoration: 'none', cursor: 'pointer' }}
+            >
+              {link.label}
             </a>
           ))}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
@@ -162,9 +217,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
       {/* ===== HERO CONTENT ===== */}
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '1100px', margin: '0 auto', padding: '160px 24px 80px' }}>
         <div style={{ textAlign: 'center', maxWidth: '760px', margin: '0 auto' }}>
-
-          {/* Badge */}
-          
 
           {/* Heading */}
           <h1 style={{
@@ -263,17 +315,5 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateAccount, onLog
     </div>
   );
 };
-
-const FeatureCard: React.FC<{ icon: React.ReactNode; title: string; description: string }> = ({
-  icon, title, description,
-}) => (
-  <div className="glass rounded-2xl p-6 hover:bg-secondary/30 transition-all duration-300 group">
-    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
-      {icon}
-    </div>
-    <h3 className="font-display text-lg font-semibold mb-2">{title}</h3>
-    <p className="text-muted-foreground text-sm">{description}</p>
-  </div>
-);
 
 export default HeroSection;
