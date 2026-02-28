@@ -460,6 +460,7 @@ export const CertificatePreview = ({
                     ref={setSignCanvasRef}
                     width={signatureBox.width}
                     height={signatureBox.height}
+                    height={Math.max(signatureBox.height,120)}
                     style={{
                       border: `2px solid ${isDrawing ? t.accentColor : t.cardBorder}`,
                       borderRadius: "10px",
