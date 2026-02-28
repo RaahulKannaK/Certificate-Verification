@@ -129,20 +129,21 @@ export const CertificatePreview = ({
   }, [documentUrl, pdfCanvasRef]);
 
   /* ================= SIGNATURE BOX - FIXED ================= */
+  // FIX 1: Added noSignerKey fallback for self-sign where signerPublicKey may be empty
   const myBox = useMemo(() => {
     if (!myPublicKey || !certificate.signatureFields) return null;
-    
-    // Find box where:
-    // 1. signerPublicKey matches myPublicKey (for institution or self-sign), OR
-    // 2. For student self-sign: isStudent flag is true AND studentPublicKey matches
+
     return certificate.signatureFields.find((b: SignatureField) => {
+      if (b.signed) return false;
+
       const matchesByKey = b.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
       const isStudentBox = b.isStudent === true || b.isStudent === 1;
       const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
-      const notSigned = !b.signed;
-      
-      // Match if: key matches directly OR it's student's self-sign box
-      return notSigned && (matchesByKey || (isStudentBox && isCredentialStudent));
+      const noSignerKey = !b.signerPublicKey || b.signerPublicKey === "";
+
+      return matchesByKey ||
+             (isStudentBox && isCredentialStudent) ||
+             (noSignerKey && isCredentialStudent); // self-sign fallback
     });
   }, [myPublicKey, certificate.signatureFields, certificate.studentPublicKey]);
 
@@ -279,12 +280,17 @@ export const CertificatePreview = ({
               <canvas ref={setPdfCanvasRef} />
 
               {certificate.signatureFields?.map((field: SignatureField) => {
-                // FIXED: Check if this field belongs to current user
                 const matchesByKey = field.signerPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
                 const isStudentBox = field.isStudent === true || field.isStudent === 1;
                 const isCredentialStudent = certificate.studentPublicKey?.toLowerCase() === myPublicKey?.toLowerCase();
-                const isMine = !field.signed && (matchesByKey || (isStudentBox && isCredentialStudent));
-                
+                const noSignerKey = !field.signerPublicKey || field.signerPublicKey === "";
+                // FIX 2: isMine includes noSignerKey fallback (same logic as myBox)
+                const isMine = !field.signed && (
+                  matchesByKey ||
+                  (isStudentBox && isCredentialStudent) ||
+                  (noSignerKey && isCredentialStudent)
+                );
+
                 return (
                   <div
                     key={field.id}
@@ -294,16 +300,24 @@ export const CertificatePreview = ({
                       top: field.yRatio * pdfSize.height,
                       width: field.wRatio * pdfSize.width,
                       height: field.hRatio * pdfSize.height,
-                      border: `2px dashed hsl(var(--${field.color}))`,
+                      // FIX 3: green solid border for mine, grey dashed for others
+                      border: isMine
+                        ? "2px solid #16a34a"
+                        : "2px dashed #cbd5e1",
+                      background: isMine
+                        ? "rgba(22,163,74,0.08)"
+                        : "transparent",
                       borderRadius: "8px",
                       zIndex: isMine ? 10 : 1,
+                      transition: "all 0.3s",
                     }}
                   >
                     {isMine && !signatureImage && (
                       <div style={{
                         position: "absolute", top: "-24px", left: "50%", transform: "translateX(-50%)",
                         padding: "2px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
-                        color: "white", background: `hsl(var(--${field.color}))`, whiteSpace: "nowrap",
+                        // FIX 4: hardcoded green instead of broken hsl(var(--...))
+                        color: "white", background: "#16a34a", whiteSpace: "nowrap",
                       }}>
                         Your Signature
                       </div>
