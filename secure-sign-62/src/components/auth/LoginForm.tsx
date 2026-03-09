@@ -50,22 +50,34 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
         publicKey: formData.publicKey 
       });
       
-      const res = await api.post(`${import.meta.env.VITE_API_URL}/login`, {
+      // DEBUG: Log the exact URL being called
+      const loginUrl = `${import.meta.env.VITE_API_URL}/login`;
+      console.log('🌐 API URL:', loginUrl);
+      
+      const res = await api.post(loginUrl, {
         email: formData.email.trim(),
         password: formData.password,
         publicKey: formData.publicKey.trim(),
       });
       
+      console.log('📦 Full login response:', res);
+      console.log('📦 Response data:', res.data);
+      console.log('📦 Response status:', res.status);
+      
       const data = res.data;
-      console.log('📦 Login response:', data);
       
       if (data.user) {
+        console.log('👤 User found in response, calling AuthContext login...');
+        
         // Pass all credentials to login context
         const success = await login({
           email: formData.email.trim(),
           password: formData.password,
           publicKey: formData.publicKey.trim(),
+          userData: data.user // Pass the user data from server
         });
+        
+        console.log('✅ AuthContext login success:', success);
         
         if (success) {
           toast.success('Login successful!');
@@ -74,11 +86,26 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
           toast.error('Failed to set user context');
         }
       } else {
+        console.log('❌ No user in response data');
         toast.error('Invalid credentials. Please check and try again.');
       }
     } catch (err: any) {
-      console.error('❌ Login error:', err);
-      toast.error(err?.response?.data?.message || 'Server error during login');
+      console.error('❌ Full error object:', err);
+      console.error('❌ Error response:', err?.response);
+      console.error('❌ Error response data:', err?.response?.data);
+      console.error('❌ Error message:', err?.message);
+      console.error('❌ Error status:', err?.response?.status);
+      
+      // More specific error messages
+      if (err?.response?.status === 401) {
+        toast.error('Invalid password');
+      } else if (err?.response?.status === 404) {
+        toast.error('User not found. Check your email and public key.');
+      } else if (err?.response?.status === 500) {
+        toast.error(`Server error: ${err?.response?.data?.error || 'Unknown error'}`);
+      } else {
+        toast.error(err?.response?.data?.message || 'Server error during login');
+      }
     } finally {
       setLoading(false);
     }

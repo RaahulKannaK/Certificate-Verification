@@ -107,6 +107,9 @@ app.post("/signup", async (req, res) => {
 // ==========================================================
 // 🔐 LOGIN (Email + Password + Public Key) - DEBUG VERSION
 // ==========================================================
+// ==========================================================
+// 🔐 LOGIN (Email + Password + Public Key) - DEBUG VERSION
+// ==========================================================
 app.post("/login", async (req, res) => {
   const { email, password, publicKey } = req.body;
   
@@ -116,12 +119,7 @@ app.post("/login", async (req, res) => {
   if (!email || !password || !publicKey) {
     console.log("❌ Missing fields:", { email: !!email, password: !!password, publicKey: !!publicKey });
     return res.status(400).json({ 
-      message: "Email, password, and public key are required",
-      missing: {
-        email: !email,
-        password: !password,
-        publicKey: !publicKey
-      }
+      message: "Email, password, and public key are required"
     });
   }
 
@@ -142,6 +140,10 @@ app.post("/login", async (req, res) => {
       
       // Verify password
       console.log("🔐 Checking password...");
+      console.log("Input password:", password);
+      console.log("DB password:", user.password);
+      console.log("Match:", user.password === password);
+      
       if (user.password !== password) {
         console.log("❌ Password mismatch");
         return res.status(401).json({ message: "Invalid password" });
@@ -150,6 +152,8 @@ app.post("/login", async (req, res) => {
 
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
+      
+      console.log("📤 Sending user response:", userWithoutPassword);
       
       return res.json({ 
         message: "✅ Login successful!", 
@@ -180,18 +184,22 @@ app.post("/login", async (req, res) => {
       // Format institution response like user
       const { password: _, ...instWithoutPassword } = inst;
       
+      const responseUser = {
+        id: instWithoutPassword.id,
+        firstName: instWithoutPassword.institutionName,
+        lastName: '',
+        age: null,
+        phone: instWithoutPassword.phone,
+        email: instWithoutPassword.email,
+        role: 'institution',
+        walletPublicKey: instWithoutPassword.walletPublicKey
+      };
+      
+      console.log("📤 Sending institution response:", responseUser);
+      
       return res.json({ 
         message: "✅ Login successful!", 
-        user: {
-          id: instWithoutPassword.id,
-          firstName: instWithoutPassword.institutionName,
-          lastName: '',
-          age: null,
-          phone: instWithoutPassword.phone,
-          email: instWithoutPassword.email,
-          role: 'institution',
-          walletPublicKey: instWithoutPassword.walletPublicKey
-        }
+        user: responseUser
       });
     }
 
@@ -204,12 +212,11 @@ app.post("/login", async (req, res) => {
   } catch (err) {
     console.error("❌ Login Error Details:", err);
     console.error("Error Code:", err.code);
-    console.error("Error SQL:", err.sql);
-    console.error("Error SQL State:", err.sqlState);
+    console.error("Error Message:", err.message);
+    console.error("Error Stack:", err.stack);
     res.status(500).json({ 
       message: "Server error during login",
-      error: err.message,
-      code: err.code
+      error: err.message 
     });
   }
 });
