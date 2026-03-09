@@ -14,7 +14,7 @@ import { User } from "@/types";
 ============================================================ */
 interface AuthContextType {
   user: User | null;
-  login: (publicKey: string) => Promise<boolean>;
+  login: (credentials: { email: string; password: string; publicKey: string }) => Promise<boolean>;
   logout: () => void;
   createAccount: (
     userData: Omit<
@@ -118,16 +118,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   /* ============================================================
-     🔐 LOGIN
+     🔐 LOGIN (Updated for Email + Password + Public Key)
   ============================================================ */
-  const login = async (publicKey: string): Promise<boolean> => {
-    if (!publicKey.trim()) {
-      toast.error("Public key is required");
+  const login = async (credentials: { email: string; password: string; publicKey: string }): Promise<boolean> => {
+    const { email, password, publicKey } = credentials;
+
+    if (!email?.trim() || !password?.trim() || !publicKey?.trim()) {
+      toast.error("Email, password, and public key are required");
       return false;
     }
 
     try {
+      console.log("🔐 AuthContext login attempt:", { email, publicKey });
+
       const response = await axios.post("/login", {
+        email: email.trim(),
+        password: password,
         publicKey: publicKey.trim(),
       });
 
@@ -161,7 +167,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
       return true;
     } catch (err: any) {
-      console.error("Login failed:", err);
+      console.error("❌ Login failed:", err);
       toast.error(err.response?.data?.message || "Login failed");
       return false;
     }
