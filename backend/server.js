@@ -103,32 +103,50 @@ app.post("/signup", async (req, res) => {
 // ==========================================================
 // 🔐 LOGIN (Email + Password + Public Key)
 // ==========================================================
+
+// ==========================================================
+// 🔐 LOGIN (Email + Password + Public Key) - DEBUG VERSION
+// ==========================================================
 app.post("/login", async (req, res) => {
   const { email, password, publicKey } = req.body;
   
+  console.log("🔍 Login attempt:", { email, publicKey, passwordReceived: !!password });
+
   // Validation - all three fields required
   if (!email || !password || !publicKey) {
+    console.log("❌ Missing fields:", { email: !!email, password: !!password, publicKey: !!publicKey });
     return res.status(400).json({ 
-      message: "Email, password, and public key are required" 
+      message: "Email, password, and public key are required",
+      missing: {
+        email: !email,
+        password: !password,
+        publicKey: !publicKey
+      }
     });
   }
 
   try {
     // ========== TRY USERS TABLE ==========
+    console.log("🔍 Checking users table...");
     const [userRows] = await db.query(
       `SELECT id, firstName, lastName, age, phone, email, role, walletPublicKey, password 
        FROM users 
        WHERE email = ? AND walletPublicKey = ?`,
       [email, publicKey]
     );
+    console.log("👤 Users found:", userRows.length);
 
     if (userRows.length) {
       const user = userRows[0];
+      console.log("✅ User matched:", user.email);
       
       // Verify password
+      console.log("🔐 Checking password...");
       if (user.password !== password) {
+        console.log("❌ Password mismatch");
         return res.status(401).json({ message: "Invalid password" });
       }
+      console.log("✅ Password matched");
 
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
@@ -140,18 +158,22 @@ app.post("/login", async (req, res) => {
     }
 
     // ========== TRY INSTITUTIONS TABLE ==========
+    console.log("🔍 Checking institutions table...");
     const [instRows] = await db.query(
       `SELECT id, institutionName, email, phone, walletPublicKey, password, 'institution' AS role
        FROM institutions 
        WHERE email = ? AND walletPublicKey = ?`,
       [email, publicKey]
     );
+    console.log("🏛️ Institutions found:", instRows.length);
 
     if (instRows.length) {
       const inst = instRows[0];
+      console.log("✅ Institution matched:", inst.email);
       
       // Verify password
       if (inst.password !== password) {
+        console.log("❌ Institution password mismatch");
         return res.status(401).json({ message: "Invalid password" });
       }
 
@@ -174,16 +196,23 @@ app.post("/login", async (req, res) => {
     }
 
     // ========== NO MATCH FOUND ==========
+    console.log("❌ No matching user or institution found");
     return res.status(404).json({ 
       message: "Invalid credentials. Please check your email, password, and public key." 
     });
 
   } catch (err) {
-    console.error("❌ Login Error:", err);
-    res.status(500).json({ message: "Server error during login" });
+    console.error("❌ Login Error Details:", err);
+    console.error("Error Code:", err.code);
+    console.error("Error SQL:", err.sql);
+    console.error("Error SQL State:", err.sqlState);
+    res.status(500).json({ 
+      message: "Server error during login",
+      error: err.message,
+      code: err.code
+    });
   }
 });
-
 // ==========================================================
 // 🔗 GET WALLET
 // ==========================================================
