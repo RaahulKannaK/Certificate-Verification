@@ -8,7 +8,8 @@ import {
   Copy,
   Check,
   Eye,
-  EyeOff
+  EyeOff,
+  Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/api/axios';
@@ -129,23 +130,53 @@ const GradientButton: React.FC<{
 export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, onSuccess }) => {
   const [step, setStep] = useState<'form' | 'wallet'>('form');
   const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', age: '', role: 'student'
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phone: '',
+    age: '',
+    role: 'student'
   });
   const [walletKeys, setWalletKeys] = useState<WalletKeys | null>(null);
   const [copiedPublic, setCopiedPublic] = useState(false);
   const [copiedPrivate, setCopiedPrivate] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
+
+  const handleChange = (key: string, value: string) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.phone || !formData.age) {
+    
+    // Validation
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword || !formData.phone || !formData.age) {
       toast.error('Please fill all fields');
       return;
     }
+    
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
     try {
       const keys = createWallet();
       const response = await api.post('/signup', {
-        ...formData,
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        age: parseInt(formData.age),
+        role: formData.role,
         walletPublicKey: keys.publicKey,
         walletPrivateKeyEncrypted: keys.privateKey
       });
@@ -269,23 +300,61 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
           />
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {[
-              { label: 'Full Name', placeholder: 'Eg: Alice', key: 'name', type: 'text' },
-              { label: 'Email', placeholder: 'Eg: abc@gmail.com', key: 'email', type: 'email' },
-              { label: 'Phone', placeholder: 'Eg: 98674xxxxx ', key: 'phone', type: 'text' },
-              { label: 'Age', placeholder: 'Eg: 19', key: 'age', type: 'number' },
-            ].map(field => (
-              <div key={field.key}>
-                <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
-                  {field.label}
-                </label>
+            {/* Full Name */}
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
+                Full Name
+              </label>
+              <input
+                type="text"
+                placeholder="Eg: Alice"
+                value={formData.name}
+                onChange={e => handleChange('name', e.target.value)}
+                style={{
+                  width: '100%', padding: '11px 14px',
+                  borderRadius: '10px', border: '1.5px solid #e2e8f0',
+                  fontSize: '14px', color: '#1e293b', background: '#f8fafc',
+                  outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+                onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
+                Email
+              </label>
+              <input
+                type="email"
+                placeholder="Eg: abc@gmail.com"
+                value={formData.email}
+                onChange={e => handleChange('email', e.target.value)}
+                style={{
+                  width: '100%', padding: '11px 14px',
+                  borderRadius: '10px', border: '1.5px solid #e2e8f0',
+                  fontSize: '14px', color: '#1e293b', background: '#f8fafc',
+                  outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+                onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
+                Password
+              </label>
+              <div style={{ position: 'relative' }}>
                 <input
-                  type={field.type}
-                  placeholder={field.placeholder}
-                  value={formData[field.key as keyof typeof formData]}
-                  onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Min 6 characters"
+                  value={formData.password}
+                  onChange={e => handleChange('password', e.target.value)}
                   style={{
-                    width: '100%', padding: '11px 14px',
+                    width: '100%', padding: '11px 40px 11px 14px',
                     borderRadius: '10px', border: '1.5px solid #e2e8f0',
                     fontSize: '14px', color: '#1e293b', background: '#f8fafc',
                     outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
@@ -293,8 +362,97 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
                   onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
                   onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute', right: '12px', top: '50%',
+                    transform: 'translateY(-50%)', background: 'none',
+                    border: 'none', cursor: 'pointer', padding: '4px',
+                    color: '#64748b', display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
-            ))}
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
+                Confirm Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="Re-enter password"
+                  value={formData.confirmPassword}
+                  onChange={e => handleChange('confirmPassword', e.target.value)}
+                  style={{
+                    width: '100%', padding: '11px 40px 11px 14px',
+                    borderRadius: '10px', border: '1.5px solid #e2e8f0',
+                    fontSize: '14px', color: '#1e293b', background: '#f8fafc',
+                    outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{
+                    position: 'absolute', right: '12px', top: '50%',
+                    transform: 'translateY(-50%)', background: 'none',
+                    border: 'none', cursor: 'pointer', padding: '4px',
+                    color: '#64748b', display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
+                Phone
+              </label>
+              <input
+                type="text"
+                placeholder="Eg: 98674xxxxx"
+                value={formData.phone}
+                onChange={e => handleChange('phone', e.target.value)}
+                style={{
+                  width: '100%', padding: '11px 14px',
+                  borderRadius: '10px', border: '1.5px solid #e2e8f0',
+                  fontSize: '14px', color: '#1e293b', background: '#f8fafc',
+                  outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+                onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
+              />
+            </div>
+
+            {/* Age */}
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
+                Age
+              </label>
+              <input
+                type="number"
+                placeholder="Eg: 19"
+                value={formData.age}
+                onChange={e => handleChange('age', e.target.value)}
+                style={{
+                  width: '100%', padding: '11px 14px',
+                  borderRadius: '10px', border: '1.5px solid #e2e8f0',
+                  fontSize: '14px', color: '#1e293b', background: '#f8fafc',
+                  outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+                onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
+              />
+            </div>
 
             {/* Role */}
             <div>
@@ -303,7 +461,7 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
               </label>
               <select
                 value={formData.role}
-                onChange={e => setFormData({ ...formData, role: e.target.value })}
+                onChange={e => handleChange('role', e.target.value)}
                 style={{
                   width: '100%', padding: '11px 14px',
                   borderRadius: '10px', border: '1.5px solid #e2e8f0',

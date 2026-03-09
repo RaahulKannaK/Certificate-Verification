@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, Key, LogIn } from 'lucide-react';
+import { ArrowLeft, Key, LogIn, Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/api/axios';
 
@@ -14,25 +14,59 @@ interface LoginFormProps {
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
   const { login } = useAuth();
-  const [publicKey, setPublicKey] = useState('');
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    publicKey: '',
+  });
   const [loading, setLoading] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!publicKey.trim()) {
+    
+    // Validation
+    if (!formData.email.trim()) {
+      toast.error('Please enter your email');
+      return;
+    }
+    if (!formData.password.trim()) {
+      toast.error('Please enter your password');
+      return;
+    }
+    if (!formData.publicKey.trim()) {
       toast.error('Please enter your public key');
       return;
     }
+
     try {
       setLoading(true);
-      console.log('🔑 Attempting login with publicKey:', publicKey);
-      const res = await api.post(`${import.meta.env.VITE_API_URL}/login`, {
-        publicKey: publicKey.trim(),
+      console.log('🔑 Attempting login with:', { 
+        email: formData.email, 
+        publicKey: formData.publicKey 
       });
+      
+      const res = await api.post(`${import.meta.env.VITE_API_URL}/login`, {
+        email: formData.email.trim(),
+        password: formData.password,
+        publicKey: formData.publicKey.trim(),
+      });
+      
       const data = res.data;
       console.log('📦 Login response:', data);
+      
       if (data.user) {
-        const success = await login(publicKey.trim());
+        // Pass all credentials to login context
+        const success = await login({
+          email: formData.email.trim(),
+          password: formData.password,
+          publicKey: formData.publicKey.trim(),
+        });
+        
         if (success) {
           toast.success('Login successful!');
           onSuccess();
@@ -40,7 +74,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
           toast.error('Failed to set user context');
         }
       } else {
-        toast.error('Invalid public key. Please check and try again.');
+        toast.error('Invalid credentials. Please check and try again.');
       }
     } catch (err: any) {
       console.error('❌ Login error:', err);
@@ -106,21 +140,62 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
               Welcome Back
             </h2>
             <p className="text-slate-500 text-sm">
-              Enter your public key to access your dashboard (student or institution)
+              Enter your credentials to access your dashboard
             </p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Email Field */}
             <div>
-              <Label htmlFor="publicKey" className="text-slate-700 font-semibold">
+              <Label htmlFor="email" className="text-slate-700 font-semibold flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Email
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                value={formData.email}
+                onChange={handleChange}
+                className="mt-1.5 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 text-slate-900 placeholder:text-slate-400"
+                disabled={loading}
+                autoComplete="email"
+              />
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <Label htmlFor="password" className="text-slate-700 font-semibold flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                Password
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange}
+                className="mt-1.5 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 text-slate-900 placeholder:text-slate-400"
+                disabled={loading}
+                autoComplete="current-password"
+              />
+            </div>
+
+            {/* Public Key Field */}
+            <div>
+              <Label htmlFor="publicKey" className="text-slate-700 font-semibold flex items-center gap-2">
+                <Key className="w-4 h-4" />
                 Public Key
               </Label>
               <Input
                 id="publicKey"
+                name="publicKey"
                 placeholder="0x..."
-                value={publicKey}
-                onChange={(e) => setPublicKey(e.target.value)}
+                value={formData.publicKey}
+                onChange={handleChange}
                 className="mt-1.5 font-mono text-sm bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 text-slate-900 placeholder:text-slate-400"
                 disabled={loading}
               />
@@ -142,6 +217,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
                 boxShadow: loading ? 'none' : '0 6px 20px rgba(99,102,241,0.35)',
                 transition: 'all 0.2s',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                marginTop: '24px',
               }}
               onMouseEnter={e => {
                 if (!loading) {
