@@ -117,8 +117,6 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
   const [walletKeys, setWalletKeys] = useState<WalletKeys | null>(null);
   const [copiedPublic, setCopiedPublic] = useState(false);
   const [copiedPrivate, setCopiedPrivate] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
 
   const handleChange = (key: string, value: string) => {
