@@ -35,48 +35,25 @@ interface DigitalSignatureProps {
 
 /* ================= THEME ================= */
 const getTheme = (role: string) => {
-  if (role === "institution") {
-    return {
-      pageBg: "#f0faf4",
-      blob1: "radial-gradient(circle at 30% 20%, rgba(22,163,74,0.08), transparent 50%)",
-      blob2: "radial-gradient(circle at 70% 80%, rgba(5,150,105,0.05), transparent 50%)",
-      gradient: "linear-gradient(135deg, #16a34a, #059669)",
-      btnShadow: "0 4px 12px rgba(22,163,74,0.30)",
-      btnShadowHover: "0 8px 20px rgba(22,163,74,0.42)",
-      cardBorder: "#bbf7d0",
-      cardHoverBg: "#f0fdf4",
-      iconColor: "#16a34a",
-      iconBg: "#f0fdf4",
-      badgePending: { bg: "#fef9c3", color: "#a16207", border: "#fde68a" },
-      badgeSigned: { bg: "#f0fdf4", color: "#16a34a", border: "#86efac" },
-      tabActiveBg: "#16a34a",
-      inputBorder: "#bbf7d0",
-      inputFocus: "#16a34a",
-      accentColor: "#16a34a",
-      outlineBorder: "#bbf7d0",
-      outlineHover: "#16a34a",
-    };
-  }
-  // Student — Purple
   return {
     pageBg: "#f5f3ff",
-    blob1: "radial-gradient(circle at 30% 20%, rgba(124,58,237,0.08), transparent 50%)",
-    blob2: "radial-gradient(circle at 70% 80%, rgba(99,102,241,0.05), transparent 50%)",
-    gradient: "linear-gradient(135deg, #7c3aed, #6366f1)",
-    btnShadow: "0 4px 12px rgba(124,58,237,0.30)",
-    btnShadowHover: "0 8px 20px rgba(124,58,237,0.42)",
-    cardBorder: "#ddd6fe",
+    blob1: "radial-gradient(circle at 30% 20%, rgba(30,26,107,0.08), transparent 50%)",
+    blob2: "radial-gradient(circle at 70% 80%, rgba(44,37,142,0.05), transparent 50%)",
+    gradient: "linear-gradient(135deg, #1e1a6b, #1e1a6b)",
+    btnShadow: "0 4px 12px rgba(30,26,107,0.20)",
+    btnShadowHover: "0 8px 20px rgba(30,26,107,0.32)",
+    cardBorder: "#c4b5fd",
     cardHoverBg: "#f5f3ff",
-    iconColor: "#7c3aed",
+    iconColor: "#1e1a6b",
     iconBg: "#f5f3ff",
     badgePending: { bg: "#fef9c3", color: "#a16207", border: "#fde68a" },
     badgeSigned: { bg: "#f0fdf4", color: "#16a34a", border: "#86efac" },
-    tabActiveBg: "#7c3aed",
-    inputBorder: "#ddd6fe",
-    inputFocus: "#7c3aed",
-    accentColor: "#7c3aed",
-    outlineBorder: "#ddd6fe",
-    outlineHover: "#7c3aed",
+    tabActiveBg: "#1e1a6b",
+    inputBorder: "#c4b5fd",
+    inputFocus: "#1e1a6b",
+    accentColor: "#1e1a6b",
+    outlineBorder: "#c4b5fd",
+    outlineHover: "#1e1a6b",
   };
 };
 
@@ -178,11 +155,8 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
 
   /* ================= UI ================= */
   return (
-    <div style={{ minHeight: "100vh", background: t.pageBg, position: "relative", overflow: "hidden" }}>
+    <div style={{ position: "relative" }}>
 
-      {/* Background blobs */}
-      <div style={{ position: "fixed", inset: 0, background: t.blob1, zIndex: 0, pointerEvents: "none" }} />
-      <div style={{ position: "fixed", inset: 0, background: t.blob2, zIndex: 0, pointerEvents: "none" }} />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: "1100px", margin: "0 auto", padding: "40px 24px 60px" }}>
 
@@ -206,7 +180,7 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
         {/* Header */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", marginBottom: "36px" }}>
           <div>
-            <h1 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginBottom: "6px" }}>
+            <h1 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginBottom: "6px" }}>
               Digital Signature
             </h1>
             <p style={{ fontSize: "15px", color: "#64748b" }}>Blockchain-based certificate signing</p>
@@ -258,7 +232,10 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
 
         {/* Certificates Card */}
         <div style={{
-          background: "white", borderRadius: "20px",
+          background: "rgba(255, 255, 255, 0.45)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          borderRadius: "20px",
           border: `1px solid ${t.cardBorder}`,
           boxShadow: "0 4px 20px rgba(0,0,0,0.06)", overflow: "hidden",
         }}>
@@ -266,14 +243,14 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
           <div style={{ padding: "24px 28px 0", borderBottom: `1px solid ${t.cardBorder}` }}>
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "16px", marginBottom: "20px" }}>
               <div>
-                <h2 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>
+                <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>
                   Your Certificates
                 </h2>
                 <p style={{ fontSize: "13px", color: "#64748b" }}>Issued credentials waiting for signature</p>
               </div>
 
               {/* Search */}
-              <div style={{ position: "relative", width: "240px" }}>
+              <div style={{ position: "relative" }}>
                 <Search size={15} color={t.iconColor} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
                 <input
                   style={{
@@ -346,7 +323,7 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
                         display: "flex", justifyContent: "space-between", alignItems: "center",
                         padding: "16px 20px", borderRadius: "14px",
                         border: `1px solid ${isHovered ? t.accentColor : t.cardBorder}`,
-                        background: isHovered ? t.cardHoverBg : "white",
+                        background: isHovered ? t.cardHoverBg : "rgba(255, 255, 255, 0.3)",
                         transition: "all 0.2s",
                         boxShadow: isHovered ? `0 4px 16px rgba(0,0,0,0.06)` : "none",
                       }}

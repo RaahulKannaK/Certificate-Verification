@@ -21,7 +21,7 @@ const app = express();
 // 🔧 Middleware
 // ========================
 app.use(cors({
-  origin: ["https://w-sign.onrender.com","http://localhost:8080"],
+  origin: ["https://w-sign.onrender.com", "http://localhost:8080"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
@@ -146,7 +146,7 @@ app.get("/biometric/status/:email", async (req, res) => {
       "SELECT biometric_type FROM users WHERE email = ?",
       [email]
     );
-    
+
 
     const [[institution]] = await db.query(
       "SELECT biometric_type FROM institutions WHERE email = ?",
@@ -333,9 +333,9 @@ app.post("/credential/sign", async (req, res) => {
 
   // ---------------------- Validation ----------------------
   if (!credentialId || !signerPublicKey || !faceImage) {
-    return res.status(400).json({ 
-      success: false, 
-      message: "Missing data: credentialId, signerPublicKey, and faceImage are required" 
+    return res.status(400).json({
+      success: false,
+      message: "Missing data: credentialId, signerPublicKey, and faceImage are required"
     });
   }
 
@@ -423,19 +423,19 @@ app.post("/credential/sign", async (req, res) => {
     if (selfSign) {
       // Self-sign: Must be the student
       if (credential.studentPublicKey !== signerPublicKey) {
-        return res.status(403).json({ 
-          success: false, 
-          message: "Not authorized to self-sign this credential" 
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to self-sign this credential"
         });
       }
     } else {
       // Institution sign: Must be in institutionPublicKeys or credential_signers
       const institutionKeys = JSON.parse(credential.institutionPublicKeys || "[]");
-      
+
       if (!institutionKeys.includes(signerPublicKey)) {
-        return res.status(403).json({ 
-          success: false, 
-          message: "Not authorized institution signer" 
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized institution signer"
         });
       }
     }
@@ -504,8 +504,8 @@ app.post("/credential/sign", async (req, res) => {
     // ---------------------- 🔟 Success response ----------------------
     res.json({
       success: true,
-      message: selfSign 
-        ? "Self-signed successfully with biometric verification" 
+      message: selfSign
+        ? "Self-signed successfully with biometric verification"
         : "Signed successfully with biometric face verification",
       confidence,
     });
@@ -841,7 +841,7 @@ app.post("/institution/issueCredential", async (req, res) => {
 
     /* ================= VALIDATION ================= */
     const isSelfSign = signingType === "self";
-    
+
     if (
       !studentPublicKey ||
       !Array.isArray(institutionPublicKey) ||
@@ -1065,7 +1065,7 @@ app.post("/getIssuedCredentials", async (req, res) => {
 
       // Merge and dedupe
       const all = [...asInstitution, ...asSigner];
-      credentials = all.filter((v, i, a) => 
+      credentials = all.filter((v, i, a) =>
         a.findIndex(t => t.credentialId === v.credentialId) === i
       );
 
@@ -1102,7 +1102,7 @@ app.post("/getIssuedCredentials", async (req, res) => {
 
       // Merge and dedupe
       const all = [...selfSigned, ...institutionIssued, ...asSigner];
-      credentials = all.filter((v, i, a) => 
+      credentials = all.filter((v, i, a) =>
         a.findIndex(t => t.credentialId === v.credentialId) === i
       );
     }
@@ -1183,8 +1183,8 @@ app.get("/issuedCredential/:credentialId", async (req, res) => {
     );
 
     // Parse JSON fields if needed
-    const institutionPublicKeys = credential.institutionPublicKeys 
-      ? JSON.parse(credential.institutionPublicKeys) 
+    const institutionPublicKeys = credential.institutionPublicKeys
+      ? JSON.parse(credential.institutionPublicKeys)
       : [];
 
     res.json({

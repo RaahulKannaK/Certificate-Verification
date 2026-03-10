@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Button from '../context/Button';
 import { SigningType, Signer } from '@/types';
 import { Plus, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,51 +16,26 @@ const signerColors: Array<'signer-1' | 'signer-2' | 'signer-3' | 'signer-4'> = [
 
 /* ================= THEME ================= */
 const getTheme = (role: string) => {
-  if (role === 'institution') {
-    return {
-      pageBg: '#f0faf4',
-      blob1: 'radial-gradient(circle, #bbf7d0 0%, transparent 70%)',
-      blob2: 'radial-gradient(circle, #d1fae5 0%, transparent 70%)',
-      gradient: 'linear-gradient(135deg, #16a34a, #059669)',
-      btnShadow: '0 4px 12px rgba(22,163,74,0.28)',
-      btnShadowHover: '0 8px 20px rgba(22,163,74,0.40)',
-      accentColor: '#16a34a',
-      cardBg: 'white',
-      cardBorder: '#bbf7d0',
-      cardShadow: '0 4px 20px rgba(22,163,74,0.07)',
-      inputBorder: '#bbf7d0',
-      inputFocus: '#16a34a',
-      labelColor: '#374151',
-      addBtnBorder: '#86efac',
-      addBtnColor: '#16a34a',
-      addBtnHoverBg: '#f0fdf4',
-      badgeBg: '#f0fdf4',
-      badgeBorder: '#86efac',
-      badgeColor: '#16a34a',
-      removeBtnHover: '#fff1f2',
-    };
-  }
-  // Student — Purple
   return {
     pageBg: '#f5f3ff',
     blob1: 'radial-gradient(circle, #ddd6fe 0%, transparent 70%)',
     blob2: 'radial-gradient(circle, #ede9fe 0%, transparent 70%)',
-    gradient: 'linear-gradient(135deg, #7c3aed, #6366f1)',
-    btnShadow: '0 4px 12px rgba(124,58,237,0.28)',
-    btnShadowHover: '0 8px 20px rgba(124,58,237,0.40)',
-    accentColor: '#7c3aed',
+    gradient: 'linear-gradient(135deg, #1e1a6b, #1e1a6b)',
+    btnShadow: 'none',
+    btnShadowHover: 'none',
+    accentColor: '#1e1a6b',
     cardBg: 'white',
-    cardBorder: '#ddd6fe',
-    cardShadow: '0 4px 20px rgba(124,58,237,0.07)',
-    inputBorder: '#ddd6fe',
-    inputFocus: '#7c3aed',
+    cardBorder: '#c4b5fd',
+    cardShadow: 'none',
+    inputBorder: '#c4b5fd',
+    inputFocus: '#1e1a6b',
     labelColor: '#374151',
     addBtnBorder: '#c4b5fd',
-    addBtnColor: '#7c3aed',
+    addBtnColor: '#1e1a6b',
     addBtnHoverBg: '#f5f3ff',
     badgeBg: '#f5f3ff',
     badgeBorder: '#c4b5fd',
-    badgeColor: '#7c3aed',
+    badgeColor: '#1e1a6b',
     removeBtnHover: '#fff1f2',
   };
 };
@@ -273,21 +249,12 @@ export const SignerConfiguration: React.FC<SignerConfigurationProps> = ({ type, 
           )}
 
           {/* Continue Button */}
-          <button
+          <Button
             onClick={handleConfirm}
-            onMouseEnter={() => setSubmitHovered(true)}
-            onMouseLeave={() => setSubmitHovered(false)}
-            style={{
-              width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
-              background: t.gradient, color: 'white',
-              fontSize: '15px', fontWeight: 700, cursor: 'pointer',
-              boxShadow: submitHovered ? t.btnShadowHover : t.btnShadow,
-              transform: submitHovered ? 'translateY(-1px)' : 'translateY(0)',
-              transition: 'all 0.2s',
-            }}
+            className="!w-full !py-4 border-none"
           >
             Continue to Document Editor
-          </button>
+          </Button>
         </div>
       </div>
     </div>

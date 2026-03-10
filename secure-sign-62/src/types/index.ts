@@ -1,6 +1,8 @@
 export interface User {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone: string;
   age: number;
@@ -11,7 +13,7 @@ export interface User {
   biometricType?: 'fingerprint' | 'face';
   walletAddress?: string | null;
   walletPublicKey?: string | null;
-
+  walletPrivateKey?: string | null;
 }
 
 export interface Signer {

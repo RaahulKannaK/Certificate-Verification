@@ -43,55 +43,28 @@ const clamp = (v: number) => Math.min(1, Math.max(0, v));
 
 /* ================= THEME ================= */
 const getTheme = (role: string) => {
-  if (role === "institution") {
-    return {
-      pageBg: "#f0faf4",
-      blob1: "radial-gradient(circle, #bbf7d0 0%, transparent 70%)",
-      blob2: "radial-gradient(circle, #d1fae5 0%, transparent 70%)",
-      gradient: "linear-gradient(135deg, #16a34a, #059669)",
-      btnShadow: "0 4px 12px rgba(22,163,74,0.28)",
-      btnShadowHover: "0 8px 20px rgba(22,163,74,0.40)",
-      accentColor: "#16a34a",
-      toolbarBg: "rgba(255,255,255,0.92)",
-      toolbarBorder: "#bbf7d0",
-      toolActiveBg: "linear-gradient(135deg, #16a34a, #059669)",
-      toolActiveColor: "white",
-      toolHoverBg: "#f0fdf4",
-      cardBg: "white",
-      cardBorder: "#bbf7d0",
-      sidebarBg: "rgba(255,255,255,0.92)",
-      sidebarBorder: "#bbf7d0",
-      signerCardBg: "#f0fdf4",
-      signedBg: "#f0fdf4",
-      signedColor: "#16a34a",
-      pendingColor: "#64748b",
-      docBorder: "#bbf7d0",
-      selfSignBg: "#fef3c7",
-      selfSignBorder: "#f59e0b",
-    };
-  }
   return {
     pageBg: "#f5f3ff",
     blob1: "radial-gradient(circle, #ddd6fe 0%, transparent 70%)",
     blob2: "radial-gradient(circle, #ede9fe 0%, transparent 70%)",
-    gradient: "linear-gradient(135deg, #7c3aed, #6366f1)",
-    btnShadow: "0 4px 12px rgba(124,58,237,0.28)",
-    btnShadowHover: "0 8px 20px rgba(124,58,237,0.40)",
-    accentColor: "#7c3aed",
+    gradient: "linear-gradient(135deg, #1e1a6b, #1e1a6b)",
+    btnShadow: "0 4px 12px rgba(30,26,107,0.24)",
+    btnShadowHover: "0 8px 20px rgba(30,26,107,0.36)",
+    accentColor: "#1e1a6b",
     toolbarBg: "rgba(255,255,255,0.92)",
-    toolbarBorder: "#ddd6fe",
-    toolActiveBg: "linear-gradient(135deg, #7c3aed, #6366f1)",
+    toolbarBorder: "#c4b5fd",
+    toolActiveBg: "linear-gradient(135deg, #1e1a6b, #1e1a6b)",
     toolActiveColor: "white",
     toolHoverBg: "#f5f3ff",
     cardBg: "white",
-    cardBorder: "#ddd6fe",
+    cardBorder: "#c4b5fd",
     sidebarBg: "rgba(255,255,255,0.92)",
-    sidebarBorder: "#ddd6fe",
+    sidebarBorder: "#c4b5fd",
     signerCardBg: "#f5f3ff",
     signedBg: "#f0fdf4",
     signedColor: "#16a34a",
     pendingColor: "#64748b",
-    docBorder: "#ddd6fe",
+    docBorder: "#c4b5fd",
     selfSignBg: "#fef3c7",
     selfSignBorder: "#f59e0b",
   };
@@ -141,7 +114,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   /* ================= INIT SIGNATURE BOXES ================= */
   useEffect(() => {
     if (!signers?.length && signingType !== "self") return;
-    
+
     let boxes: SignatureBox[] = [];
 
     if (signingType === "self") {
@@ -173,7 +146,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         isStudent: false,
       }));
     }
-    
+
     setSignatureBoxes(boxes);
   }, [signers, signingType, user]);
 
@@ -198,10 +171,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       prev.map((box) =>
         box.id === draggingBox
           ? {
-              ...box,
-              xRatio: clamp((e.clientX - rect.left - dragOffset.x) / pdfSize.width),
-              yRatio: clamp((e.clientY - rect.top - dragOffset.y) / pdfSize.height),
-            }
+            ...box,
+            xRatio: clamp((e.clientX - rect.left - dragOffset.x) / pdfSize.width),
+            yRatio: clamp((e.clientY - rect.top - dragOffset.y) / pdfSize.height),
+          }
           : box
       )
     );
@@ -211,16 +184,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   /* ================= ISSUE CREDENTIAL ================= */
   const handleIssueCredential = async () => {
-    if (!user?.walletPublicKey) { 
-      toast.error("Wallet not connected"); 
-      return; 
+    if (!user?.walletPublicKey) {
+      toast.error("Wallet not connected");
+      return;
     }
 
     try {
       setProcessing(true);
       const formData = new FormData();
       formData.append("certificate", file);
-      
+
       const uploadRes = await axios.post(
         `${import.meta.env.VITE_API_URL}/institution/upload`,
         formData,
@@ -236,11 +209,11 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         signingType: signingType, // Explicitly use the prop value
         signatureFields: signatureBoxes.map((b) => ({
           signerPublicKey: b.signerPublicKey,
-          xRatio: Number(b.xRatio), 
+          xRatio: Number(b.xRatio),
           yRatio: Number(b.yRatio),
-          widthRatio: Number(b.widthRatio), 
+          widthRatio: Number(b.widthRatio),
           heightRatio: Number(b.heightRatio),
-          page: b.page || 1, 
+          page: b.page || 1,
           color: b.color,
           isStudent: b.isStudent || false,
         })),
@@ -262,13 +235,13 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       console.log("🔍 Sending payload:", payload); // Debug log
 
       const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/institution/issueCredential`, 
+        `${import.meta.env.VITE_API_URL}/institution/issueCredential`,
         payload
       );
-      
-      if (res.data.success) { 
-        toast.success("Credential issued successfully"); 
-        onComplete(); 
+
+      if (res.data.success) {
+        toast.success("Credential issued successfully");
+        onComplete();
       } else {
         toast.error(res.data.message);
       }
@@ -282,20 +255,20 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   /* ================= SIGN DOCUMENT ================= */
   const handleSignDocument = async (box: SignatureBox) => {
     if (!user?.walletPublicKey || !credentialId) return;
-    
+
     try {
       setProcessing(true);
-      
-      const endpoint = box.isStudent 
+
+      const endpoint = box.isStudent
         ? `${import.meta.env.VITE_API_URL}/credential/selfSign`
         : `${import.meta.env.VITE_API_URL}/credential/sign`;
-      
+
       const res = await axios.post(endpoint, {
-        credentialId, 
+        credentialId,
         signerPublicKey: user.walletPublicKey,
         isSelfSign: box.isStudent || false,
       });
-      
+
       if (res.data.success) {
         toast.success(box.isStudent ? "Self-signed successfully" : "Signed successfully");
         setSignatureBoxes((prev) => prev.map((b) => b.id === box.id ? { ...b, signed: true } : b));
@@ -310,7 +283,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   /* ================= TOOLS ================= */
   const tools = [
     { id: "move", icon: <Move size={15} />, label: "Move" },
-    { id: "box",  icon: <Square size={15} />, label: "Box" },
+    { id: "box", icon: <Square size={15} />, label: "Box" },
     { id: "text", icon: <Type size={15} />, label: "Text" },
     { id: "eraser", icon: <Eraser size={15} />, label: "Eraser" },
   ];
@@ -378,7 +351,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                 {signatureBoxes.map((box) => {
                   const signer = signers.find((s) => s.publicKey === box.signerPublicKey);
                   const isSelfSign = box.isStudent;
-                  
+
                   return (
                     <div
                       key={box.id}
@@ -398,11 +371,11 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     >
                       <div
                         className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100"
-                        style={{ 
-                          background: isSelfSign ? '#f59e0b' : `hsl(var(--${box.color}))`, 
-                          color: "#fff", 
-                          whiteSpace: "nowrap", 
-                          fontWeight: 600 
+                        style={{
+                          background: isSelfSign ? '#f59e0b' : `hsl(var(--${box.color}))`,
+                          color: "#fff",
+                          whiteSpace: "nowrap",
+                          fontWeight: 600
                         }}
                       >
                         {isSelfSign ? "Self Signature" : signer?.name}
@@ -415,7 +388,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                           style={{
                             position: "absolute", bottom: "4px", right: "4px",
                             padding: "4px 12px", borderRadius: "6px", border: "none",
-                            background: isSelfSign ? 'linear-gradient(135deg, #f59e0b, #d97706)' : t.gradient, 
+                            background: isSelfSign ? 'linear-gradient(135deg, #f59e0b, #d97706)' : t.gradient,
                             color: "white",
                             fontSize: "11px", fontWeight: 600,
                             cursor: processing ? "not-allowed" : "pointer",
@@ -425,12 +398,12 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                           {isSelfSign ? "Self Sign" : "Sign"}
                         </button>
                       )}
-                      
+
                       {box.signed && (
                         <div style={{
-                          position: "absolute", 
-                          top: "50%", 
-                          left: "50%", 
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
                           transform: "translate(-50%, -50%)",
                           background: "rgba(22, 163, 74, 0.9)",
                           color: "white",

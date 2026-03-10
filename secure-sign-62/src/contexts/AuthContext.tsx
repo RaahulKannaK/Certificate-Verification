@@ -14,7 +14,9 @@ import { User } from "@/types";
 ============================================================ */
 interface AuthContextType {
   user: User | null;
-  login: (publicKey: string) => Promise<boolean>;
+  login: (
+    loginParams: string | { email?: string; password?: string; publicKey: string; userData?: any }
+  ) => Promise<boolean>;
   logout: () => void;
   createAccount: (
     userData: Omit<
@@ -120,31 +122,54 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   /* ============================================================
      🔐 LOGIN
   ============================================================ */
-  const login = async (publicKey: string): Promise<boolean> => {
-    if (!publicKey.trim()) {
+  const login = async (
+    loginParams: string | { email?: string; password?: string; publicKey: string; userData?: any }
+  ): Promise<boolean> => {
+    let publicKey: string;
+    let userData: any = null;
+
+    if (typeof loginParams === "string") {
+      publicKey = loginParams.trim();
+    } else {
+      publicKey = loginParams.publicKey.trim();
+      userData = loginParams.userData;
+    }
+
+    if (!publicKey) {
       toast.error("Public key is required");
       return false;
     }
 
     try {
-      const response = await axios.post("/login", {
-        publicKey: publicKey.trim(),
-      });
+      let u: any;
 
-      const u = response.data.user;
+      if (userData) {
+        // If userData is already provided (from explicit API call in component)
+        u = userData;
+      } else {
+        // Standard login via publicKey only
+        const response = await axios.post("/login", {
+          publicKey,
+        });
+        u = response.data.user;
+      }
+
       if (!u) throw new Error("User not found");
 
       const mappedUser: User = {
         id: u.id,
         firstName: u.firstName,
         lastName: u.lastName,
+        name: `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.name || "User",
         age: u.age,
         phone: u.phone,
         email: u.email,
         role: u.role,
 
+        publicKey: u.publicKey || u.walletPublicKey || "",
+        privateKey: u.privateKey || u.walletPrivateKey || "",
         walletPublicKey: u.walletPublicKey || u.publicKey || "",
-        walletPrivateKey: u.walletPrivateKey || "",
+        walletPrivateKey: u.walletPrivateKey || u.privateKey || "",
 
         biometricSetup: false,   // 🔥 always revalidate
         biometricType: null,
@@ -153,10 +178,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       setUser(mappedUser);
       persistUser(mappedUser);
 
-      // 🔥 Fetch biometric status from DB
-      await refreshBiometricStatus(mappedUser.email);
+      // 🔥 Fetch biometric status from DB (Non-blocking)
+      if (mappedUser.email) {
+        refreshBiometricStatus(mappedUser.email);
+      }
 
-      toast.success("Login successful!");
       console.log("✅ Logged in user:", mappedUser);
 
       return true;
@@ -244,7 +270,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       return false;
     }
   };
-  
+
 
   /* ============================================================
      PROVIDER

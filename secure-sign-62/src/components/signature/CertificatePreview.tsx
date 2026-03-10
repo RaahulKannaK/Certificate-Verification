@@ -375,7 +375,7 @@ export const CertificatePreview = ({
 
               {/* Header */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>Add Signature</h3>
+                <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>Add Signature</h3>
                 <button
                   onClick={clearSignature}
                   style={{
@@ -458,8 +458,8 @@ export const CertificatePreview = ({
                   </p>
                   <canvas
                     ref={setSignCanvasRef}
-                    width={Math.max(signatureBox.width,700)}
-                    height={Math.max(signatureBox.height,150)}
+                    width={Math.max(signatureBox.width, 700)}
+                    height={Math.max(signatureBox.height, 150)}
                     style={{
                       border: `2px solid ${isDrawing ? t.accentColor : t.cardBorder}`,
                       borderRadius: "10px",

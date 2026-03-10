@@ -8,137 +8,55 @@
   box-sizing: border-box;
 }
 
-html, body, #root {
-  height: 100%;
+html,
+body,
+#root {
+  height: 100vh;
+  min-height: 100vh;
   width: 100%;
-  font-family: 'Inter', sans-serif;
-  background: #000;
+  font-family: 'WeSignFont', 'Inter', sans-serif !important;
   overflow-x: hidden;
-  color: white;
+  overflow-y: auto;
+  color: #0f172a;
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: none;
+  background: #eeedf9 url('/images/bg.png') no-repeat center center fixed;
+  background-size: cover;
 }
+
+* {
+  font-family: 'WeSignFont', sans-serif !important;
+}
+
+/* Global containers */
 
 /* ============================= */
-/*        MAIN CONTENT LAYER     */
+/*        SCROLLBAR              */
 /* ============================= */
 
-.app-container {
-  position: relative;
-  z-index: 10;
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
 }
 
-/* ============================= */
-/*   DYNAMIC NETFLIX AI BACKGROUND */
-/* ============================= */
-
-.animated-background {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-
-  background: linear-gradient(
-    -45deg,
-    #0ea5e9,
-    #000000,
-    #a855f7,
-    #000000,
-    #0ea5e9,
-    #a855f7
-  );
-
-  background-size: 400% 400%;
-  animation: gradientShift 18s ease infinite;
-  filter: blur(90px);
-  opacity: 0.9;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* REAL color movement animation */
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  25% { background-position: 50% 100%; }
-  50% { background-position: 100% 50%; }
-  75% { background-position: 50% 0%; }
-  100% { background-position: 0% 50%; }
+::-webkit-scrollbar-thumb {
+  background: #ffffff;
+  border-radius: 20px;
 }
 
-/* ============================= */
-/*     SUBTLE DEPTH OVERLAY      */
-/* ============================= */
-
-.animated-background::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at center, transparent 40%, #000 90%);
-  opacity: 0.6;
+::-webkit-scrollbar-thumb:hover {
+  background: #f8fafc;
 }
 
-/* ============================= */
-/*      DYNAMIC AI BUTTON        */
-/* ============================= */
-
-.ai-button {
-  position: relative;
-  padding: 12px 28px;
-  border-radius: 50px;
-  border: none;
-  font-weight: 600;
-  font-size: 15px;
-  cursor: pointer;
-  color: white;
-  overflow: hidden;
-  transition: all 0.3s ease;
-
-  background: linear-gradient(
-    -45deg,
-    #0ea5e9,
-    #a855f7,
-    #0ea5e9,
-    #000000,
-    #a855f7
-  );
-
-  background-size: 300% 300%;
-  animation: buttonGradientMove 6s ease infinite;
-}
-
-/* Smooth gradient movement */
-@keyframes buttonGradientMove {
-  0% { background-position: 0% 50%; }
-  25% { background-position: 50% 100%; }
-  50% { background-position: 100% 50%; }
-  75% { background-position: 50% 0%; }
-  100% { background-position: 0% 50%; }
-}
-
-/* Glow border effect */
-.ai-button::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  background: linear-gradient(
-    90deg,
-    #0ea5e9,
-    #a855f7,
-    #0ea5e9
-  );
-  background-size: 200% 200%;
-  border-radius: 50px;
-  z-index: -1;
-  animation: buttonGlow 3s linear infinite;
-  filter: blur(12px);
-  opacity: 0.8;
-}
-
-@keyframes buttonGlow {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
-}
-
-.ai-button:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 0 20px rgba(14, 165, 233, 0.6),
-    0 0 30px rgba(168, 85, 247, 0.6);
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ffffff transparent;
 }
 
 /* ============================= */
@@ -146,38 +64,9 @@ html, body, #root {
 /* ============================= */
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(44, 37, 142, 0.12);
   padding: 24px;
-}
-
-/* ============================= */
-/*       GRADIENT HEADING        */
-/* ============================= */
-
-.ai-heading {
-  font-size: 2.5rem;
-  font-weight: 700;
-  background: linear-gradient(90deg, #0ea5e9, #a855f7);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-/* ============================= */
-/*        SCROLLBAR              */
-/* ============================= */
-
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #000;
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(#0ea5e9, #a855f7);
-  border-radius: 10px;
 }
