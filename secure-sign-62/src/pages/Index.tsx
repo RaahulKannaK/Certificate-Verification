@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { CreateAccountForm } from "@/components/auth/CreateAccountForm";
 import { LoginForm } from "@/components/auth/LoginForm";
-import { Dashboard } from "@/components/dashboard/Dashboard";
 import DigitalSignature from "@/components/dashboard/DigitalSignature";
 import SignCertificate from "@/pages/SignCertificate";
 import { useAuth } from "@/contexts/AuthContext";
+
+import StudentPage from "@/app/student/page";
+import InstitutionPage from "@/app/institution/page";
 
 /* 🔹 ADD NEW VIEWS HERE */
 type View =
@@ -25,10 +27,14 @@ const Index: React.FC = () => {
   const [selectedCredentialId, setSelectedCredentialId] = useState<string | null>(null);
   const [signingType, setSigningType] = useState<"self" | "sequential" | "parallel">("self");
 
-  /* 🔹 IF USER LOGGED IN, FORCE DASHBOARD */
-  if (user && view === "landing") {
-    setView("dashboard");
-  }
+  /* 🔹 AUTO-REDIRECT ON AUTH CHANGE */
+  React.useEffect(() => {
+    if (!user && view !== "landing" && view !== "login" && view !== "create") {
+      setView("landing");
+    } else if (user && view === "landing") {
+      setView("dashboard");
+    }
+  }, [user, view]);
 
   switch (view) {
     case "create":
@@ -48,15 +54,10 @@ const Index: React.FC = () => {
       );
 
     case "dashboard":
-      return (
-        <Dashboard
-          onNavigate={(next: string) => {
-            if (next === "digital-signature") {
-              setView("digital-signature");
-            }
-          }}
-        />
-      );
+      if (user?.role === "institution") {
+        return <InstitutionPage onHome={() => setView("landing")} />;
+      }
+      return <StudentPage onHome={() => setView("landing")} />;
 
     case "digital-signature":
       return (
@@ -85,7 +86,6 @@ const Index: React.FC = () => {
       return (
         <SignCertificate
           credentialId={selectedCredentialId}
-          signingType={signingType} // optional if your SignCertificate uses it
           onBack={() => setView("digital-signature")}
         />
       );

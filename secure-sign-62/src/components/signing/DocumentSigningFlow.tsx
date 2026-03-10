@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import ThemeButton from '../context/Button';
 import {
   ArrowLeft,
   Upload,
@@ -19,43 +20,21 @@ interface DocumentSigningFlowProps {
 }
 
 const getTheme = (role: string) => {
-  if (role === 'institution') {
-    return {
-      pageBg: '#f0faf4',
-      blob1: 'radial-gradient(circle, #bbf7d0 0%, transparent 70%)',
-      blob2: 'radial-gradient(circle, #d1fae5 0%, transparent 70%)',
-      gradient: 'linear-gradient(135deg, #16a34a, #059669)',
-      shadow: 'rgba(22,163,74,0.25)',
-      cardBorder: '#bbf7d0',
-      cardHoverBorder: '#86efac',
-      cardIconBg: '#f0fdf4',
-      iconColor: '#16a34a',
-      badgeBg: '#f0fdf4',
-      badgeBorder: '#86efac',
-      badgeColor: '#16a34a',
-      uploadBorder: '#86efac',
-      uploadBg: '#f0fdf4',
-      uploadHoverBg: '#dcfce7',
-      backHover: '#f0fdf4',
-    };
-  }
-  // Student — Purple
   return {
-    pageBg: '#f5f3ff',
     blob1: 'radial-gradient(circle, #ddd6fe 0%, transparent 70%)',
     blob2: 'radial-gradient(circle, #ede9fe 0%, transparent 70%)',
-    gradient: 'linear-gradient(135deg, #7c3aed, #6366f1)',
-    shadow: 'rgba(124,58,237,0.25)',
-    cardBorder: '#ddd6fe',
-    cardHoverBorder: '#c4b5fd',
+    gradient: 'linear-gradient(135deg, #1e1a6b, #1e1a6b)',
+    shadow: 'none',
+    cardBorder: '#c4b5fd',
+    cardHoverBorder: '#1e1a6b',
     cardIconBg: '#f5f3ff',
-    iconColor: '#7c3aed',
+    iconColor: '#1e1a6b',
     badgeBg: '#f5f3ff',
     badgeBorder: '#c4b5fd',
-    badgeColor: '#7c3aed',
+    badgeColor: '#1e1a6b',
     uploadBorder: '#c4b5fd',
     uploadBg: '#f5f3ff',
-    uploadHoverBg: '#ede9fe',
+    uploadHoverBg: '#eeedf9',
     backHover: '#f5f3ff',
   };
 };
@@ -106,7 +85,7 @@ export const DocumentSigningFlow: React.FC<DocumentSigningFlowProps> = ({ onBack
 
   /* ================= UI ================= */
   return (
-    <div style={{ minHeight: '100vh', background: t.pageBg, position: 'relative', overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
 
       {/* Background blobs */}
       <div style={{ position: 'fixed', top: '-100px', right: '-100px', width: '500px', height: '500px', borderRadius: '50%', background: t.blob1, zIndex: 0, pointerEvents: 'none' }} />
@@ -115,31 +94,26 @@ export const DocumentSigningFlow: React.FC<DocumentSigningFlowProps> = ({ onBack
       <div style={{ position: 'relative', zIndex: 1 }} className="container mx-auto px-6 py-8">
 
         {/* Back Button */}
-        <button
+        <ThemeButton
           onClick={step === 'upload' ? onBack : () => {
             if (step === 'type') setStep('upload');
             else if (step === 'signers') setStep('type');
             else if (step === 'editor') setStep(signingType === 'self' ? 'type' : 'signers');
           }}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '8px',
-            marginBottom: '24px', padding: '8px 18px', borderRadius: '10px',
-            border: `1px solid ${t.cardBorder}`, background: 'white',
-            color: '#374151', fontSize: '14px', fontWeight: 500,
-            cursor: 'pointer', transition: 'all 0.2s',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-          }}
-          onMouseEnter={e => { (e.currentTarget.style.background = t.backHover); (e.currentTarget.style.borderColor = t.cardHoverBorder); (e.currentTarget.style.color = t.iconColor); }}
-          onMouseLeave={e => { (e.currentTarget.style.background = 'white'); (e.currentTarget.style.borderColor = t.cardBorder); (e.currentTarget.style.color = '#374151'); }}
+          showIcon={false}
+          className="!px-6 !py-2 border-none mb-6"
         >
-          <ArrowLeft size={16} /> Back
-        </button>
+          <ArrowLeft size={16} className="mr-2" /> Back
+        </ThemeButton>
 
         {/* ================= UPLOAD STEP ================= */}
         {step === 'upload' && (
           <div className="max-w-2xl mx-auto">
             <div style={{
-              background: 'white', borderRadius: '24px',
+              background: 'rgba(255, 255, 255, 0.45)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              borderRadius: '24px',
               border: `1px solid ${t.cardBorder}`,
               boxShadow: `0 8px 32px ${t.shadow}`,
               padding: '48px 40px', textAlign: 'center',
@@ -263,7 +237,9 @@ const SigningTypeCard: React.FC<{
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? t.uploadHoverBg : 'white',
+        background: hovered ? t.uploadHoverBg : 'rgba(255, 255, 255, 0.45)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
         borderRadius: '18px',
         border: `1px solid ${hovered ? t.cardHoverBorder : t.cardBorder}`,
         padding: '32px 24px',

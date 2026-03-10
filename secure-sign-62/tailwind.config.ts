@@ -1,4 +1,6 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
+
 
 export default {
   darkMode: ["class"],
@@ -14,8 +16,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        display: ['Space Grotesk', 'sans-serif'],
+        sans: ['WeSignFont', 'Inter', 'sans-serif'],
+        display: ['WeSignFont', 'Space Grotesk', 'sans-serif'],
+        brand: ['WeSignFont', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -23,6 +26,11 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        brand: {
+          DEFAULT: "#2c258e",
+          dark: "#1e1a6b",
+          light: "#eeedf9",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -104,5 +112,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate],
 } satisfies Config;

@@ -19,9 +19,6 @@ const AppContent = () => {
 
   return (
     <TooltipProvider>
-      {/* 🔥 Animated Netflix-style AI Background */}
-      <div className="animated-background" />
-
       {/* Content Layer */}
       <div className="app-container">
         <Toaster />

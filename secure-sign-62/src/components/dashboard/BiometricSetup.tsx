@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Button from "../context/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Fingerprint, ScanFace, Check, Loader2, X, AlertCircle,
@@ -15,7 +16,7 @@ interface BiometricSetupProps {
 const getTheme = (role: string) => {
   if (role === "institution") {
     return {
-      pageBg: "#f0faf4",
+      pageBg: "#e2e7ff",
       blob1: "radial-gradient(circle, #bbf7d0 0%, transparent 70%)",
       blob2: "radial-gradient(circle, #d1fae5 0%, transparent 70%)",
       gradient: "linear-gradient(135deg, #16a34a, #059669)",
@@ -44,7 +45,7 @@ const getTheme = (role: string) => {
   }
   // Student — Purple
   return {
-    pageBg: "#f5f3ff",
+    pageBg: "#e2e7ff",
     blob1: "radial-gradient(circle, #ddd6fe 0%, transparent 70%)",
     blob2: "radial-gradient(circle, #ede9fe 0%, transparent 70%)",
     gradient: "linear-gradient(135deg, #7c3aed, #6366f1)",
@@ -178,9 +179,7 @@ export const BiometricSetup: React.FC<BiometricSetupProps> = ({
         if (!data.success) throw new Error(data.message);
       }
 
-      if (type === "fingerprint") {
-        await setupBiometric("fingerprint");
-      }
+      await setupBiometric("fingerprint", "");
 
       toast.success(`${type === "face" ? "Face recognition" : "Fingerprint"} set up successfully!`);
       setIsProcessing(false);
@@ -196,8 +195,8 @@ export const BiometricSetup: React.FC<BiometricSetupProps> = ({
   /* ================= CAMERA UI ================= */
   if (showCamera) {
     return (
-      <div style={{ position: "fixed", inset: 0, background: "rgba(255,255,255,0.95)", backdropFilter: "blur(20px)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-        <div style={{ background: t.cardBg, borderRadius: "24px", border: `1px solid ${t.cardBorder}`, boxShadow: t.cardShadow, padding: "32px", maxWidth: "500px", width: "100%", position: "relative" }}>
+      <div style={{ position: "fixed", inset: 0, background: "rgba(255,255,255,0.1)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+        <div style={{ background: "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderRadius: "24px", border: `1px solid ${t.cardBorder}`, boxShadow: t.cardShadow, padding: "32px", maxWidth: "500px", width: "100%", position: "relative" }}>
 
           {/* Close */}
           <button
@@ -225,12 +224,13 @@ export const BiometricSetup: React.FC<BiometricSetupProps> = ({
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: "24px", textAlign: "center" }}>
                 <AlertCircle size={40} color="#ef4444" style={{ marginBottom: "12px" }} />
                 <p style={{ fontSize: "13px", color: "#ef4444", marginBottom: "16px" }}>{cameraError}</p>
-                <button
+                <Button
                   onClick={startCamera}
-                  style={{ padding: "8px 20px", borderRadius: "8px", border: "none", background: t.gradient, color: "white", fontSize: "13px", fontWeight: 600, cursor: "pointer", boxShadow: t.btnShadow }}
+                  showIcon={false}
+                  className="!px-6 !py-2 border-none"
                 >
                   Retry
-                </button>
+                </Button>
               </div>
             ) : (
               <>
@@ -272,7 +272,7 @@ export const BiometricSetup: React.FC<BiometricSetupProps> = ({
       <div style={{ position: "fixed", bottom: "-80px", left: "-80px", width: "420px", height: "420px", borderRadius: "50%", background: t.blob2, zIndex: 0, pointerEvents: "none" }} />
 
       <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "420px" }}>
-        <div style={{ background: t.cardBg, borderRadius: "24px", border: `1px solid ${t.cardBorder}`, boxShadow: t.cardShadow, padding: "40px 36px" }}>
+        <div style={{ background: "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderRadius: "24px", border: `1px solid ${t.cardBorder}`, boxShadow: t.cardShadow, padding: "40px 36px" }}>
 
           {/* Header */}
           <div style={{ textAlign: "center", marginBottom: "32px" }}>
@@ -355,22 +355,13 @@ export const BiometricSetup: React.FC<BiometricSetupProps> = ({
 
           {/* Skip */}
           {onSkip && (
-            <button
+            <Button
               onClick={onSkip}
-              onMouseEnter={() => setSkipHovered(true)}
-              onMouseLeave={() => setSkipHovered(false)}
-              style={{
-                width: "100%", padding: "11px", marginTop: "8px",
-                borderRadius: "10px",
-                border: `1px solid ${skipHovered ? t.skipHoverBorder : t.skipBorder}`,
-                background: "white",
-                color: skipHovered ? t.skipHoverColor : "#64748b",
-                fontSize: "14px", fontWeight: 500,
-                cursor: "pointer", transition: "all 0.2s",
-              }}
+              showIcon={false}
+              className="!w-full !py-2.5 border-none bg-slate-50 hover:bg-slate-100 !text-slate-500"
             >
               Skip for now
-            </button>
+            </Button>
           )}
         </div>
       </div>

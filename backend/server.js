@@ -21,7 +21,7 @@ const app = express();
 // 🔧 Middleware
 // ========================
 app.use(cors({
-  origin: ["https://w-sign.onrender.com","http://localhost:8080"],
+  origin: ["https://w-sign.onrender.com", "http://localhost:8080"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
@@ -112,103 +112,47 @@ app.post("/signup", async (req, res) => {
 // ==========================================================
 app.post("/login", async (req, res) => {
   const { email, password, publicKey } = req.body;
-  
-  console.log("🔍 Login attempt:", { email, publicKey, passwordReceived: !!password });
-
-  // Validation - all three fields required
-  if (!email || !password || !publicKey) {
-    console.log("❌ Missing fields:", { email: !!email, password: !!password, publicKey: !!publicKey });
-    return res.status(400).json({ 
-      message: "Email, password, and public key are required"
-    });
-  }
 
   try {
-    // ========== TRY USERS TABLE ==========
-    console.log("🔍 Checking users table...");
-    const [userRows] = await db.query(
-      `SELECT id, firstName, lastName, age, phone, email, role, walletPublicKey, password 
-       FROM users 
-       WHERE email = ? AND walletPublicKey = ?`,
-      [email, publicKey]
-    );
-    console.log("👤 Users found:", userRows.length);
+    // Parallelize user and institution lookups
+    const [userResult, instResult] = await Promise.all([
+      db.query(
+        "SELECT id, firstName, lastName, age, phone, email, role, walletPublicKey, password FROM users WHERE email = ? AND walletPublicKey = ?",
+        [email, publicKey]
+      ),
+      db.query(
+        "SELECT id, institutionName AS firstName, '' AS lastName, null AS age, phone, email, 'institution' AS role, walletPublicKey, password FROM institutions WHERE email = ? AND walletPublicKey = ?",
+        [email, publicKey]
+      )
+    ]);
+
+    const userRows = userResult[0];
+    const instRows = instResult[0];
+
+    let foundUser = null;
 
     if (userRows.length) {
-      const user = userRows[0];
-      console.log("✅ User matched:", user.email);
-      
-      // Verify password
-      console.log("🔐 Checking password...");
-      console.log("Input password:", password);
-      console.log("DB password:", user.password);
-      console.log("Match:", user.password === password);
-      
-      if (user.password !== password) {
-        console.log("❌ Password mismatch");
-        return res.status(401).json({ message: "Invalid password" });
-      }
-      console.log("✅ Password matched");
-
-      // Remove password from response
-      const { password: _, ...userWithoutPassword } = user;
-      
-      console.log("📤 Sending user response:", userWithoutPassword);
-      
-      return res.json({ 
-        message: "✅ Login successful!", 
-        user: userWithoutPassword 
-      });
+      foundUser = userRows[0];
+    } else if (instRows.length) {
+      foundUser = instRows[0];
     }
 
-    // ========== TRY INSTITUTIONS TABLE ==========
-    console.log("🔍 Checking institutions table...");
-    const [instRows] = await db.query(
-      `SELECT id, institutionName, email, phone, walletPublicKey, password, 'institution' AS role
-       FROM institutions 
-       WHERE email = ? AND walletPublicKey = ?`,
-      [email, publicKey]
-    );
-    console.log("🏛️ Institutions found:", instRows.length);
-
-    if (instRows.length) {
-      const inst = instRows[0];
-      console.log("✅ Institution matched:", inst.email);
-      
-      // Verify password
-      if (inst.password !== password) {
-        console.log("❌ Institution password mismatch");
-        return res.status(401).json({ message: "Invalid password" });
-      }
-
-      // Format institution response like user
-      const { password: _, ...instWithoutPassword } = inst;
-      
-      const responseUser = {
-        id: instWithoutPassword.id,
-        firstName: instWithoutPassword.institutionName,
-        lastName: '',
-        age: null,
-        phone: instWithoutPassword.phone,
-        email: instWithoutPassword.email,
-        role: 'institution',
-        walletPublicKey: instWithoutPassword.walletPublicKey
-      };
-      
-      console.log("📤 Sending institution response:", responseUser);
-      
-      return res.json({ 
-        message: "✅ Login successful!", 
-        user: responseUser
-      });
+    if (!foundUser) {
+      return res.status(404).json({ message: "User or institution not found" });
     }
 
-    // ========== NO MATCH FOUND ==========
-    console.log("❌ No matching user or institution found");
-    return res.status(404).json({ 
-      message: "Invalid credentials. Please check your email, password, and public key." 
+    // Verify password (plain text as per existing logic)
+    if (foundUser.password !== password) {
+      return res.status(401).json({ message: "Invalid password" });
+    }
+
+    // Success - Remove password from response
+    const { password: _, ...userWithoutPassword } = foundUser;
+
+    return res.json({
+      message: "✅ Login successful!",
+      user: userWithoutPassword
     });
-
   } catch (err) {
     console.error("❌ Login Error Details:", err);
     console.error("Error Code:", err.code);
@@ -249,7 +193,7 @@ app.get("/biometric/status/:email", async (req, res) => {
       "SELECT biometric_type FROM users WHERE email = ?",
       [email]
     );
-    
+
 
     const [[institution]] = await db.query(
       "SELECT biometric_type FROM institutions WHERE email = ?",
@@ -436,9 +380,9 @@ app.post("/credential/sign", async (req, res) => {
 
   // ---------------------- Validation ----------------------
   if (!credentialId || !signerPublicKey || !faceImage) {
-    return res.status(400).json({ 
-      success: false, 
-      message: "Missing data: credentialId, signerPublicKey, and faceImage are required" 
+    return res.status(400).json({
+      success: false,
+      message: "Missing data: credentialId, signerPublicKey, and faceImage are required"
     });
   }
 
@@ -526,19 +470,19 @@ app.post("/credential/sign", async (req, res) => {
     if (selfSign) {
       // Self-sign: Must be the student
       if (credential.studentPublicKey !== signerPublicKey) {
-        return res.status(403).json({ 
-          success: false, 
-          message: "Not authorized to self-sign this credential" 
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to self-sign this credential"
         });
       }
     } else {
       // Institution sign: Must be in institutionPublicKeys or credential_signers
       const institutionKeys = JSON.parse(credential.institutionPublicKeys || "[]");
-      
+
       if (!institutionKeys.includes(signerPublicKey)) {
-        return res.status(403).json({ 
-          success: false, 
-          message: "Not authorized institution signer" 
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized institution signer"
         });
       }
     }
@@ -607,8 +551,8 @@ app.post("/credential/sign", async (req, res) => {
     // ---------------------- 🔟 Success response ----------------------
     res.json({
       success: true,
-      message: selfSign 
-        ? "Self-signed successfully with biometric verification" 
+      message: selfSign
+        ? "Self-signed successfully with biometric verification"
         : "Signed successfully with biometric face verification",
       confidence,
     });
@@ -944,7 +888,7 @@ app.post("/institution/issueCredential", async (req, res) => {
 
     /* ================= VALIDATION ================= */
     const isSelfSign = signingType === "self";
-    
+
     if (
       !studentPublicKey ||
       !Array.isArray(institutionPublicKey) ||
@@ -1168,7 +1112,7 @@ app.post("/getIssuedCredentials", async (req, res) => {
 
       // Merge and dedupe
       const all = [...asInstitution, ...asSigner];
-      credentials = all.filter((v, i, a) => 
+      credentials = all.filter((v, i, a) =>
         a.findIndex(t => t.credentialId === v.credentialId) === i
       );
 
@@ -1205,7 +1149,7 @@ app.post("/getIssuedCredentials", async (req, res) => {
 
       // Merge and dedupe
       const all = [...selfSigned, ...institutionIssued, ...asSigner];
-      credentials = all.filter((v, i, a) => 
+      credentials = all.filter((v, i, a) =>
         a.findIndex(t => t.credentialId === v.credentialId) === i
       );
     }
@@ -1286,8 +1230,8 @@ app.get("/issuedCredential/:credentialId", async (req, res) => {
     );
 
     // Parse JSON fields if needed
-    const institutionPublicKeys = credential.institutionPublicKeys 
-      ? JSON.parse(credential.institutionPublicKeys) 
+    const institutionPublicKeys = credential.institutionPublicKeys
+      ? JSON.parse(credential.institutionPublicKeys)
       : [];
 
     res.json({

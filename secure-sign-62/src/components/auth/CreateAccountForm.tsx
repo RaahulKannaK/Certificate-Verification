@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { theme } from '../../theme/theme';
+import ThemeButton from '../context/Button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,23 +35,16 @@ const createWallet = (): WalletKeys => {
   };
 };
 
-/* ── shared page wrapper ── */
 const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div
-    style={{ background: '#f0f4f8', position: 'relative', overflow: 'hidden' }}
-    className="min-h-screen flex items-center justify-center p-6"
+    style={{
+      background: theme.colors.background,
+      position: 'relative',
+      overflow: 'visible',
+      touchAction: 'pan-y'
+    }}
+    className="min-h-screen flex items-start justify-center"
   >
-    {/* blobs */}
-    <div style={{
-      position: 'absolute', top: '-100px', right: '-100px',
-      width: '500px', height: '500px', borderRadius: '50%',
-      background: 'radial-gradient(circle, #dbeafe 0%, transparent 70%)', zIndex: 0,
-    }} />
-    <div style={{
-      position: 'absolute', bottom: '-80px', left: '-80px',
-      width: '420px', height: '420px', borderRadius: '50%',
-      background: 'radial-gradient(circle, #ede9fe 0%, transparent 70%)', zIndex: 0,
-    }} />
     <div style={{ position: 'relative', zIndex: 1, width: '100%' }}>
       {children}
     </div>
@@ -60,34 +55,38 @@ const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
   <div
     style={{
-      background: 'white',
-      borderRadius: '24px',
-      border: '1px solid #bfdbfe',
-      boxShadow: '0 8px 32px rgba(99,102,241,0.08), 0 2px 8px rgba(0,0,0,0.06)',
+      background: '#ffffff',
+      borderRadius: '20px',
+      border: '1px solid #c4b5fd',
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
     }}
-    className={`p-8 ${className}`}
+    className={`p-6 ${className}`}
   >
     {children}
   </div>
 );
 
-/* ── shared icon header ── */
-const IconHeader: React.FC<{ icon: React.ReactNode; title: string; subtitle: string }> = ({ icon, title, subtitle }) => (
-  <div className="text-center mb-8">
-    <div
+/* ── shared icon header (Updated for Hero Style) ── */
+const HeroHeader: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
+  <div className="text-left mb-4 pt-4 w-full">
+    <h1
       style={{
-        background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-        boxShadow: '0 8px 20px rgba(99,102,241,0.35)',
-        borderRadius: '18px',
+        fontFamily: 'WeSignFont',
+        fontSize: 'clamp(1rem, 3vw, 2.8rem)',
+        fontWeight: 900,
+        lineHeight: 1.1,
+        background: `linear-gradient(135deg, ${theme.colors.brand}, ${theme.colors.brandDark})`,
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text',
+        marginBottom: '16px'
       }}
-      className="w-16 h-16 flex items-center justify-center mx-auto mb-4"
     >
-      {icon}
-    </div>
-    <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', color: '#0f172a' }} className="text-2xl font-bold mb-2">
       {title}
-    </h2>
-    <p className="text-slate-500 text-sm">{subtitle}</p>
+    </h1>
+    <p style={{ fontFamily: 'WeSignFont', fontSize: '14px', color: '#1d1d1e', maxWidth: '600px' }}>
+      {subtitle}
+    </p>
   </div>
 );
 
@@ -98,46 +97,23 @@ const GradientButton: React.FC<{
   disabled?: boolean;
   children: React.ReactNode;
 }> = ({ type = 'button', onClick, disabled, children }) => (
-  <button
+  <ThemeButton
     type={type}
     onClick={onClick}
     disabled={disabled}
-    style={{
-      width: '100%', padding: '13px',
-      borderRadius: '10px', border: 'none',
-      background: disabled ? '#a5b4fc' : 'linear-gradient(135deg, #3b82f6, #6366f1)',
-      color: 'white', fontSize: '15px', fontWeight: 600,
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      boxShadow: disabled ? 'none' : '0 6px 20px rgba(99,102,241,0.35)',
-      transition: 'all 0.2s',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    }}
-    onMouseEnter={e => {
-      if (!disabled) {
-        (e.currentTarget.style.transform = 'translateY(-2px)');
-        (e.currentTarget.style.boxShadow = '0 10px 28px rgba(99,102,241,0.45)');
-      }
-    }}
-    onMouseLeave={e => {
-      (e.currentTarget.style.transform = 'translateY(0)');
-      (e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.35)');
-    }}
+    className="!w-full !border-[#1e1a6b]/30"
   >
     {children}
-  </button>
+  </ThemeButton>
 );
 
 export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, onSuccess }) => {
   const [step, setStep] = useState<'form' | 'wallet'>('form');
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    phone: '',
-    age: '',
-    role: 'student'
+    rollNo: '', empId: '', name: '', email: '', phone: '', password: '', confirmPassword: '', role: 'student'
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [walletKeys, setWalletKeys] = useState<WalletKeys | null>(null);
   const [copiedPublic, setCopiedPublic] = useState(false);
   const [copiedPrivate, setCopiedPrivate] = useState(false);
@@ -151,20 +127,38 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword || !formData.phone || !formData.age) {
-      toast.error('Please fill all fields');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Please enter a valid email address (e.g., abc@gmail.com)');
       return;
     }
-    
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+
+    if (formData.phone.length < 10) {
+      toast.error('Please enter a valid 10-digit phone number');
       return;
     }
-    
+
+    const isStudent = formData.role === 'student';
+    const isInstitution = formData.role === 'institution';
+
+    if (isStudent && (!formData.rollNo || !formData.name || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword)) {
+      toast.error('Please fill all mandatory fields for Student');
+      return;
+    }
+
+    if (isInstitution && (!formData.empId || !formData.name || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword)) {
+      toast.error('Please fill all mandatory fields for Institution');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
       return;
     }
 
@@ -205,13 +199,13 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
   if (step === 'wallet' && walletKeys) {
     return (
       <PageWrapper>
-        <div className="w-full max-w-lg mx-auto">
-          <Card>
-            <IconHeader
-              icon={<Wallet className="w-8 h-8 text-white" />}
-              title="Wallet Created!"
-              subtitle="Save these keys securely. You will NOT be able to recover them later."
-            />
+        <div className="w-full max-w-2xl mx-auto flex flex-col items-center">
+          <HeroHeader
+            title="Wallet Created!"
+            subtitle="Save these keys securely. You will NOT be able to recover them later."
+          />
+
+          <Card className="w-full">
 
             <div className="space-y-6">
               {/* Public Key */}
@@ -220,15 +214,15 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
                   Public Key (Wallet Address)
                 </label>
                 <div className="flex items-center gap-2">
-                  <div style={{ background: '#f0f4f8', border: '1px solid #e2e8f0', borderRadius: '10px' }}
+                  <div style={{ background: theme.colors.background, border: '1px solid #e2e8f0', borderRadius: '10px' }}
                     className="flex-1 p-3 font-mono text-xs break-all text-slate-700">
                     {walletKeys.publicKey}
                   </div>
                   <button
                     onClick={() => copyToClipboard(walletKeys.publicKey, 'public')}
-                    style={{ background: '#f0f4f8', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}
+                    style={{ background: theme.colors.background, border: '1px solid #c4b5fd', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}
                   >
-                    {copiedPublic ? <Check className="w-4 h-4 text-indigo-500" /> : <Copy className="w-4 h-4 text-slate-500" />}
+                    {copiedPublic ? <Check className="w-4 h-4 text-[#1e1a6b]" /> : <Copy className="w-4 h-4 text-slate-500" />}
                   </button>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">Example: <code>0xAbC123...789</code></p>
@@ -240,21 +234,21 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
                   Private Key (Keep Secret!)
                 </label>
                 <div className="flex items-center gap-2">
-                  <div style={{ background: '#f0f4f8', border: '1px solid #e2e8f0', borderRadius: '10px' }}
+                  <div style={{ background: theme.colors.background, border: '1px solid #e2e8f0', borderRadius: '10px' }}
                     className="flex-1 p-3 font-mono text-xs break-all text-slate-700">
                     {showPrivateKey ? walletKeys.privateKey : '•'.repeat(66)}
                   </div>
                   <button
                     onClick={() => setShowPrivateKey(!showPrivateKey)}
-                    style={{ background: '#f0f4f8', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}
+                    style={{ background: theme.colors.background, border: '1px solid #c4b5fd', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}
                   >
                     {showPrivateKey ? <EyeOff className="w-4 h-4 text-slate-500" /> : <Eye className="w-4 h-4 text-slate-500" />}
                   </button>
                   <button
                     onClick={() => copyToClipboard(walletKeys.privateKey, 'private')}
-                    style={{ background: '#f0f4f8', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}
+                    style={{ background: theme.colors.background, border: '1px solid #c4b5fd', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}
                   >
-                    {copiedPrivate ? <Check className="w-4 h-4 text-indigo-500" /> : <Copy className="w-4 h-4 text-slate-500" />}
+                    {copiedPrivate ? <Check className="w-4 h-4 text-[#1e1a6b]" /> : <Copy className="w-4 h-4 text-slate-500" />}
                   </button>
                 </div>
                 <p style={{ color: '#ef4444' }} className="text-xs mt-2">
@@ -274,217 +268,179 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
     );
   }
 
-  /* ── FORM STEP ── */
   return (
     <PageWrapper>
-      <div className="w-full max-w-md mx-auto">
-        <button
-          onClick={onBack}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            marginBottom: '24px', background: 'none', border: 'none',
-            cursor: 'pointer', color: '#64748b', fontSize: '14px', fontWeight: 500,
-            transition: 'color 0.2s', padding: 0,
-          }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#1e293b')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
-        >
-          <ArrowLeft size={16} /> Back
-        </button>
+      <div className="w-full h-screen flex flex-col lg:flex-row overflow-hidden">
+        {/* Left Side: Branding & Info */}
+        <div className="w-full lg:w-1/2 flex flex-col p-8 sm:p-12 lg:p-20 lg:fixed lg:left-0 lg:top-0 lg:h-screen lg:justify-start">
+          {/* Logo & Project Name & Back Button Area - Strictly Top-Left */}
+          <div className="flex flex-col items-start gap-6 mb-8 lg:mb-16">
+            <ThemeButton
+              onClick={onBack}
+              showIcon={false}
+              className="!px-4 !py-1.5 !text-xs !border-[#1e1a6b]/20"
+            >
+              <ArrowLeft size={14} className="mr-1" /> Back to Home
+            </ThemeButton>
 
-        <Card>
-          <IconHeader
-            icon={<Wallet className="w-8 h-8 text-white" />}
-            title="Create Your Wallet"
-            subtitle="Fill in your details to generate a blockchain wallet"
-          />
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Full Name */}
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
-                Full Name
-              </label>
-              <input
-                type="text"
-                placeholder="Eg: Alice"
-                value={formData.name}
-                onChange={e => handleChange('name', e.target.value)}
-                style={{
-                  width: '100%', padding: '11px 14px',
-                  borderRadius: '10px', border: '1.5px solid #e2e8f0',
-                  fontSize: '14px', color: '#1e293b', background: '#f8fafc',
-                  outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
-                }}
-                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
-                onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
+            <div className="flex items-center gap-4">
+              <img
+                src="/images/logo.png"
+                alt="SigNemic Logo"
+                className="h-10 sm:h-12 w-auto object-contain"
               />
+              <span style={{ fontSize: '25px', fontWeight: 700, color: theme.colors.brand, fontFamily: 'WeSignFont' }}>
+                SigNemic
+              </span>
             </div>
+          </div>
 
-            {/* Email */}
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
-                Email
-              </label>
-              <input
-                type="email"
-                placeholder="Eg: abc@gmail.com"
-                value={formData.email}
-                onChange={e => handleChange('email', e.target.value)}
-                style={{
-                  width: '100%', padding: '11px 14px',
-                  borderRadius: '10px', border: '1.5px solid #e2e8f0',
-                  fontSize: '14px', color: '#1e293b', background: '#f8fafc',
-                  outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
-                }}
-                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
-                onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
-              />
-            </div>
+          {/* Title & Description - "Too Big" Font - Moved Upward & Rightward */}
+          <div className="flex flex-col items-start mt-auto mb-auto lg:mt-0 lg:mb-0 lg:flex-grow lg:justify-start lg:pt-12 lg:pl-12">
+            <h1
+              style={{
+                fontFamily: 'WeSignFont',
+                fontSize: 'clamp(3.5rem, 8vw, 6rem)',
+                fontWeight: 900,
+                lineHeight: 1.1,
+                background: `linear-gradient(135deg, ${theme.colors.brand}, ${theme.colors.brandDark})`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                marginBottom: '20px',
+                letterSpacing: '-0.02em',
+                paddingBottom: '8px'
+              }}
+            >
+              Register
+            </h1>
+            <p style={{
+              fontFamily: 'WeSignFont',
+              fontSize: '18px',
+              color: '#1d1d1e',
+              maxWidth: '450px',
+              lineHeight: 1.6,
+              opacity: 0.9
+            }}>
+              Fill in your details to register the account.
+            </p>
+          </div>
+        </div>
 
-            {/* Password */}
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
-                Password
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Min 6 characters"
-                  value={formData.password}
-                  onChange={e => handleChange('password', e.target.value)}
-                  style={{
-                    width: '100%', padding: '11px 40px 11px 14px',
-                    borderRadius: '10px', border: '1.5px solid #e2e8f0',
-                    fontSize: '14px', color: '#1e293b', background: '#f8fafc',
-                    outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
-                  }}
-                  onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
-                  onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
-                />
+        {/* Right Side: Form Area -> Fixed & Centered */}
+        <div className="w-full lg:w-1/2 lg:ml-[50%] flex justify-center items-center h-full p-4 sm:p-10">
+          <div className="w-full max-w-lg">
+            <Card className="!p-7">
+              {/* Role Switcher */}
+              <div className="flex items-center justify-end gap-6 mb-8 border-b border-slate-200 pb-2">
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setFormData({ ...formData, role: 'institution' })}
                   style={{
-                    position: 'absolute', right: '12px', top: '50%',
-                    transform: 'translateY(-50%)', background: 'none',
-                    border: 'none', cursor: 'pointer', padding: '4px',
-                    color: '#64748b', display: 'flex', alignItems: 'center',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    transition: 'all 0.2s',
+                    background: formData.role === 'institution' ? theme.colors.brand : 'transparent',
+                    color: formData.role === 'institution' ? '#fff' : '#64748b',
                   }}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  Institution
                 </button>
-              </div>
-            </div>
-
-            {/* Confirm Password */}
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
-                Confirm Password
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Re-enter password"
-                  value={formData.confirmPassword}
-                  onChange={e => handleChange('confirmPassword', e.target.value)}
-                  style={{
-                    width: '100%', padding: '11px 40px 11px 14px',
-                    borderRadius: '10px', border: '1.5px solid #e2e8f0',
-                    fontSize: '14px', color: '#1e293b', background: '#f8fafc',
-                    outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
-                  }}
-                  onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
-                  onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
-                />
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  onClick={() => setFormData({ ...formData, role: 'student' })}
                   style={{
-                    position: 'absolute', right: '12px', top: '50%',
-                    transform: 'translateY(-50%)', background: 'none',
-                    border: 'none', cursor: 'pointer', padding: '4px',
-                    color: '#64748b', display: 'flex', alignItems: 'center',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    transition: 'all 0.2s',
+                    background: formData.role === 'student' ? theme.colors.brand : 'transparent',
+                    color: formData.role === 'student' ? '#fff' : '#64748b',
                   }}
                 >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  Student
                 </button>
               </div>
-            </div>
 
-            {/* Phone */}
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
-                Phone
-              </label>
-              <input
-                type="text"
-                placeholder="Eg: 98674xxxxx"
-                value={formData.phone}
-                onChange={e => handleChange('phone', e.target.value)}
-                style={{
-                  width: '100%', padding: '11px 14px',
-                  borderRadius: '10px', border: '1.5px solid #e2e8f0',
-                  fontSize: '14px', color: '#1e293b', background: '#f8fafc',
-                  outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
-                }}
-                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
-                onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
-              />
-            </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {(formData.role === 'student'
+                  ? [
+                    { label: 'Roll No', placeholder: 'Eg: 21CSR001', key: 'rollNo', type: 'text' },
+                    { label: 'Full Name', placeholder: 'Eg: Alice', key: 'name', type: 'text' },
+                    { label: 'Email', placeholder: 'Eg: abc@gmail.com', key: 'email', type: 'email' },
+                    { label: 'Phone No', placeholder: 'Eg: 98674xxxxx ', key: 'phone', type: 'text' },
+                    { label: 'Password', placeholder: 'Enter password', key: 'password', type: 'password' },
+                    { label: 'Confirm Password', placeholder: 'Confirm password', key: 'confirmPassword', type: 'password' },
+                  ]
+                  : [
+                    { label: 'EmpID', placeholder: 'Eg: FAC123', key: 'empId', type: 'text' },
+                    { label: 'Full Name', placeholder: 'Eg: Dr. Smith', key: 'name', type: 'text' },
+                    { label: 'Email', placeholder: 'Eg: smith@institution.com', key: 'email', type: 'email' },
+                    { label: 'Phone No', placeholder: 'Eg: 98674xxxxx ', key: 'phone', type: 'text' },
+                    { label: 'Password', placeholder: 'Enter password', key: 'password', type: 'password' },
+                    { label: 'Confirm Password', placeholder: 'Confirm password', key: 'confirmPassword', type: 'password' },
+                  ]
+                ).map(field => {
+                  const isPasswordField = field.key === 'password' || field.key === 'confirmPassword';
+                  const showCurrent = field.key === 'password' ? showPassword : showConfirmPassword;
+                  const toggleVisibility = field.key === 'password' ? setShowPassword : setShowConfirmPassword;
 
-            {/* Age */}
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
-                Age
-              </label>
-              <input
-                type="number"
-                placeholder="Eg: 19"
-                value={formData.age}
-                onChange={e => handleChange('age', e.target.value)}
-                style={{
-                  width: '100%', padding: '11px 14px',
-                  borderRadius: '10px', border: '1.5px solid #e2e8f0',
-                  fontSize: '14px', color: '#1e293b', background: '#f8fafc',
-                  outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
-                }}
-                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
-                onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
-              />
-            </div>
+                  return (
+                    <div key={field.key} className="space-y-1.5">
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block' }}>
+                        {field.label} <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={isPasswordField ? (showCurrent ? 'text' : 'password') : field.type}
+                          placeholder={field.placeholder}
+                          value={formData[field.key as keyof typeof formData]}
+                          onChange={e => {
+                            let val = e.target.value;
+                            if (field.key === 'name') val = val.replace(/[^a-zA-Z\s]/g, '');
+                            if (field.key === 'phone') val = val.replace(/[^0-9]/g, '');
+                            setFormData({ ...formData, [field.key]: val });
+                          }}
+                          style={{
+                            width: '100%', padding: '9px 13px',
+                            paddingRight: isPasswordField ? '40px' : '13px',
+                            borderRadius: '8px', border: '1.5px solid #c4b5fd',
+                            fontSize: '13px', color: '#1e293b', background: '#f8fafc',
+                            outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
+                          }}
+                          onFocus={e => (e.currentTarget.style.borderColor = '#1e1a6b')}
+                          onBlur={e => (e.currentTarget.style.borderColor = '#c4b5fd')}
+                        />
+                        {isPasswordField && (
+                          <button
+                            type="button"
+                            onClick={() => toggleVisibility(!showCurrent)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                          >
+                            {showCurrent ? (
+                              <EyeOff size={18} style={{ color: '#1e1a6b' }} />
+                            ) : (
+                              <Eye size={18} style={{ color: '#1e1a6b' }} />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
 
-            {/* Role */}
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
-                Role
-              </label>
-              <select
-                value={formData.role}
-                onChange={e => handleChange('role', e.target.value)}
-                style={{
-                  width: '100%', padding: '11px 14px',
-                  borderRadius: '10px', border: '1.5px solid #e2e8f0',
-                  fontSize: '14px', color: '#1e293b', background: '#f8fafc',
-                  outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
-                  cursor: 'pointer',
-                }}
-                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
-                onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
-              >
-                <option value="student">Student</option>
-                <option value="institution">Institution</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-
-            <div className="pt-2">
-              <GradientButton type="submit">
-                Generate Wallet
-              </GradientButton>
-            </div>
-          </form>
-        </Card>
+                <div className="pt-2">
+                  <GradientButton type="submit">
+                    Create Account
+                  </GradientButton>
+                </div>
+              </form>
+            </Card>
+          </div>
+        </div>
       </div>
     </PageWrapper>
   );
