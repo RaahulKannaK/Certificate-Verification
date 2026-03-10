@@ -44,7 +44,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '1250px', margin: '0 auto', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '100px 24px 24px', transform: 'translateY(0)' }}>
         <div style={{ textAlign: 'left', maxWidth: '700px' }}>
 
-          {/* Heading */}
           <h1 style={{
             fontFamily: 'WeSignFont',
             fontSize: 'clamp(2.0rem, 5vw, 4.4rem)',
@@ -58,7 +57,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               background: `linear-gradient(135deg, ${theme.colors.brand}, ${theme.colors.brandDark})`,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
+              backgroundClip: 'text'
             }}>
               for Institutional Credentials
             </span>

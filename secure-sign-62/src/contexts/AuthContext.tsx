@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   /* ============================================================
-     🔐 LOGIN
+     🔐 LOGIN (Updated for Email + Password + Public Key)
   ============================================================ */
   const login = async (
     loginParams: string | { email?: string; password?: string; publicKey: string; userData?: any }
@@ -187,7 +187,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
       return true;
     } catch (err: any) {
-      console.error("Login failed:", err);
+      console.error("❌ Login failed:", err);
       toast.error(err.response?.data?.message || "Login failed");
       return false;
     }

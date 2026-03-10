@@ -113,12 +113,6 @@ app.post("/signup", async (req, res) => {
 app.post("/login", async (req, res) => {
   const { email, password, publicKey } = req.body;
 
-  if (!email || !password || !publicKey) {
-    return res.status(400).json({
-      message: "Email, password, and public key are required"
-    });
-  }
-
   try {
     // Parallelize user and institution lookups
     const [userResult, instResult] = await Promise.all([
@@ -160,8 +154,14 @@ app.post("/login", async (req, res) => {
       user: userWithoutPassword
     });
   } catch (err) {
-    console.error("❌ Login Error:", err);
-    res.status(500).json({ message: "Server error during login" });
+    console.error("❌ Login Error Details:", err);
+    console.error("Error Code:", err.code);
+    console.error("Error Message:", err.message);
+    console.error("Error Stack:", err.stack);
+    res.status(500).json({ 
+      message: "Server error during login",
+      error: err.message 
+    });
   }
 });
 // ==========================================================

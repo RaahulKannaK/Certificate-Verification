@@ -1,0 +1,118 @@
+issued_credentials
+
+id	int	NO	PRI		auto_increment
+credentialId	varchar(100)	NO	UNI		
+studentPublicKey	varchar(100)	NO			
+institutionPublicKeys	text	NO			
+signingType	enum('self','sequential','parallel')	NO		sequential	
+title	varchar(255)	YES		Credential	
+filePath	varchar(255)	YES			
+purpose	varchar(255)	YES			
+status	enum('pending','issued','completed')	YES		pending	
+txHash	varchar(255)	YES			
+currentSignerOrder	int	YES		1	
+issuedAt	timestamp	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+extra	json	YES			
+createdAt	timestamp	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+updatedAt	timestamp	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+
+
+signature_fields
+
+
+id	int	NO	PRI		auto_increment
+credentialId	varchar(100)	NO			
+signerPublicKey	varchar(100)	NO			
+xRatio	float	NO			
+yRatio	float	NO			
+widthRatio	float	NO			
+heightRatio	float	NO			
+x_px	float	NO			
+y_px	float	NO			
+width_px	float	NO			
+height_px	float	NO			
+color	varchar(50)	YES		blue	
+createdAt	timestamp	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+updatedAt	timestamp	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+isStudent	tinyint(1)	YES		0	
+
+
+institutions
+
+id	int	NO	PRI		auto_increment
+institutionName	varchar(200)	NO			
+email	varchar(150)	NO	UNI		
+phone	varchar(20)	YES			
+walletPublicKey	varchar(100)	NO	UNI		
+walletPrivateKeyEncrypted	text	NO			
+createdAt	timestamp	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+biometric_type	varchar(20)	YES			
+biometric_vector_encrypted	longblob	YES			
+biometric_iv	blob	YES			
+biometric_salt	blob	YES			
+biometric_created_at	datetime	YES			
+biometric_verified_at	datetime	YES			
+
+
+credentials
+
+id	int	NO	PRI		auto_increment
+studentId	int	NO	MUL		
+institutionId	int	YES	MUL		
+credentialId	varchar(100)	NO	UNI		
+credentialHash	char(64)	NO			
+purpose	varchar(100)	NO			
+title	varchar(150)	NO			
+filePath	varchar(255)	YES			
+institutionSigned	tinyint(1)	YES		0	
+studentSigned	tinyint(1)	YES		0	
+txHash	varchar(66)	YES			
+status	varchar(30)	YES			
+
+
+users
+
+id	int	NO	PRI		auto_increment
+name	varchar(255)	YES			
+firstName	varchar(50)	YES			
+lastName	varchar(50)	YES			
+age	int	NO			
+gender	varchar(10)	YES			
+phone	varchar(20)	NO			
+email	varchar(100)	YES	UNI		
+role	enum('student','admin','worker')	NO		student	
+walletAddress	varchar(255)	YES			
+issued	tinyint(1)	YES		0	
+walletPublicKey	varchar(255)	YES			
+walletPrivateKeyEncrypted	text	YES			
+biometric_type	varchar(20)	YES			
+biometric_vector_encrypted	longblob	YES			
+biometric_iv	blob	YES			
+biometric_salt	blob	YES			
+biometric_created_at	datetime	YES			
+biometric_verified_at	datetime	YES			
+
+
+credential_signers
+
+id	int	NO	PRI		auto_increment
+credentialId	varchar(100)	NO			
+studentPublicKey	varchar(100)	NO			
+institutionPublicKeys	text	NO			
+signingType	enum('self','sequential','parallel')	NO		sequential	
+title	varchar(255)	YES			
+filePath	varchar(255)	YES			
+purpose	varchar(255)	YES			
+status	enum('pending','issued','completed')	YES		pending	
+issuedAt	timestamp	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+txHash	varchar(255)	YES			
+currentSignerOrder	int	YES		1	
+signerId	varchar(100)	YES			
+signerPublicKey	varchar(100)	YES			
+signerName	varchar(100)	YES			
+signerOrder	int	YES			
+signed	tinyint(1)	YES		0	
+color	varchar(50)	YES			
+createdAt	timestamp	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+updatedAt	timestamp	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+isStudent	tinyint(1)	YES		0	

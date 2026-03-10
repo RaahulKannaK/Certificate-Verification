@@ -23,6 +23,7 @@ export interface Certificate {
   date: string;
   status: "pending" | "signed";
   type: string;
+  signingType: "self" | "sequential" | "parallel"; // Added from backend
 }
 
 type SigningType = "self" | "sequential" | "parallel";
@@ -70,7 +71,7 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] =
     useState<"all" | "pending" | "signed">("pending");
-  const [signingType, setSigningType] = useState<SigningType>("self");
+  const [filterType, setFilterType] = useState<"all" | "self" | "institution">("all");
   const [hoveredCert, setHoveredCert] = useState<string | null>(null);
 
   const t = getTheme(user?.role || "student");
@@ -112,6 +113,7 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
           date: new Date(c.issuedAt).toLocaleDateString(),
           status: c.status === "signed" ? "signed" : "pending",
           type: c.signingType || "self",
+          signingType: c.signingType || "self", // From backend: "self", "sequential", or "parallel"
         }));
 
         setCertificates(mapped);
@@ -133,7 +135,14 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
       c.issuer.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchTab = activeTab === "all" || c.status === activeTab;
-    return matchSearch && matchTab;
+    
+    // Filter by signing type: self vs institution (sequential/parallel)
+    const matchType = 
+      filterType === "all" || 
+      (filterType === "self" && c.signingType === "self") ||
+      (filterType === "institution" && (c.signingType === "sequential" || c.signingType === "parallel"));
+
+    return matchSearch && matchTab && matchType;
   });
 
   /* ================= ACTIONS ================= */
@@ -150,7 +159,7 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
       return;
     }
 
-    onSign(certificate, signingType); // 🔥 IMPORTANT
+    onSign(certificate, certificate.signingType); // Use the certificate's actual signing type from backend
   };
 
   /* ================= UI ================= */
@@ -205,26 +214,63 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
           </div>
         </div>
 
-        {/* Signing Mode — kept empty array as original */}
+        {/* Signing Mode Filter Buttons - Based on Backend Data */}
         <div className="grid md:grid-cols-3 gap-4" style={{ marginBottom: "28px" }}>
           {[
-          ].map(({ type, icon: Icon, label }: any) => (
+            { 
+              type: "all", 
+              icon: Users, 
+              label: "All Certificates",
+              description: "View all signing types",
+              count: certificates.length 
+            },
+            { 
+              type: "self", 
+              icon: User, 
+              label: "Self Signing",
+              description: "Personal blockchain signing",
+              count: certificates.filter(c => c.signingType === "self").length 
+            },
+            { 
+              type: "institution", 
+              icon: GitBranch, 
+              label: "Issued to Institution",
+              description: "Sequential & parallel signing",
+              count: certificates.filter(c => c.signingType === "sequential" || c.signingType === "parallel").length 
+            },
+          ].map(({ type, icon: Icon, label, description, count }) => (
             <div
               key={type}
-              onClick={() => setSigningType(type as SigningType)}
+              onClick={() => setFilterType(type as "all" | "self" | "institution")}
               style={{
                 background: "white", borderRadius: "16px", padding: "16px",
-                border: `${signingType === type ? "2px" : "1px"} solid ${signingType === type ? t.accentColor : t.cardBorder}`,
+                border: `${filterType === type ? "2px" : "1px"} solid ${filterType === type ? t.accentColor : t.cardBorder}`,
                 cursor: "pointer", display: "flex", alignItems: "center", gap: "16px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.04)", transition: "all 0.2s",
+                boxShadow: filterType === type ? t.btnShadow : "0 2px 8px rgba(0,0,0,0.04)", 
+                transition: "all 0.2s",
+                transform: filterType === type ? "translateY(-2px)" : "translateY(0)",
               }}
             >
-              <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: t.iconBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon size={22} color={t.iconColor} />
+              <div style={{ 
+                width: "48px", height: "48px", borderRadius: "12px", 
+                background: filterType === type ? t.gradient : t.iconBg, 
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.2s"
+              }}>
+                <Icon size={22} color={filterType === type ? "white" : t.iconColor} />
               </div>
-              <div>
-                <h3 style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>{label}</h3>
-                <p style={{ fontSize: "12px", color: "#94a3b8" }}>Blockchain signing</p>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <h3 style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>{label}</h3>
+                  <span style={{
+                    padding: "2px 8px", borderRadius: "999px", fontSize: "11px", fontWeight: 600,
+                    background: filterType === type ? t.iconBg : "#f1f5f9", 
+                    color: filterType === type ? t.accentColor : "#64748b",
+                  }}>
+                    {count}
+                  </span>
+                </div>
+                <p style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>{description}</p>
               </div>
             </div>
           ))}
@@ -246,7 +292,11 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
                 <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>
                   Your Certificates
                 </h2>
-                <p style={{ fontSize: "13px", color: "#64748b" }}>Issued credentials waiting for signature</p>
+                <p style={{ fontSize: "13px", color: "#64748b" }}>
+                  {filterType === "all" && "All issued credentials"}
+                  {filterType === "self" && "Self-signed certificates"}
+                  {filterType === "institution" && "Multi-signature institutional certificates"}
+                </p>
               </div>
 
               {/* Search */}
@@ -306,14 +356,26 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
                 <div style={{ width: "52px", height: "52px", borderRadius: "14px", background: t.iconBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
                   <Search size={22} color={t.iconColor} />
                 </div>
-                <p style={{ fontSize: "15px", fontWeight: 600, color: "#475569" }}>No certificates found</p>
-                <p style={{ fontSize: "13px", color: "#94a3b8", marginTop: "4px" }}>Try adjusting your search or tab filter</p>
+                <p style={{ fontSize: "15px", fontWeight: 600, color: "#475569" }}>
+                  {filterType === "self" ? "No self-signed certificates" : 
+                   filterType === "institution" ? "No institutional certificates" : 
+                   "No certificates found"}
+                </p>
+                <p style={{ fontSize: "13px", color: "#94a3b8", marginTop: "4px" }}>
+                  {filterType !== "all" ? "Try selecting a different filter" : "Try adjusting your search or tab filter"}
+                </p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {filteredCertificates.map((cert) => {
                   const isHovered = hoveredCert === cert.id;
                   const badge = cert.status === "pending" ? t.badgePending : t.badgeSigned;
+                  
+                  // Determine display label for signing type
+                  const signingTypeLabel = cert.signingType === "self" ? "Self" : 
+                                          cert.signingType === "sequential" ? "Sequential" : 
+                                          cert.signingType === "parallel" ? "Parallel" : "Unknown";
+                  
                   return (
                     <div
                       key={cert.id}
@@ -328,8 +390,18 @@ const DigitalSignature: React.FC<DigitalSignatureProps> = ({
                         boxShadow: isHovered ? `0 4px 16px rgba(0,0,0,0.06)` : "none",
                       }}
                     >
-                      <div>
-                        <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{cert.name}</h3>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                          <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>{cert.name}</h3>
+                          <span style={{
+                            padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
+                            background: cert.signingType === "self" ? "#e0e7ff" : "#fef3c7",
+                            color: cert.signingType === "self" ? "#4f46e5" : "#d97706",
+                            border: `1px solid ${cert.signingType === "self" ? "#c7d2fe" : "#fde68a"}`,
+                          }}>
+                            {signingTypeLabel}
+                          </span>
+                        </div>
                         <p style={{ fontSize: "12px", color: "#64748b" }}>Issued on {cert.date}</p>
                       </div>
 

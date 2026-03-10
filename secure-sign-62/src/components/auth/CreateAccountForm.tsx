@@ -10,7 +10,8 @@ import {
   Copy,
   Check,
   Eye,
-  EyeOff
+  EyeOff,
+  Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/api/axios';
@@ -116,7 +117,13 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
   const [walletKeys, setWalletKeys] = useState<WalletKeys | null>(null);
   const [copiedPublic, setCopiedPublic] = useState(false);
   const [copiedPrivate, setCopiedPrivate] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
+
+  const handleChange = (key: string, value: string) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,7 +165,12 @@ export const CreateAccountForm: React.FC<CreateAccountFormProps> = ({ onBack, on
     try {
       const keys = createWallet();
       const response = await api.post('/signup', {
-        ...formData,
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        age: parseInt(formData.age),
+        role: formData.role,
         walletPublicKey: keys.publicKey,
         walletPrivateKeyEncrypted: keys.privateKey
       });
