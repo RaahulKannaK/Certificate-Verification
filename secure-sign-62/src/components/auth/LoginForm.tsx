@@ -97,30 +97,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
 
     try {
       setLoading(true);
-      console.log('🔑 Attempting login with:', {
-        email: formData.email,
-        publicKey: formData.publicKey
-      });
+      console.log('🔑 Attempting login for:', formData.email);
 
-      // DEBUG: Log the exact URL being called
       const loginUrl = `${import.meta.env.VITE_API_URL}/login`;
-      console.log('🌐 API URL:', loginUrl);
-
       const res = await api.post(loginUrl, {
         email: formData.email.trim(),
         password: formData.password,
         publicKey: formData.publicKey.trim(),
       });
 
-      console.log('📦 Full login response:', res);
-      console.log('📦 Response data:', res.data);
-      console.log('📦 Response status:', res.status);
-
       const data = res.data;
 
       if (data.user) {
-        console.log('👤 User found in response, calling AuthContext login...');
-
         // Pass all credentials to login context
         const success = await login({
           email: formData.email.trim(),
@@ -129,8 +117,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
           userData: data.user // Pass the user data from server
         });
 
-        console.log('✅ AuthContext login success:', success);
-
         if (success) {
           toast.success('Login successful!');
           onSuccess();
@@ -138,15 +124,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack, onSuccess }) => {
           toast.error('Failed to set user context');
         }
       } else {
-        console.log('❌ No user in response data');
         toast.error('Invalid credentials. Please check and try again.');
       }
     } catch (err: any) {
-      console.error('❌ Full error object:', err);
-      console.error('❌ Error response:', err?.response);
-      console.error('❌ Error response data:', err?.response?.data);
-      console.error('❌ Error message:', err?.message);
-      console.error('❌ Error status:', err?.response?.status);
+      console.error('❌ Login error:', err?.response?.data?.message || err?.message);
 
       // More specific error messages
       if (err?.response?.status === 401) {

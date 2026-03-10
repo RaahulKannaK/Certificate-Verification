@@ -48,75 +48,122 @@ db.getConnection((err, connection) => {
 // ==========================================================
 // 🧩 SIGNUP
 // ==========================================================
+// ==========================================================
+// 🔐 SIGNUP
+// ==========================================================
 app.post("/signup", async (req, res) => {
-  const { name, email, phone, age, role, walletPublicKey, walletPrivateKeyEncrypted } = req.body;
-  console.log("Signup payload:", req.body);
+  const { name, email, password, phone, age, role, walletPublicKey, walletPrivateKeyEncrypted } = req.body;
+  console.log("Signup payload:", { ...req.body, password: '[REDACTED]' });
 
-  if (!name || !email || !role || !walletPublicKey || !walletPrivateKeyEncrypted) {
+  // Validation - now includes password
+  if (!name || !email || !password || !role || !walletPublicKey || !walletPrivateKeyEncrypted) {
     return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  // Password strength validation
+  if (password.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters" });
   }
 
   try {
     if (role === "institution") {
       const [result] = await db.query(
         `INSERT INTO institutions 
-         (institutionName, email, phone, walletPublicKey, walletPrivateKeyEncrypted)
-         VALUES (?, ?, ?, ?, ?)`,
-        [name, email, phone || null, walletPublicKey, walletPrivateKeyEncrypted]
+         (institutionName, email, password, phone, walletPublicKey, walletPrivateKeyEncrypted)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [name, email, password, phone || null, walletPublicKey, walletPrivateKeyEncrypted]
       );
       console.log("Institution inserted ID:", result.insertId);
       return res.status(201).json({ message: "🏛️ Institution registered successfully" });
     }
 
-    // Student / Worker
+    // Student / Worker / Admin
     const [firstName, ...lastParts] = name.trim().split(" ");
     const lastName = lastParts.join(" ") || "";
 
-    await db.query(
+    const [result] = await db.query(
       `INSERT INTO users
-       (firstName, lastName, age, phone, email, role, walletPublicKey, walletPrivateKeyEncrypted)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [firstName, lastName, age || null, phone || null, email, role, walletPublicKey, walletPrivateKeyEncrypted]
+       (firstName, lastName, age, phone, email, password, role, walletPublicKey, walletPrivateKeyEncrypted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [firstName, lastName, age || null, phone || null, email, password, role, walletPublicKey, walletPrivateKeyEncrypted]
     );
 
+    console.log("User inserted ID:", result.insertId);
     res.status(201).json({ message: "🎓 User signup successful" });
   } catch (err) {
     console.error("❌ Signup Error:", err.sqlMessage || err);
+    // Handle duplicate email error
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: "Email already exists" });
+    }
     res.status(500).json({ message: err.sqlMessage || "Server error" });
   }
 });
 
 // ==========================================================
-// 🔐 LOGIN
+// 🔐 LOGIN (Email + Password + Public Key)
+// ==========================================================
+
+// ==========================================================
+// 🔐 LOGIN (Email + Password + Public Key) - DEBUG VERSION
+// ==========================================================
+// ==========================================================
+// 🔐 LOGIN (Email + Password + Public Key) - DEBUG VERSION
 // ==========================================================
 app.post("/login", async (req, res) => {
-  const { publicKey } = req.body;
-  if (!publicKey) return res.status(400).json({ message: "Public key is required" });
+  const { email, password, publicKey } = req.body;
+
+  if (!email || !password || !publicKey) {
+    return res.status(400).json({
+      message: "Email, password, and public key are required"
+    });
+  }
 
   try {
-    // Try student first
-    const [userRows] = await db.query(
-      "SELECT id, firstName, lastName, age, phone, email, role, walletPublicKey FROM users WHERE walletPublicKey = ?",
-      [publicKey]
-    );
+    // Parallelize user and institution lookups
+    const [userResult, instResult] = await Promise.all([
+      db.query(
+        "SELECT id, firstName, lastName, age, phone, email, role, walletPublicKey, password FROM users WHERE email = ? AND walletPublicKey = ?",
+        [email, publicKey]
+      ),
+      db.query(
+        "SELECT id, institutionName AS firstName, '' AS lastName, null AS age, phone, email, 'institution' AS role, walletPublicKey, password FROM institutions WHERE email = ? AND walletPublicKey = ?",
+        [email, publicKey]
+      )
+    ]);
 
-    if (userRows.length) return res.json({ message: "✅ Login successful!", user: userRows[0] });
+    const userRows = userResult[0];
+    const instRows = instResult[0];
 
-    // Try institution
-    const [instRows] = await db.query(
-      "SELECT id, institutionName AS firstName, '' AS lastName, null AS age, phone, email, 'institution' AS role, walletPublicKey FROM institutions WHERE walletPublicKey = ?",
-      [publicKey]
-    );
+    let foundUser = null;
 
-    if (instRows.length) return res.json({ message: "✅ Login successful!", user: instRows[0] });
+    if (userRows.length) {
+      foundUser = userRows[0];
+    } else if (instRows.length) {
+      foundUser = instRows[0];
+    }
 
-    return res.status(404).json({ message: "User or institution not found" });
+    if (!foundUser) {
+      return res.status(404).json({ message: "User or institution not found" });
+    }
+
+    // Verify password (plain text as per existing logic)
+    if (foundUser.password !== password) {
+      return res.status(401).json({ message: "Invalid password" });
+    }
+
+    // Success - Remove password from response
+    const { password: _, ...userWithoutPassword } = foundUser;
+
+    return res.json({
+      message: "✅ Login successful!",
+      user: userWithoutPassword
+    });
   } catch (err) {
     console.error("❌ Login Error:", err);
     res.status(500).json({ message: "Server error during login" });
   }
 });
-
 // ==========================================================
 // 🔗 GET WALLET
 // ==========================================================
