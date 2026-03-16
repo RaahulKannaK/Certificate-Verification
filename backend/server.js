@@ -540,11 +540,10 @@ app.post("/credential/sign", async (req, res) => {
 });
 
 // Merge signatures into final PDF
+// Keep ONLY this one mergeSignatures function (remove any other)
 async function mergeSignatures(credentialId) {
-  const { PDFDocument } = require('pdf-lib');
-  const axios = require('axios');
-  const streamifier = require('streamifier');
-
+  const { PDFDocument } = await import('pdf-lib');
+  
   // Get original document
   const [[cred]] = await db.query(
     `SELECT filePath FROM issued_credentials WHERE credentialId = ?`,
@@ -560,58 +559,56 @@ async function mergeSignatures(credentialId) {
     [credentialId, credentialId]
   );
 
-  // Download and load PDF
-  const pdfResponse = await axios.get(cred.filePath, { responseType: 'arraybuffer' });
+  // Download original PDF
+  const pdfResponse = await axios.get(cred.filePath, { 
+    responseType: 'arraybuffer',
+    timeout: 30000 
+  });
+  
   const pdfDoc = await PDFDocument.load(pdfResponse.data);
   const pages = pdfDoc.getPages();
   const firstPage = pages[0];
   const { width, height } = firstPage.getSize();
 
-  // Overlay each signature
+  // Add each signature
   for (const sig of signatures) {
     try {
-      const imgResponse = await axios.get(sig.signatureImageUrl, { responseType: 'arraybuffer' });
-      const pngImage = await pdfDoc.embedPng(imgResponse.data);
+      const imgResponse = await axios.get(sig.signatureImageUrl, { 
+        responseType: 'arraybuffer',
+        timeout: 30000 
+      });
       
-      // Convert ratios to actual coordinates
+      const pngImage = await pdfDoc.embedPng(imgResponse.data);
       const x = sig.xRatio * width;
       const y = sig.yRatio * height;
       const w = sig.widthRatio * width;
       const h = sig.heightRatio * height;
 
-      firstPage.drawImage(pngImage, {
-        x: x,
-        y: y,
-        width: w,
-        height: h
-      });
+      firstPage.drawImage(pngImage, { x, y, width: w, height: h });
+      console.log(`✅ Embedded signature at (${x.toFixed(0)}, ${y.toFixed(0)})`);
     } catch (imgErr) {
-      console.error("Error embedding signature:", imgErr);
-      // Continue with other signatures
+      console.error("❌ Error embedding signature:", imgErr.message);
     }
   }
 
-  // Save final PDF
+  // Save and upload final PDF
   const finalPdfBytes = await pdfDoc.save();
   const finalBuffer = Buffer.from(finalPdfBytes);
 
-  // Upload to Cloudinary
   const finalResult = await new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: 'final_documents',
-        public_id: `${credentialId}_final`,
+        public_id: `${credentialId}_final_${Date.now()}`,
         resource_type: 'raw',
         format: 'pdf'
       },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      }
+      (error, result) => error ? reject(error) : resolve(result)
     );
     streamifier.createReadStream(finalBuffer).pipe(stream);
   });
 
+  console.log("✅ Final document uploaded:", finalResult.secure_url);
   return finalResult.secure_url;
 }
 
