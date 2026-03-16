@@ -21,24 +21,26 @@ import { useAuth } from "../../../contexts/AuthContext";
 export interface Signer {
   signerPublicKey: string;
   signerOrder: number;
-  signed: boolean; // 0 or 1 from DB, mapped to boolean
+  signed: boolean;
   isStudent: boolean;
+  name?: string; // Optional: if we can resolve name from backend
 }
 
 export interface Certificate {
   id: string;
   name: string;
-  issuer: string; // Resolved issuer name (Self, Institution Name, or Unknown)
+  issuer: string; // Student who issued (resolved from studentPublicKey)
   issuerEmail: string;
-  walletAddress: string;
+  walletAddress: string; // studentPublicKey
   date: string;
-  status: "pending" | "signed" | "completed"; // Added 'completed' based on backend
+  status: "pending" | "signed" | "completed";
   type: string;
   signingType: "self" | "sequential" | "parallel";
   description?: string;
   txHash?: string;
-  signers: Signer[]; // Added to track who signed
+  signers: Signer[];
   filePath?: string;
+  institutionKeys: string[]; // Raw institution public keys
 }
 
 type SigningType = "self" | "sequential" | "parallel";
@@ -98,7 +100,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               walletPublicKey: user.walletPublicKey,
-              role: user.role // Pass role to help backend filter if needed
+              role: user.role
             }),
           }
         );
@@ -111,23 +113,30 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
 
         // Map backend data to frontend Certificate type
         const mapped: Certificate[] = data.data.map((c: any) => {
-          // Determine Issuer Name
+          // The issuer is the student who created this credential (studentPublicKey)
+          // For self-sign, it's the same person. For sequential/parallel, student initiates
+          const isSelfSign = c.signingType === "self";
+          
+          // Resolve issuer name - try to get from joined data or use shortened key
           let issuerName = "Unknown";
-          if (c.signingType === "self") {
-            issuerName = "Self";
-          } else if (c.institutionName) {
-            issuerName = c.institutionName;
-          } else if (c.institutionPublicKeys && c.institutionPublicKeys.length > 0) {
-             // Fallback if name not joined, though backend should provide it
-             issuerName = `Institution (${c.institutionPublicKeys[0].slice(0,6)}...)`;
+          if (c.studentName) {
+            issuerName = c.studentName;
+          } else if (c.studentPublicKey) {
+            issuerName = `${c.studentPublicKey.slice(0, 6)}...${c.studentPublicKey.slice(-4)}`;
           }
 
-          // Map Signers
+          // Parse institution keys
+          const instKeys = c.institutionPublicKeys ? JSON.parse(c.institutionPublicKeys) : [];
+
+          // Map Signers from credential_signers table
+          // For self-sign: only the student
+          // For sequential/parallel: student + institutions
           const mappedSigners: Signer[] = (c.signers || []).map((s: any) => ({
             signerPublicKey: s.signerPublicKey,
             signerOrder: s.signerOrder,
             signed: s.signed === 1 || s.signed === true,
             isStudent: s.isStudent === 1 || s.isStudent === true,
+            name: s.isStudent ? (c.studentName || "Student") : `Institution ${s.signerOrder || 1}`
           }));
 
           // Sort signers by order for sequential display
@@ -136,8 +145,8 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
           return {
             id: c.credentialId,
             name: c.title || "Untitled Certificate",
-            issuer: issuerName,
-            issuerEmail: c.issuerEmail || "",
+            issuer: issuerName, // Student who issued
+            issuerEmail: c.studentEmail || "",
             walletAddress: c.studentPublicKey,
             date: new Date(c.issuedAt).toLocaleDateString(),
             status: c.status === "completed" ? "signed" : (c.status || "pending"),
@@ -146,7 +155,8 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
             description: c.purpose || "No description available for this credential.",
             txHash: c.txHash || null,
             signers: mappedSigners,
-            filePath: c.filePath
+            filePath: c.filePath,
+            institutionKeys: instKeys
           };
         });
 
@@ -204,6 +214,28 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
+  };
+
+  // Check if current user can sign this credential
+  const canUserSign = (cert: Certificate): boolean => {
+    if (cert.status !== "pending") return false;
+    
+    // Find if current user is in the signers list and hasn't signed yet
+    const userSigner = cert.signers.find(s => 
+      s.signerPublicKey.toLowerCase() === user?.walletPublicKey?.toLowerCase()
+    );
+    
+    if (!userSigner) return false;
+    if (userSigner.signed) return false;
+    
+    // For sequential, check if it's their turn (all previous must be signed)
+    if (cert.signingType === "sequential") {
+      const previousSigners = cert.signers.filter(s => s.signerOrder < userSigner.signerOrder);
+      const allPreviousSigned = previousSigners.every(s => s.signed);
+      if (!allPreviousSigned) return false;
+    }
+    
+    return true;
   };
 
   return (
@@ -306,6 +338,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                 {filteredCertificates.map((cert) => {
                   const isHovered = hoveredCert === cert.id;
                   const badge = cert.status === "pending" ? t.badgePending : t.badgeSigned;
+                  const userCanSign = canUserSign(cert);
                   
                   return (
                     <div
@@ -332,6 +365,12 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                             <span>Issued: {cert.date}</span>
                             <span>•</span>
                             <span style={{ textTransform: "capitalize" }}>Type: {cert.signingType}</span>
+                            {cert.signers.length > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>{cert.signers.filter(s => s.signed).length}/{cert.signers.length} Signed</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -346,7 +385,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (cert.status === "pending") {
+                            if (userCanSign) {
                               handleStartSigning(cert);
                             } else {
                               openPreview(cert);
@@ -354,8 +393,8 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                           }}
                           style={{
                             padding: "9px 20px", borderRadius: "10px", border: "none",
-                            background: cert.status === "pending" ? t.gradient : "#f1f5f9",
-                            color: cert.status === "pending" ? "white" : "#64748b",
+                            background: userCanSign ? t.gradient : "#f1f5f9",
+                            color: userCanSign ? "white" : "#64748b",
                             fontSize: "13px", fontWeight: 600, cursor: "pointer",
                             transition: "all 0.2s",
                             display: "flex",
@@ -363,8 +402,8 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                             gap: "6px"
                           }}
                         >
-                          {cert.status === "pending" ? "Sign Now" : "Review"}
-                          {cert.status !== "pending" && <ExternalLink size={14} />}
+                          {userCanSign ? "Sign Now" : "Review"}
+                          {!userCanSign && <ExternalLink size={14} />}
                         </button>
                       </div>
                     </div>
@@ -423,7 +462,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                     </h2>
                   </div>
                   <p style={{ color: "#64748b", fontSize: "14px", marginLeft: "4px" }}>
-                    Review the details and signature status before proceeding.
+                    Review signer status and document details.
                   </p>
                 </div>
                 <button 
@@ -450,7 +489,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                 flexDirection: "column",
                 gap: "24px"
               }}>
-                {/* Document Info Card */}
+                {/* Document Info Card - REMOVED "Issued By" */}
                 <div style={{
                   background: "#f8fafc",
                   borderRadius: "16px",
@@ -465,12 +504,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                   </p>
                   
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                    <div>
-                      <p style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "4px" }}>Issued By</p>
-                      <p style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
-                        {selectedCert.issuer}
-                      </p>
-                    </div>
+                    {/* REMOVED Issued By Field */}
                     <div>
                       <p style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "4px" }}>Issue Date</p>
                       <p style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>{selectedCert.date}</p>
@@ -495,10 +529,16 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                         </button>
                       </div>
                     </div>
+                    <div>
+                      <p style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "4px" }}>Signers Required</p>
+                      <p style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
+                        {selectedCert.signers.length}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Signer Status Section - NEW */}
+                {/* Signer Status Section - ENHANCED */}
                 {selectedCert.signers && selectedCert.signers.length > 0 && (
                   <div style={{
                     background: "white",
@@ -515,61 +555,110 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                     </h3>
                     
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                      {selectedCert.signers.map((signer, index) => (
-                        <div key={signer.signerPublicKey} style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "12px 16px",
-                          background: signer.signed ? "#f0fdf4" : "#f8fafc",
-                          borderRadius: "12px",
-                          border: `1px solid ${signer.signed ? "#86efac" : "#e2e8f0"}`
-                        }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            <div style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "50%",
-                              background: signer.signed ? "#16a34a" : "#94a3b8",
-                              color: "white",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "12px",
-                              fontWeight: 700
-                            }}>
-                              {signer.isStudent ? "ST" : `I${index + 1}`}
-                            </div>
-                            <div>
-                              <p style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
-                                {signer.isStudent ? "Student" : `Institution ${index + 1}`}
-                              </p>
-                              <p style={{ fontSize: "11px", color: "#64748b", fontFamily: "monospace" }}>
-                                {signer.signerPublicKey.slice(0, 10)}...{signer.signerPublicKey.slice(-4)}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            {signer.signed ? (
-                              <>
-                                <CheckCircle2 size={18} color="#16a34a" />
-                                <span style={{ fontSize: "13px", fontWeight: 600, color: "#16a34a" }}>Signed</span>
-                              </>
-                            ) : (
-                              <>
-                                <Clock size={18} color="#94a3b8" />
-                                <span style={{ fontSize: "13px", fontWeight: 600, color: "#64748b" }}>Pending</span>
-                              </>
+                      {selectedCert.signers.map((signer, index) => {
+                        const isCurrentUser = signer.signerPublicKey.toLowerCase() === user?.walletPublicKey?.toLowerCase();
+                        const showOrder = selectedCert.signingType === 'sequential';
+                        
+                        return (
+                          <div key={signer.signerPublicKey} style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "14px 16px",
+                            background: signer.signed ? "#f0fdf4" : (isCurrentUser ? "#eff6ff" : "#f8fafc"),
+                            borderRadius: "12px",
+                            border: `2px solid ${signer.signed ? "#86efac" : (isCurrentUser ? "#bfdbfe" : "#e2e8f0")}`,
+                            position: "relative"
+                          }}>
+                            {/* Order Badge for Sequential */}
+                            {showOrder && (
+                              <div style={{
+                                position: "absolute",
+                                left: "-8px",
+                                top: "50%",
+                                transform: "translateY(-50%)",
+                                width: "24px",
+                                height: "24px",
+                                borderRadius: "50%",
+                                background: signer.signed ? "#16a34a" : (isCurrentUser ? "#2563eb" : "#94a3b8"),
+                                color: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                border: "2px solid white"
+                              }}>
+                                {signer.signerOrder}
+                              </div>
                             )}
+                            
+                            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginLeft: showOrder ? "12px" : "0" }}>
+                              <div style={{
+                                width: "36px",
+                                height: "36px",
+                                borderRadius: "10px",
+                                background: signer.isStudent ? "#dbeafe" : "#f3e8ff",
+                                color: signer.isStudent ? "#2563eb" : "#9333ea",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}>
+                                {signer.isStudent ? <User size={18} /> : <GitBranch size={18} />}
+                              </div>
+                              <div>
+                                <p style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
+                                  {signer.isStudent ? "Student" : `Institution ${index + 1}`}
+                                  {isCurrentUser && <span style={{ marginLeft: "6px", fontSize: "11px", color: "#2563eb", background: "#dbeafe", padding: "2px 6px", borderRadius: "4px" }}>You</span>}
+                                </p>
+                                <p style={{ fontSize: "11px", color: "#64748b", fontFamily: "monospace" }}>
+                                  {signer.signerPublicKey.slice(0, 10)}...{signer.signerPublicKey.slice(-4)}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              {signer.signed ? (
+                                <>
+                                  <CheckCircle2 size={18} color="#16a34a" />
+                                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#16a34a" }}>Signed</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Clock size={18} color={isCurrentUser ? "#2563eb" : "#94a3b8"} />
+                                  <span style={{ fontSize: "13px", fontWeight: 600, color: isCurrentUser ? "#2563eb" : "#64748b" }}>
+                                    {isCurrentUser ? "Your Turn" : "Pending"}
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div style={{ marginTop: "16px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                        <span style={{ fontSize: "12px", color: "#64748b" }}>Progress</span>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#0f172a" }}>
+                          {selectedCert.signers.filter(s => s.signed).length} of {selectedCert.signers.length}
+                        </span>
+                      </div>
+                      <div style={{ height: "6px", background: "#e2e8f0", borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{
+                          height: "100%",
+                          width: `${(selectedCert.signers.filter(s => s.signed).length / selectedCert.signers.length) * 100}%`,
+                          background: t.gradient,
+                          borderRadius: "3px",
+                          transition: "width 0.3s ease"
+                        }} />
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Signature Status Section */}
+                {/* Document Status Section */}
                 <div style={{
                   background: selectedCert.status === "signed" ? "#f0fdf4" : "#fffbeb",
                   borderRadius: "16px",
@@ -665,7 +754,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                   Close
                 </button>
                 
-                {selectedCert.status === "pending" ? (
+                {canUserSign(selectedCert) ? (
                   <button
                     onClick={() => handleStartSigning(selectedCert)}
                     style={{
@@ -704,8 +793,17 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                     }}
                     disabled
                   >
-                    <CheckCircle2 size={18} />
-                    Already Signed
+                    {selectedCert.status === "signed" ? (
+                      <>
+                        <CheckCircle2 size={18} />
+                        Fully Signed
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={18} />
+                        Awaiting Others
+                      </>
+                    )}
                   </button>
                 )}
               </div>
