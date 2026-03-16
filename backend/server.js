@@ -1087,57 +1087,17 @@ app.post("/getIssuedCredentials", async (req, res) => {
       });
     }
 
-    let credentials = [];
-
-    if (role === "institution") {
-      // Institution view
-      const [rows] = await db.query(
-        `SELECT 
-          ic.*,
-          u.firstName as studentFirstName,
-          u.lastName as studentLastName,
-          CONCAT(u.firstName, ' ', u.lastName) as studentFullName,
-          u.email as studentEmail,
-          u.walletPublicKey as studentWallet
-         FROM issued_credentials ic
-         LEFT JOIN users u ON ic.studentPublicKey COLLATE utf8mb4_unicode_ci = u.walletPublicKey COLLATE utf8mb4_unicode_ci
-         WHERE (
-           JSON_CONTAINS(ic.institutionPublicKeys, JSON_QUOTE(?))
-           OR EXISTS (
-             SELECT 1 FROM credential_signers cs 
-             WHERE cs.credentialId = ic.credentialId COLLATE utf8mb4_unicode_ci
-             AND cs.signerPublicKey COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
-           )
-         )
-         AND ic.signingType IN ('sequential', 'parallel')
-         ORDER BY ic.issuedAt DESC`,
-        [walletPublicKey, walletPublicKey]
-      );
-      credentials = rows;
-
-    } else {
-      // Student view
-      const [rows] = await db.query(
-        `SELECT 
-          ic.*,
-          u.firstName as studentFirstName,
-          u.lastName as studentLastName,
-          CONCAT(u.firstName, ' ', u.lastName) as studentFullName,
-          u.email as studentEmail,
-          u.walletPublicKey as studentWallet
-         FROM issued_credentials ic
-         LEFT JOIN users u ON ic.studentPublicKey COLLATE utf8mb4_unicode_ci = u.walletPublicKey COLLATE utf8mb4_unicode_ci
-         WHERE ic.studentPublicKey COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
-            OR EXISTS (
-              SELECT 1 FROM credential_signers cs 
-              WHERE cs.credentialId COLLATE utf8mb4_unicode_ci = ic.credentialId COLLATE utf8mb4_unicode_ci
-              AND cs.signerPublicKey COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
-            )
-         ORDER BY ic.issuedAt DESC`,
-        [walletPublicKey, walletPublicKey]
-      );
-      credentials = rows;
-    }
+    // Simple fetch: get credentials where user is student OR in signers
+    const [credentials] = await db.query(
+      `SELECT * FROM issued_credentials 
+       WHERE studentPublicKey = ?
+          OR credentialId IN (
+            SELECT credentialId FROM credential_signers 
+            WHERE signerPublicKey = ?
+          )
+       ORDER BY issuedAt DESC`,
+      [walletPublicKey, walletPublicKey]
+    );
 
     if (!credentials.length) {
       return res.json({ success: true, data: [] });
@@ -1145,82 +1105,70 @@ app.post("/getIssuedCredentials", async (req, res) => {
 
     const credentialIds = credentials.map(c => c.credentialId);
 
-    // Get signature fields
-    const [fields] = await db.query(
-      `SELECT credentialId, signerPublicKey,
-              xRatio, yRatio, widthRatio, heightRatio,
-              color, isStudent
-       FROM signature_fields
-       WHERE credentialId IN (${credentialIds.map(() => "?").join(",")})`,
+    // Get all signers for these credentials
+    const [signers] = await db.query(
+      `SELECT * FROM credential_signers 
+       WHERE credentialId IN (${credentialIds.map(() => "?").join(",")})
+       ORDER BY signerOrder`,
       credentialIds
     );
 
-    // Get signers with names - explicit COLLATE
-    const [signers] = await db.query(
-      `SELECT 
-        cs.credentialId,
-        cs.signerPublicKey,
-        cs.signerOrder,
-        cs.signed,
-        cs.isStudent,
-        CASE 
-          WHEN cs.isStudent = 1 THEN CONCAT(u.firstName, ' ', u.lastName)
-          ELSE COALESCE(i.institutionName, CONCAT('Institution ', cs.signerOrder))
-        END as signerName
-       FROM credential_signers cs
-       LEFT JOIN users u ON cs.signerPublicKey COLLATE utf8mb4_unicode_ci = u.walletPublicKey COLLATE utf8mb4_unicode_ci AND cs.isStudent = 1
-       LEFT JOIN institutions i ON cs.signerPublicKey COLLATE utf8mb4_unicode_ci = i.walletPublicKey COLLATE utf8mb4_unicode_ci AND cs.isStudent = 0
-       WHERE cs.credentialId IN (${credentialIds.map(() => "?").join(",")})
-       ORDER BY cs.signerOrder`,
-      [...credentialIds]
+    // Get user/institution names in simple separate queries
+    const allKeys = [...new Set(signers.map(s => s.signerPublicKey))];
+    
+    const [users] = await db.query(
+      `SELECT walletPublicKey, CONCAT(firstName, ' ', lastName) as name 
+       FROM users WHERE walletPublicKey IN (${allKeys.map(() => "?").join(",")})`,
+      allKeys
+    );
+    
+    const [institutions] = await db.query(
+      `SELECT walletPublicKey, institutionName as name 
+       FROM institutions WHERE walletPublicKey IN (${allKeys.map(() => "?").join(",")})`,
+      allKeys
     );
 
-    // Get institution names
-    const allInstKeys = [...new Set(credentials.flatMap(c => {
-      try {
-        return JSON.parse(c.institutionPublicKeys || '[]');
-      } catch { return []; }
-    }))];
+    const nameMap = {};
+    users.forEach(u => nameMap[u.walletPublicKey] = u.name);
+    institutions.forEach(i => nameMap[i.walletPublicKey] = i.name);
 
-    let institutionMap = {};
-    if (allInstKeys.length > 0) {
-      const [instRows] = await db.query(
-        `SELECT walletPublicKey, institutionName 
-         FROM institutions 
-         WHERE walletPublicKey IN (${allInstKeys.map(() => "?").join(",")})`,
-        allInstKeys
-      );
-      institutionMap = Object.fromEntries(instRows.map(i => [i.walletPublicKey, i.institutionName]));
-    }
-
-    // Format response
+    // Simple format
     const data = credentials.map(c => {
       const credSigners = signers.filter(s => s.credentialId === c.credentialId);
-      const instKeys = c.institutionPublicKeys ? JSON.parse(c.institutionPublicKeys) : [];
       
       return {
-        ...c,
-        institutionPublicKeys: instKeys,
-        institutionNames: instKeys.map(k => institutionMap[k] || `${k.slice(0,6)}...${k.slice(-4)}`),
-        studentName: c.studentFullName || `${c.studentFirstName || ''} ${c.studentLastName || ''}`.trim() || c.studentPublicKey,
-        signatureFields: fields.filter(f => f.credentialId === c.credentialId),
+        credentialId: c.credentialId,
+        title: c.title,
+        purpose: c.purpose,
+        filePath: c.filePath,
+        status: c.status,
+        signingType: c.signingType,
+        issuedAt: c.issuedAt,
+        txHash: c.txHash,
+        studentPublicKey: c.studentPublicKey,
+        institutionPublicKeys: JSON.parse(c.institutionPublicKeys || '[]'),
+        
+        // Issuer is the student who created it
+        issuerName: c.studentPublicKey === walletPublicKey ? "You" : "Student",
+        
+        // Signers with status
         signers: credSigners.map(s => ({
           signerPublicKey: s.signerPublicKey,
           signerOrder: s.signerOrder,
           signed: s.signed === 1,
           isStudent: s.isStudent === 1,
-          name: s.signerName || (s.isStudent ? 'Student' : `Institution ${s.signerOrder}`)
-        })),
+          name: nameMap[s.signerPublicKey] || (s.isStudent ? `Student ${s.signerOrder}` : `Institution ${s.signerOrder}`),
+          isYou: s.signerPublicKey === walletPublicKey
+        }))
       };
     });
 
     res.json({ success: true, data });
   } catch (err) {
     console.error("❌ getIssuedCredentials error:", err);
-    res.status(500).json({ success: false, message: "Server error", error: err.message });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 // ==========================================================
 // 🧾 GET SINGLE ISSUED CREDENTIAL
