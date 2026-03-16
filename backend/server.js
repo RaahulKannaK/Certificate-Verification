@@ -7,7 +7,8 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import streamifier from "streamifier";
+import { PDFDocument } from 'pdf-lib';
+import streamifier from 'streamifier';
 import cloudinary from "./config/cloudinary.js";
 
 
@@ -16,9 +17,7 @@ import db from "./config/db.js";
 
 import { issueOnBlockchain } from "./services/blockchainService.js";
 import issueCredential from "./blockchain/issueCredential.js";
-import { PDFDocument } from 'pdf-lib';
-import axios from 'axios';
-import streamifier from 'streamifier';
+
 
 const app = express();
 // ========================
