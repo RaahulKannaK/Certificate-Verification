@@ -1090,7 +1090,7 @@ app.post("/getIssuedCredentials", async (req, res) => {
     let credentials = [];
 
     if (role === "institution") {
-      // Institution view: credentials where they need to sign OR have signed
+      // Institution view
       const [rows] = await db.query(
         `SELECT 
           ic.*,
@@ -1100,13 +1100,13 @@ app.post("/getIssuedCredentials", async (req, res) => {
           u.email as studentEmail,
           u.walletPublicKey as studentWallet
          FROM issued_credentials ic
-         LEFT JOIN users u ON ic.studentPublicKey = u.walletPublicKey
+         LEFT JOIN users u ON ic.studentPublicKey COLLATE utf8mb4_unicode_ci = u.walletPublicKey COLLATE utf8mb4_unicode_ci
          WHERE (
            JSON_CONTAINS(ic.institutionPublicKeys, JSON_QUOTE(?))
            OR EXISTS (
              SELECT 1 FROM credential_signers cs 
-             WHERE cs.credentialId = ic.credentialId 
-             AND cs.signerPublicKey = ?
+             WHERE cs.credentialId = ic.credentialId COLLATE utf8mb4_unicode_ci
+             AND cs.signerPublicKey COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
            )
          )
          AND ic.signingType IN ('sequential', 'parallel')
@@ -1116,7 +1116,7 @@ app.post("/getIssuedCredentials", async (req, res) => {
       credentials = rows;
 
     } else {
-      // Student view: self-signed + institution-issued + where they are signer
+      // Student view
       const [rows] = await db.query(
         `SELECT 
           ic.*,
@@ -1126,12 +1126,12 @@ app.post("/getIssuedCredentials", async (req, res) => {
           u.email as studentEmail,
           u.walletPublicKey as studentWallet
          FROM issued_credentials ic
-         LEFT JOIN users u ON ic.studentPublicKey = u.walletPublicKey
-         WHERE ic.studentPublicKey = ?
+         LEFT JOIN users u ON ic.studentPublicKey COLLATE utf8mb4_unicode_ci = u.walletPublicKey COLLATE utf8mb4_unicode_ci
+         WHERE ic.studentPublicKey COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
             OR EXISTS (
               SELECT 1 FROM credential_signers cs 
-              WHERE cs.credentialId = ic.credentialId 
-              AND cs.signerPublicKey = ?
+              WHERE cs.credentialId COLLATE utf8mb4_unicode_ci = ic.credentialId COLLATE utf8mb4_unicode_ci
+              AND cs.signerPublicKey COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
             )
          ORDER BY ic.issuedAt DESC`,
         [walletPublicKey, walletPublicKey]
@@ -1155,7 +1155,7 @@ app.post("/getIssuedCredentials", async (req, res) => {
       credentialIds
     );
 
-    // Get signers with names - JOIN with institutions and users to get names
+    // Get signers with names - explicit COLLATE
     const [signers] = await db.query(
       `SELECT 
         cs.credentialId,
@@ -1168,14 +1168,14 @@ app.post("/getIssuedCredentials", async (req, res) => {
           ELSE COALESCE(i.institutionName, CONCAT('Institution ', cs.signerOrder))
         END as signerName
        FROM credential_signers cs
-       LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey AND cs.isStudent = 1
-       LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey AND cs.isStudent = 0
+       LEFT JOIN users u ON cs.signerPublicKey COLLATE utf8mb4_unicode_ci = u.walletPublicKey COLLATE utf8mb4_unicode_ci AND cs.isStudent = 1
+       LEFT JOIN institutions i ON cs.signerPublicKey COLLATE utf8mb4_unicode_ci = i.walletPublicKey COLLATE utf8mb4_unicode_ci AND cs.isStudent = 0
        WHERE cs.credentialId IN (${credentialIds.map(() => "?").join(",")})
        ORDER BY cs.signerOrder`,
       [...credentialIds]
     );
 
-    // Get institution names for institutionPublicKeys display
+    // Get institution names
     const allInstKeys = [...new Set(credentials.flatMap(c => {
       try {
         return JSON.parse(c.institutionPublicKeys || '[]');
