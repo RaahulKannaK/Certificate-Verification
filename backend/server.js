@@ -1078,26 +1078,27 @@ app.post("/institution/issueCredential", async (req, res) => {
 
 app.post("/getIssuedCredentials", async (req, res) => {
   try {
-    const { walletPublicKey, role } = req.body;
+    const { walletPublicKey } = req.body;
 
     if (!walletPublicKey) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing walletPublicKey",
-      });
+      return res.status(400).json({ success: false, message: "Missing walletPublicKey" });
     }
 
-    // Simple fetch: get credentials where user is student OR in signers
-    const [credentials] = await db.query(
-      `SELECT * FROM issued_credentials 
-       WHERE studentPublicKey = ?
-          OR credentialId IN (
-            SELECT credentialId FROM credential_signers 
-            WHERE signerPublicKey = ?
-          )
-       ORDER BY issuedAt DESC`,
-      [walletPublicKey, walletPublicKey]
-    );
+    // Step 1: Get all credentials (simple, no joins)
+    const [allCreds] = await db.query(`SELECT * FROM issued_credentials ORDER BY issuedAt DESC`);
+
+    // Step 2: Filter in JavaScript to avoid collation issues
+    const credentials = allCreds.filter(c => {
+      const studentMatch = c.studentPublicKey?.toLowerCase() === walletPublicKey.toLowerCase();
+      
+      let instMatch = false;
+      try {
+        const instKeys = JSON.parse(c.institutionPublicKeys || '[]');
+        instMatch = instKeys.some(k => k.toLowerCase() === walletPublicKey.toLowerCase());
+      } catch(e) {}
+      
+      return studentMatch || instMatch;
+    });
 
     if (!credentials.length) {
       return res.json({ success: true, data: [] });
@@ -1105,34 +1106,23 @@ app.post("/getIssuedCredentials", async (req, res) => {
 
     const credentialIds = credentials.map(c => c.credentialId);
 
-    // Get all signers for these credentials
-    const [signers] = await db.query(
-      `SELECT * FROM credential_signers 
-       WHERE credentialId IN (${credentialIds.map(() => "?").join(",")})
-       ORDER BY signerOrder`,
-      credentialIds
-    );
+    // Step 3: Get signers for these credentials
+    const [allSigners] = await db.query(`SELECT * FROM credential_signers`);
+    const signers = allSigners.filter(s => credentialIds.includes(s.credentialId));
 
-    // Get user/institution names in simple separate queries
-    const allKeys = [...new Set(signers.map(s => s.signerPublicKey))];
-    
-    const [users] = await db.query(
-      `SELECT walletPublicKey, CONCAT(firstName, ' ', lastName) as name 
-       FROM users WHERE walletPublicKey IN (${allKeys.map(() => "?").join(",")})`,
-      allKeys
-    );
-    
-    const [institutions] = await db.query(
-      `SELECT walletPublicKey, institutionName as name 
-       FROM institutions WHERE walletPublicKey IN (${allKeys.map(() => "?").join(",")})`,
-      allKeys
-    );
+    // Step 4: Get names
+    const [allUsers] = await db.query(`SELECT walletPublicKey, firstName, lastName FROM users`);
+    const [allInst] = await db.query(`SELECT walletPublicKey, institutionName FROM institutions`);
 
     const nameMap = {};
-    users.forEach(u => nameMap[u.walletPublicKey] = u.name);
-    institutions.forEach(i => nameMap[i.walletPublicKey] = i.name);
+    allUsers.forEach(u => {
+      nameMap[u.walletPublicKey?.toLowerCase()] = `${u.firstName} ${u.lastName}`;
+    });
+    allInst.forEach(i => {
+      nameMap[i.walletPublicKey?.toLowerCase()] = i.institutionName;
+    });
 
-    // Simple format
+    // Format response
     const data = credentials.map(c => {
       const credSigners = signers.filter(s => s.credentialId === c.credentialId);
       
@@ -1146,19 +1136,20 @@ app.post("/getIssuedCredentials", async (req, res) => {
         issuedAt: c.issuedAt,
         txHash: c.txHash,
         studentPublicKey: c.studentPublicKey,
-        institutionPublicKeys: JSON.parse(c.institutionPublicKeys || '[]'),
         
-        // Issuer is the student who created it
-        issuerName: c.studentPublicKey === walletPublicKey ? "You" : "Student",
+        // Issuer is student who created it
+        issuerName: c.studentPublicKey?.toLowerCase() === walletPublicKey.toLowerCase() 
+          ? "You (Self)" 
+          : "Student",
         
-        // Signers with status
+        // Signers with names
         signers: credSigners.map(s => ({
           signerPublicKey: s.signerPublicKey,
           signerOrder: s.signerOrder,
           signed: s.signed === 1,
           isStudent: s.isStudent === 1,
-          name: nameMap[s.signerPublicKey] || (s.isStudent ? `Student ${s.signerOrder}` : `Institution ${s.signerOrder}`),
-          isYou: s.signerPublicKey === walletPublicKey
+          name: nameMap[s.signerPublicKey?.toLowerCase()] || (s.isStudent ? "Student" : `Institution ${s.signerOrder}`),
+          isYou: s.signerPublicKey?.toLowerCase() === walletPublicKey.toLowerCase()
         }))
       };
     });
