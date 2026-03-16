@@ -158,9 +158,9 @@ app.post("/login", async (req, res) => {
     console.error("Error Code:", err.code);
     console.error("Error Message:", err.message);
     console.error("Error Stack:", err.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Server error during login",
-      error: err.message 
+      error: err.message
     });
   }
 });
