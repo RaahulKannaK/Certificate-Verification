@@ -10,11 +10,15 @@ import fs from "fs";
 import streamifier from "streamifier";
 import cloudinary from "./config/cloudinary.js";
 
+
 // ✅ Only one DB import
 import db from "./config/db.js";
 
 import { issueOnBlockchain } from "./services/blockchainService.js";
 import issueCredential from "./blockchain/issueCredential.js";
+import { PDFDocument } from 'pdf-lib';
+import axios from 'axios';
+import streamifier from 'streamifier';
 
 const app = express();
 // ========================
@@ -28,6 +32,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
 
 // ✅ Serve uploaded files statically
 
@@ -51,6 +56,94 @@ db.getConnection((err, connection) => {
 // ==========================================================
 // 🔐 SIGNUP
 // ==========================================================
+
+async function mergeSignatures(credentialId) {
+  // Get original document
+  const [[cred]] = await db.query(
+    `SELECT filePath FROM issued_credentials WHERE credentialId = ?`,
+    [credentialId]
+  );
+
+  // Get all signatures with their field positions
+  const [signatures] = await db.query(
+    `SELECT si.signatureImageUrl, sf.xRatio, sf.yRatio, sf.widthRatio, sf.heightRatio
+     FROM signature_images si
+     JOIN signature_fields sf ON si.signerPublicKey = sf.signerPublicKey
+     WHERE si.credentialId = ? AND sf.credentialId = ?`,
+    [credentialId, credentialId]
+  );
+
+  // Download original PDF
+  const pdfResponse = await axios.get(cred.filePath, { 
+    responseType: 'arraybuffer',
+    timeout: 30000 
+  });
+  
+  const pdfDoc = await PDFDocument.load(pdfResponse.data);
+  const pages = pdfDoc.getPages();
+  const firstPage = pages[0];
+  const { width, height } = firstPage.getSize();
+
+  // Add each signature
+  for (const sig of signatures) {
+    try {
+      // Download signature image
+      const imgResponse = await axios.get(sig.signatureImageUrl, { 
+        responseType: 'arraybuffer',
+        timeout: 30000 
+      });
+      
+      const pngImage = await pdfDoc.embedPng(imgResponse.data);
+      
+      // Calculate position
+      const x = sig.xRatio * width;
+      const y = sig.yRatio * height;
+      const w = sig.widthRatio * width;
+      const h = sig.heightRatio * height;
+
+      firstPage.drawImage(pngImage, { 
+        x, 
+        y, 
+        width: w, 
+        height: h 
+      });
+      
+      console.log(`✅ Embedded signature at (${x}, ${y})`);
+    } catch (imgErr) {
+      console.error("❌ Error embedding signature:", imgErr.message);
+      // Continue with other signatures
+    }
+  }
+
+  // Save final PDF
+  const finalPdfBytes = await pdfDoc.save();
+  const finalBuffer = Buffer.from(finalPdfBytes);
+
+  // Upload to Cloudinary
+  const finalResult = await new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'final_documents',
+        public_id: `${credentialId}_final_${Date.now()}`,
+        resource_type: 'raw',
+        format: 'pdf'
+      },
+      (error, result) => {
+        if (error) {
+          console.error("Cloudinary upload error:", error);
+          reject(error);
+        } else {
+          resolve(result);
+        }
+      }
+    );
+    streamifier.createReadStream(finalBuffer).pipe(stream);
+  });
+
+  console.log("✅ Final document uploaded:", finalResult.secure_url);
+  return finalResult.secure_url;
+}
+
 app.post("/signup", async (req, res) => {
   const { name, email, password, phone, age, role, walletPublicKey, walletPrivateKeyEncrypted } = req.body;
   console.log("Signup payload:", { ...req.body, password: '[REDACTED]' });
