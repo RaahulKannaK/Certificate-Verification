@@ -70,7 +70,7 @@ const InstitutionProfile: React.FC = () => {
         }
     };
 
-    const accent = "#16a34a"; // Green accent for Institution
+    const accent = "#1e1a6b"; // Blue accent
     const fields = [
         { icon: <User size={18} color={accent} />, label: "Institution Name", value: fullName },
         { icon: <Mail size={18} color={accent} />, label: "Email Address", value: user.email || "—" },
@@ -80,46 +80,53 @@ const InstitutionProfile: React.FC = () => {
     ];
 
     return (
-        <div>
+        <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            width: '100%',
+            paddingBottom: '40px'
+        }}>
             {/* Page Header */}
-            <div style={{ marginBottom: "40px" }}>
+            <div style={{ marginBottom: "32px", textAlign: "center" }}>
                 <h1 style={{
-                    fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800,
+                    fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900,
                     color: "#0f172a", marginBottom: "10px",
                     fontFamily: "Space Grotesk, sans-serif",
+                    letterSpacing: "-0.02em",
                 }}>
                     Institution Profile
                 </h1>
-                <p style={{ fontSize: "17px", color: "#64748b", lineHeight: 1.7 }}>
+                <p style={{ fontSize: "14px", color: "#64748b", lineHeight: 1.6, maxWidth: "500px", margin: "0 auto" }}>
                     Your institution's account information and security settings.
                 </p>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "24px", maxWidth: "720px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px", width: "100%", maxWidth: "540px", textAlign: "left" }}>
 
                 {/* Avatar + Name Banner */}
                 <div style={{
-                    display: "flex", alignItems: "center", gap: "24px",
-                    background: "white", borderRadius: "24px",
-                    padding: "28px 32px", border: "1px solid #e2e8f0",
+                    display: "flex", alignItems: "center", gap: "20px",
+                    background: "white", borderRadius: "20px",
+                    padding: "24px 28px", border: "1px solid #e2e8f0",
                     boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
                 }}>
                     <div style={{
-                        width: "72px", height: "72px", borderRadius: "50%",
-                        background: `linear-gradient(135deg, ${accent}, #047857)`,
+                        width: "60px", height: "60px", borderRadius: "50%",
+                        background: `linear-gradient(135deg, ${accent}, #2c258e)`,
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0, boxShadow: "0 6px 20px rgba(22,163,74,0.22)", // Green shadow
+                        flexShrink: 0, boxShadow: "0 6px 20px rgba(30,26,107,0.22)",
                     }}>
-                        <span style={{ fontSize: "28px", fontWeight: 800, color: "white" }}>
+                        <span style={{ fontSize: "24px", fontWeight: 800, color: "white" }}>
                             {fullName.charAt(0).toUpperCase()}
                         </span>
                     </div>
                     <div>
-                        <h2 style={{ fontSize: "22px", fontWeight: 800, color: "#0f172a", marginBottom: "4px" }}>{fullName}</h2>
+                        <h2 style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a", marginBottom: "6px" }}>{fullName}</h2>
                         <span style={{
                             display: "inline-block", padding: "3px 12px", borderRadius: "99px",
                             fontSize: "12px", fontWeight: 600,
-                            background: "#dcfce7", color: accent, border: "1px solid #86efac", // Green tags
+                            background: "#ede9fe", color: accent, border: "1px solid #c4b5fd",
                         }}>
                             {user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Institution"} Account
                         </span>
@@ -128,23 +135,23 @@ const InstitutionProfile: React.FC = () => {
 
                 {/* Account Details */}
                 <div style={{
-                    background: "white", borderRadius: "24px",
+                    background: "white", borderRadius: "20px",
                     border: "1px solid #e2e8f0", overflow: "hidden",
                     boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
                 }}>
-                    <div style={{ padding: "24px 32px", borderBottom: "1px solid #f1f5f9" }}>
-                        <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>Account Details</h3>
+                    <div style={{ padding: "20px 28px", borderBottom: "1px solid #f1f5f9" }}>
+                        <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>Account Details</h3>
                     </div>
-                    <div style={{ padding: "8px 0" }}>
+                    <div style={{ padding: "4px 0" }}>
                         {fields.map((f, i) => (
                             <div key={i} style={{
-                                display: "flex", alignItems: "center", gap: "16px",
-                                padding: "16px 32px",
+                                display: "flex", alignItems: "center", gap: "14px",
+                                padding: "14px 28px",
                                 borderBottom: i < fields.length - 1 ? "1px solid #f8fafc" : "none",
                             }}>
                                 <div style={{
-                                    width: "38px", height: "38px", borderRadius: "10px",
-                                    background: "#f0fdf4", display: "flex", alignItems: "center", // Light green bg
+                                    width: "36px", height: "36px", borderRadius: "10px",
+                                    background: "#f5f3ff", display: "flex", alignItems: "center",
                                     justifyContent: "center", flexShrink: 0,
                                 }}>
                                     {f.icon}
@@ -160,16 +167,16 @@ const InstitutionProfile: React.FC = () => {
 
                 {/* Public Key Card */}
                 <div style={{
-                    background: "white", borderRadius: "24px",
+                    background: "white", borderRadius: "20px",
                     border: "1px solid #e2e8f0",
                     boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
-                    padding: "24px 32px",
+                    padding: "20px 28px",
                 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-                        <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Key size={18} color={accent} />
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
+                        <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Key size={16} color={accent} />
                         </div>
-                        <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>Institution Key</h3>
+                        <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>Institution Key</h3>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <div style={{
@@ -198,7 +205,7 @@ const InstitutionProfile: React.FC = () => {
 
                 {/* Change Password */}
                 <div style={{
-                    background: "white", borderRadius: "24px",
+                    background: "white", borderRadius: "20px",
                     border: "1px solid #e2e8f0",
                     boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
                     overflow: "hidden",
@@ -206,18 +213,18 @@ const InstitutionProfile: React.FC = () => {
                     <button
                         onClick={() => setShowPasswordForm(!showPasswordForm)}
                         style={{
-                            width: "100%", padding: "24px 32px",
-                            display: "flex", alignItems: "center", gap: "16px",
+                            width: "100%", padding: "20px 28px",
+                            display: "flex", alignItems: "center", gap: "14px",
                             background: "transparent", border: "none", cursor: "pointer",
                             textAlign: "left",
                             borderBottom: showPasswordForm ? "1px solid #f1f5f9" : "none",
                         }}
                     >
-                        <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <Lock size={18} color="#d97706" />
+                        <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <Lock size={16} color="#d97706" />
                         </div>
                         <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a", marginBottom: "2px" }}>Change Password</p>
+                            <p style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", marginBottom: "2px" }}>Change Password</p>
                             <p style={{ fontSize: "13px", color: "#64748b" }}>Update your account password</p>
                         </div>
                         <ChevronRight size={18} color="#94a3b8" style={{
@@ -284,12 +291,12 @@ const InstitutionProfile: React.FC = () => {
                                     disabled={isSubmitting}
                                     style={{
                                         flex: 1, padding: "12px", borderRadius: "12px",
-                                        border: "none", background: `linear-gradient(135deg, ${accent}, #047857)`,
+                                        border: "none", background: `linear-gradient(135deg, ${accent}, #2c258e)`,
                                         fontSize: "14px", fontWeight: 600, color: "white",
                                         cursor: isSubmitting ? "not-allowed" : "pointer",
                                         display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                                         opacity: isSubmitting ? 0.7 : 1,
-                                        boxShadow: "0 4px 14px rgba(22,163,74,0.22)",
+                                        boxShadow: "0 4px 14px rgba(30,26,107,0.22)",
                                     }}
                                 >
                                     {isSubmitting ? <><Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Updating...</> : "Update Password"}
