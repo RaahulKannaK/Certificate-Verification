@@ -2,6 +2,7 @@
 import crypto from "crypto";
 import axios from "axios";
 import express from "express";
+import { ethers } from "ethers";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import multer from "multer";
@@ -20,7 +21,6 @@ import issueCredential from "./blockchain/issueCredential.js";
 
 
 const app = express();
-const { ethers } = require("ethers");
 // ========================
 // 🔧 Middleware
 // ========================
