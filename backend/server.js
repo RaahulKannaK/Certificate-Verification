@@ -20,6 +20,7 @@ import issueCredential from "./blockchain/issueCredential.js";
 
 
 const app = express();
+const { ethers } = require("ethers");
 // ========================
 // 🔧 Middleware
 // ========================
@@ -383,22 +384,157 @@ app.post("/biometric/face", async (req, res) => {
 });
 
 
-app.post("/credential/sign", async (req, res) => {
-  const { credentialId, signerPublicKey, faceImage, signatureImage, isSelfSign } = req.body;
 
-  if (!credentialId || !signerPublicKey || !faceImage || !signatureImage) {
-    return res.status(400).json({
-      success: false,
-      message: "Missing data: credentialId, signerPublicKey, faceImage, signatureImage"
-    });
-  }
+
+app.post("/credential/sign", async (req, res) => {
+  console.log("📥 SIGN API HIT");
+  console.log("📦 Body:", req.body);
 
   try {
+    const {
+      credentialId,
+      signerPublicKey,
+      signature,
+      message,
+      isSelfSign = false,
+    } = req.body;
 
-    /* ==============================
-       1️⃣ Get Credential
-    ============================== */
+    /* ================= VALIDATION ================= */
+    if (!credentialId || !signerPublicKey) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
 
+    /* ================= ECDSA VERIFY ================= */
+    if (signature && message) {
+      const recoveredAddress = ethers.verifyMessage(message, signature);
+
+      console.log("🔐 Recovered:", recoveredAddress);
+      console.log("🎯 Expected:", signerPublicKey);
+
+      if (
+        recoveredAddress.toLowerCase() !== signerPublicKey.toLowerCase()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid signature (ECDSA failed)",
+        });
+      }
+
+      console.log("✅ ECDSA verification passed");
+    } else {
+      console.log("⚠️ No ECDSA provided (fallback mode)");
+    }
+
+    /* ================= CHECK SIGNER ================= */
+    const [[signer]] = await db.query(
+      `SELECT * FROM credential_signers
+       WHERE credentialId = ? AND signerPublicKey = ?`,
+      [credentialId, signerPublicKey]
+    );
+
+    if (!signer) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized signer",
+      });
+    }
+
+    /* ================= SEQUENTIAL CHECK ================= */
+    const [[credential]] = await db.query(
+      `SELECT signingType FROM issued_credentials WHERE credentialId = ?`,
+      [credentialId]
+    );
+
+    if (credential?.signingType === "sequential") {
+      const [[previous]] = await db.query(
+        `SELECT * FROM credential_signers
+         WHERE credentialId = ? AND signerOrder < ?
+         ORDER BY signerOrder DESC LIMIT 1`,
+        [credentialId, signer.signerOrder]
+      );
+
+      if (previous && previous.signed === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Previous signer not completed",
+        });
+      }
+    }
+
+    /* ================= FACE VERIFY (KEEP YOUR OLD LOGIC HERE) ================= */
+    // 👉 IMPORTANT: un existing face verification code inga paste pannu
+    // Example:
+    // const isFaceValid = await verifyFace(req);
+    // if (!isFaceValid) return res.status(400).json({ success:false, message:"Face failed" });
+
+    /* ================= UPDATE SIGN ================= */
+    await db.query(
+      `UPDATE credential_signers
+       SET signed = 1,
+           signature = ?,
+           signedAt = NOW()
+       WHERE credentialId = ? AND signerPublicKey = ?`,
+      [signature || null, credentialId, signerPublicKey]
+    );
+
+    console.log("✅ DB Updated");
+
+    /* ================= CHECK ALL SIGNED ================= */
+    const [allSigners] = await db.query(
+      `SELECT signed FROM credential_signers WHERE credentialId = ?`,
+      [credentialId]
+    );
+
+    const allDone = allSigners.every((s) => s.signed === 1);
+
+    if (allDone) {
+      console.log("🎉 All signers completed");
+
+      /* ================= FINAL PDF / MERGE ================= */
+      // 👉 un existing PDF merge logic inga vaikkalam
+
+      /* ================= UPDATE STATUS ================= */
+      await db.query(
+        `UPDATE issued_credentials
+         SET status = 'completed'
+         WHERE credentialId = ?`,
+        [credentialId]
+      );
+    }
+
+    /* ================= RESPONSE ================= */
+    res.json({
+      success: true,
+      message: "Signed successfully",
+    });
+
+  } catch (err) {
+    console.error("❌ SIGN ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
+app.post("/verifyCredential", async (req, res) => {
+  console.log("🔍 VERIFY API HIT");
+  console.log("📦 Body:", req.body);
+
+  try {
+    const { credentialId } = req.body;
+
+    if (!credentialId) {
+      return res.status(400).json({
+        success: false,
+        message: "Credential ID required",
+      });
+    }
+
+    /* ================= GET CREDENTIAL ================= */
     const [[credential]] = await db.query(
       `SELECT * FROM issued_credentials WHERE credentialId = ?`,
       [credentialId]
@@ -407,254 +543,71 @@ app.post("/credential/sign", async (req, res) => {
     if (!credential) {
       return res.status(404).json({
         success: false,
-        message: "Credential not found"
+        message: "Credential not found",
       });
     }
 
-    const selfSign = isSelfSign || credential.signingType === "self";
-
-    /* ==============================
-       2️⃣ Fetch biometric record
-    ============================== */
-
-    let biometricRecord;
-
-    if (selfSign) {
-
-      const [[user]] = await db.query(
-        `SELECT biometric_vector_encrypted, biometric_iv, biometric_salt
-         FROM users
-         WHERE walletPublicKey = ?`,
-        [signerPublicKey]
-      );
-
-      if (!user?.biometric_vector_encrypted) {
-        return res.status(403).json({
-          success: false,
-          message: "Biometric not enrolled"
-        });
-      }
-
-      biometricRecord = user;
-
-    } else {
-
-      const [[institution]] = await db.query(
-        `SELECT biometric_vector_encrypted, biometric_iv, biometric_salt
-         FROM institutions
-         WHERE walletPublicKey = ?`,
-        [signerPublicKey]
-      );
-
-      if (!institution?.biometric_vector_encrypted) {
-        return res.status(403).json({
-          success: false,
-          message: "Biometric not enrolled"
-        });
-      }
-
-      biometricRecord = institution;
-    }
-
-    /* ==============================
-       3️⃣ Decrypt biometric vector
-    ============================== */
-
-    const encryptedVector = biometricRecord.biometric_vector_encrypted;
-    const iv = biometricRecord.biometric_iv;
-    const salt = biometricRecord.biometric_salt;
-
-    const key = crypto.scryptSync(process.env.BIOMETRIC_SECRET, salt, 32);
-
-    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
-
-    const decrypted = Buffer.concat([
-      decipher.update(encryptedVector),
-      decipher.final()
-    ]);
-
-    const storedVector = JSON.parse(decrypted.toString());
-
-    /* ==============================
-       4️⃣ Verify Face via Python
-    ============================== */
-
-    const aiResponse = await axios.post(
-      `${process.env.FACE_API_URL}/verify-face`,
-      {
-        image: faceImage,
-        storedVector
-      }
-    );
-
-    const { match, confidence } = aiResponse.data;
-
-    if (!match) {
-      return res.status(401).json({
-        success: false,
-        message: "Face verification failed",
-        confidence
-      });
-    }
-
-    /* ==============================
-       5️⃣ Authorization Check
-    ============================== */
-
-    if (selfSign) {
-
-      if (credential.studentPublicKey !== signerPublicKey) {
-        return res.status(403).json({
-          success: false,
-          message: "Not authorized to self-sign"
-        });
-      }
-
-    } else {
-
-      const [[signer]] = await db.query(
-        `SELECT * FROM credential_signers
-         WHERE credentialId = ? AND signerPublicKey = ?`,
-        [credentialId, signerPublicKey]
-      );
-
-      if (!signer) {
-        return res.status(403).json({
-          success: false,
-          message: "Not authorized signer"
-        });
-      }
-
-      if (signer.signed) {
-        return res.json({
-          success: false,
-          message: "Already signed"
-        });
-      }
-
-      // Sequential signing check
-      if (credential.signingType === "sequential") {
-
-        const [[nextSigner]] = await db.query(
-          `SELECT signerOrder
-           FROM credential_signers
-           WHERE credentialId = ?
-           AND signed = 0
-           ORDER BY signerOrder
-           LIMIT 1`,
-          [credentialId]
-        );
-
-        if (nextSigner && nextSigner.signerOrder !== signer.signerOrder) {
-          return res.status(403).json({
-            success: false,
-            message: "Not your turn to sign"
-          });
-        }
-      }
-    }
-
-    /* ==============================
-       6️⃣ Upload Signature
-    ============================== */
-
-    const sigUpload = await cloudinary.uploader.upload(signatureImage, {
-      folder: `signatures/${credentialId}`,
-      public_id: `signer_${signerPublicKey.slice(0, 10)}_${Date.now()}`,
-      resource_type: "image"
-    });
-
-    await db.query(
-      `INSERT INTO signature_images
-       (credentialId, signerPublicKey, signatureImageUrl)
-       VALUES (?, ?, ?)`,
-      [credentialId, signerPublicKey, sigUpload.secure_url]
-    );
-
-    /* ==============================
-       7️⃣ Mark signer signed
-    ============================== */
-
-    if (!selfSign) {
-      await db.query(
-        `UPDATE credential_signers
-         SET signed = 1, updatedAt = NOW()
-         WHERE credentialId = ?
-         AND signerPublicKey = ?`,
-        [credentialId, signerPublicKey]
-      );
-    }
-
-    /* ==============================
-       8️⃣ Check remaining signers
-    ============================== */
-
-    const [[pending]] = await db.query(
-      `SELECT COUNT(*) as cnt
-       FROM credential_signers
-       WHERE credentialId = ?
-       AND signed = 0`,
+    /* ================= GET SIGNERS ================= */
+    const [signers] = await db.query(
+      `SELECT signerPublicKey, signed, signedAt 
+       FROM credential_signers 
+       WHERE credentialId = ?`,
       [credentialId]
     );
 
-    const allSigned = pending.cnt === 0 || selfSign;
+    /* ================= CHECK ALL SIGNED ================= */
+    const allSigned = signers.every((s) => s.signed === 1);
 
-    let finalDocUrl = null;
+    /* ================= BLOCKCHAIN VERIFY ================= */
+    let blockchainValid = false;
 
-    /* ==============================
-       9️⃣ COMPLETE DOCUMENT
-    ============================== */
+    try {
+      // 👉 un existing smart contract function use pannu
+      // Example:
+      const onChainHash = await contract.getCredentialHash(credential.credentialId);
 
-    if (allSigned) {
+      console.log("⛓ On-chain:", onChainHash);
+      console.log("📄 DB:", credential.txHash);
 
-      console.log("✅ All signers completed");
-
-      // Mark credential completed FIRST
-      await db.query(
-        `UPDATE issued_credentials
-         SET status = 'completed'
-         WHERE credentialId = ?`,
-        [credentialId]
-      );
-
-      try {
-
-        finalDocUrl = await mergeSignatures(credentialId);
-
-        await db.query(
-          `UPDATE issued_credentials
-           SET finalDocumentUrl = ?
-           WHERE credentialId = ?`,
-          [finalDocUrl, credentialId]
-        );
-
-      } catch (mergeErr) {
-
-        console.error("⚠️ Signature merge failed:", mergeErr.message);
-
+      // NOTE: depends on your contract — change if needed
+      if (onChainHash) {
+        blockchainValid = true;
       }
+    } catch (err) {
+      console.log("⚠️ Blockchain check failed:", err.message);
     }
 
-    /* ==============================
-       🔟 Response
-    ============================== */
+    /* ================= FINAL STATUS ================= */
+    let status = "INVALID";
 
+    if (credential.status === "completed" && allSigned && blockchainValid) {
+      status = "VERIFIED";
+    } else if (!allSigned) {
+      status = "PENDING_SIGNATURES";
+    } else if (!blockchainValid) {
+      status = "BLOCKCHAIN_MISMATCH";
+    }
+
+    /* ================= RESPONSE ================= */
     res.json({
       success: true,
-      message: selfSign ? "Self signed successfully" : "Signed successfully",
-      confidence,
-      allSigned,
-      finalDocumentUrl: finalDocUrl
+      credentialId: credential.credentialId,
+      title: credential.title,
+      student: credential.studentPublicKey,
+      institutions: JSON.parse(credential.institutionPublicKeys || "[]"),
+      status,
+      issuedAt: credential.issuedAt,
+      signers,
+      blockchainValid,
+      txHash: credential.txHash,
+      etherscan: `https://sepolia.etherscan.io/tx/${credential.txHash}`,
     });
 
-  } catch (err) {
-
-    console.error("❌ Sign error:", err);
-
+  } catch (error) {
+    console.error("❌ VERIFY ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: err.message
     });
   }
 });

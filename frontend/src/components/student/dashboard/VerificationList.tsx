@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../contexts/AuthContext";
-
+import { ethers } from "ethers";
+import { useNavigate } from "react-router-dom";
 /* ================= TYPES ================= */
 export interface Signer {
   signerPublicKey: string;
@@ -85,6 +86,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
   // Preview Modal State
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const navigate = useNavigate();
 
   /* ================= FETCH ISSUED CERTIFICATES ================= */
   useEffect(() => {
@@ -99,9 +101,9 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              walletPublicKey: user.walletPublicKey,
-              role: user.role
-            }),
+            walletPublicKey: user.walletPublicKey,
+            role: user.role
+          }),
           }
         );
 
@@ -214,6 +216,57 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
+  };
+
+  const handleSignDocument = async (box) => {
+    try {
+      setProcessing(true);
+
+      if (!window.ethereum) {
+        alert("MetaMask not installed");
+        return;
+      }
+
+      /* 🔐 Connect wallet */
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      const walletAddress = await signer.getAddress();
+
+      /* 🧾 Create message */
+      const message = `WSIGN_PROTOCOL_V1
+  Credential:${credentialId}
+  Signer:${walletAddress}`;
+
+      /* ✍️ Sign */
+      const signature = await signer.signMessage(message);
+
+      console.log("Signature:", signature);
+
+      /* 🚀 Send to backend */
+      const endpoint = box.isStudent
+        ? `${import.meta.env.VITE_API_URL}/credential/selfSign`
+        : `${import.meta.env.VITE_API_URL}/credential/sign`;
+
+      const res = await axios.post(endpoint, {
+        credentialId,
+        signerPublicKey: walletAddress,
+        signature,
+        message,
+        isSelfSign: box.isStudent || false,
+      });
+
+      if (res.data.success) {
+        toast.success("Signed successfully");
+      } else {
+        toast.error("Sign failed");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error signing");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   // Check if current user can sign this credential
@@ -382,29 +435,45 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                           textTransform: "capitalize",
                         }}>{cert.status}</span>
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (userCanSign) {
+                        {userCanSign ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleStartSigning(cert);
-                            } else {
-                              openPreview(cert);
-                            }
-                          }}
-                          style={{
-                            padding: "9px 20px", borderRadius: "10px", border: "none",
-                            background: userCanSign ? t.gradient : "#f1f5f9",
-                            color: userCanSign ? "white" : "#64748b",
-                            fontSize: "13px", fontWeight: 600, cursor: "pointer",
-                            transition: "all 0.2s",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "6px"
-                          }}
-                        >
-                          {userCanSign ? "Sign Now" : "Review"}
-                          {!userCanSign && <ExternalLink size={14} />}
-                        </button>
+                            }}
+                            style={{
+                              padding: "9px 20px", borderRadius: "10px", border: "none",
+                              background: t.gradient,
+                              color: "white",
+                              fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                              transition: "all 0.2s",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px"
+                            }}
+                          >
+                            Sign Now
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/verify/${cert.id}`);
+                            }}
+                            style={{
+                              padding: "8px 14px",
+                              borderRadius: "8px",
+                              border: "1px solid #cbd5f5",
+                              background: "white",
+                              color: "#1e1a6b",
+                              fontSize: "12px",
+                              fontWeight: 600,
+                              cursor: "pointer"
+                            }}
+                          >
+                            Verify
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -737,6 +806,26 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                 justifyContent: "flex-end",
                 gap: "12px"
               }}>
+                <button
+                  onClick={() => navigate(`/verify/${selectedCert.id}`)}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "10px",
+                    border: "1px solid #e2e8f0",
+                    background: "white",
+                    color: "#1e1a6b",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <ExternalLink size={16} />
+                  Verify
+                </button>
+
                 <button
                   onClick={closePreview}
                   style={{
