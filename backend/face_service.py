@@ -1,5 +1,5 @@
 import base64
-import numpy as np
+import numpy as np # type: ignore
 import face_recognition
 import cv2
 from flask import Flask, request, jsonify
