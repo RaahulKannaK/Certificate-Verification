@@ -385,7 +385,6 @@ app.post("/biometric/face", async (req, res) => {
 
 
 
-
 app.post("/credential/sign", async (req, res) => {
   console.log("📥 SIGN API HIT");
   console.log("📦 Body:", req.body);
@@ -471,14 +470,30 @@ app.post("/credential/sign", async (req, res) => {
     // if (!isFaceValid) return res.status(400).json({ success:false, message:"Face failed" });
 
     /* ================= UPDATE SIGN ================= */
-    await db.query(
-      `UPDATE credential_signers
-       SET signed = 1,
-           signature = ?,
-           signedAt = NOW()
-       WHERE credentialId = ? AND signerPublicKey = ?`,
-      [signature || null, credentialId, signerPublicKey]
-    );
+    // Try with signature column first, fallback if column doesn't exist
+    try {
+      await db.query(
+        `UPDATE credential_signers
+         SET signed = 1,
+             signature = ?,
+             signedAt = NOW()
+         WHERE credentialId = ? AND signerPublicKey = ?`,
+        [signature || null, credentialId, signerPublicKey]
+      );
+    } catch (dbErr) {
+      // If signature column doesn't exist, update without it
+      if (dbErr.code === 'ER_BAD_FIELD_ERROR' && dbErr.sqlMessage.includes('signature')) {
+        await db.query(
+          `UPDATE credential_signers
+           SET signed = 1,
+               signedAt = NOW()
+           WHERE credentialId = ? AND signerPublicKey = ?`,
+          [credentialId, signerPublicKey]
+        );
+      } else {
+        throw dbErr;
+      }
+    }
 
     console.log("✅ DB Updated");
 
