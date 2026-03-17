@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Search, Upload, User, Users, GitBranch } from "lucide-react";
+import { Search, Edit3, User, Users, GitBranch } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -21,6 +21,7 @@ type SigningType = "self" | "sequential" | "parallel";
 /* ================= PROPS ================= */
 interface VerificationListProps {
   onSign: (certificate: Certificate, signingType: SigningType) => void;
+  onStartSigning?: () => void;
 }
 
 /* ================= THEME ================= */
@@ -44,9 +45,8 @@ const t = {
 };
 
 /* ================= COMPONENT ================= */
-const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
+const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSigning }) => {
   const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,7 +142,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
             <p style={{ fontSize: "16px", color: "#64748b" }}>View and sign your issued digital credentials.</p>
           </div>
           <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={onStartSigning}
               style={{
                 display: "inline-flex", alignItems: "center", gap: "8px",
                 padding: "12px 24px", borderRadius: "12px", border: "none",
@@ -151,9 +151,8 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                 boxShadow: t.btnShadow, transition: "all 0.2s",
               }}
             >
-              <Upload size={18} /> Upload New
+              <Edit3 size={18} /> Start Signing
             </button>
-            <input ref={fileInputRef} type="file" hidden />
         </div>
 
         {/* Stats / Filtering Controls */}
