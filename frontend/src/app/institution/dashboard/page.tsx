@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BiometricSetup } from "@/components/biometric/BiometricSetup";
 import { SigningSetup } from "@/components/signing/SigningSetup";
+import VerificationList, { Certificate } from "@/components/student/dashboard/VerificationList";
+import { SigningView } from "@/components/signing/SigningView";
 import Layout from "../layout";
 import { Sparkles, CreditCard } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +13,8 @@ const InstitutionDashboardPage: React.FC<{ onHome?: () => void }> = ({ onHome })
     const { user } = useAuth();
     const [showBiometricSetup, setShowBiometricSetup] = useState(false);
     const [showSigning, setShowSigning] = useState(false);
+    const [showRecords, setShowRecords] = useState(false);
+    const [selectedCertId, setSelectedCertId] = useState<string | null>(null);
 
     if (!user) return <Navigate to="/" replace />;
 
@@ -33,9 +37,44 @@ const InstitutionDashboardPage: React.FC<{ onHome?: () => void }> = ({ onHome })
         );
     }
 
+    // "Manage Records" clicked — show VerificationList for institution
+    if (showRecords) {
+        return (
+            <Layout>
+                <div style={{ padding: '20px 0' }}>
+                    {selectedCertId ? (
+                        <SigningView
+                            credentialId={selectedCertId}
+                            onBack={() => setSelectedCertId(null)}
+                        />
+                    ) : (
+                        <>
+                            {/* Back button */}
+                            <button
+                                onClick={() => setShowRecords(false)}
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '8px',
+                                    marginBottom: '24px', padding: '8px 18px', borderRadius: '10px',
+                                    border: '1px solid #e2e8f0', background: 'white',
+                                    color: '#374151', fontSize: '14px', fontWeight: 500, cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = '#16a34a'; e.currentTarget.style.color = '#16a34a'; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#374151'; }}
+                            >
+                                ← Back to Dashboard
+                            </button>
+                            <VerificationList onSign={(cert: Certificate) => setSelectedCertId(cert.id)} />
+                        </>
+                    )}
+                </div>
+            </Layout>
+        );
+    }
+
     const t = {
-        btnShadow: "0 6px 20px rgba(30,26,107,0.24)",
-        btnShadowHover: "0 10px 28px rgba(30,26,107,0.36)",
+        btnShadow: "0 6px 20px rgba(22,163,74,0.24)",
+        btnShadowHover: "0 10px 28px rgba(22,163,74,0.36)",
         actionBorder: "#e2e8f0",
     };
 
@@ -89,6 +128,7 @@ const InstitutionDashboardPage: React.FC<{ onHome?: () => void }> = ({ onHome })
                             Issue Certificate
                         </button>
                         <button 
+                            onClick={() => setShowRecords(true)}
                             style={{ 
                                 padding: '12px 32px', 
                                 borderRadius: '12px', 
