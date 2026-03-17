@@ -23,39 +23,39 @@ const StudentDashboard: React.FC<DashboardProps> = ({ onStartSigning, onShowCred
             {/* ACTION PANEL */}
             <div style={{
                 background: 'white',
-                borderRadius: '24px', 
+                borderRadius: '20px', 
                 border: `1px solid ${t.actionBorder}`,
                 boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
-                padding: '64px 32px', 
+                padding: '48px 32px', 
                 textAlign: 'center'
             }}>
                 <div style={{ 
-                    width: '80px', 
-                    height: '80px', 
-                    borderRadius: '24px', 
+                    width: '64px', 
+                    height: '64px', 
+                    borderRadius: '20px', 
                     background: '#1e1a6b', 
                     boxShadow: t.btnShadow, 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center', 
-                    margin: '0 auto 28px' 
+                    margin: '0 auto 24px' 
                 }}>
-                    <Sparkles size={36} color="white" />
+                    <Sparkles size={32} color="white" />
                 </div>
-                <h2 style={{ fontSize: '32px', fontWeight: 800, color: '#0f172a', marginBottom: '16px' }}>Student Services</h2>
-                <p style={{ fontSize: '18px', color: '#64748b', lineHeight: 1.6, maxWidth: '540px', margin: '0 auto 40px' }}>
+                <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a', marginBottom: '12px' }}>Student Services</h2>
+                <p style={{ fontSize: '15px', color: '#64748b', lineHeight: 1.6, maxWidth: '500px', margin: '0 auto 32px' }}>
                     Access your academic credentials and sign documents securely using your unique digital identity.
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '16px' }}>
                     <button 
                         onClick={onStartSigning} 
                         style={{ 
-                            padding: '14px 36px', 
+                            padding: '12px 32px', 
                             borderRadius: '12px', 
                             border: 'none', 
                             background: '#1e1a6b', 
                             color: 'white', 
-                            fontSize: '16px', 
+                            fontSize: '15px', 
                             fontWeight: 600, 
                             cursor: 'pointer', 
                             boxShadow: t.btnShadow, 
@@ -69,23 +69,23 @@ const StudentDashboard: React.FC<DashboardProps> = ({ onStartSigning, onShowCred
                     <button 
                         onClick={onShowCredentials}
                         style={{ 
-                            padding: '14px 36px', 
+                            padding: '12px 32px', 
                             borderRadius: '12px', 
                             border: `1.5px solid #e2e8f0`, 
                             background: 'white', 
                             color: '#374151', 
-                            fontSize: '16px', 
+                            fontSize: '15px', 
                             fontWeight: 600, 
                             cursor: 'pointer', 
                             transition: 'all 0.2s', 
                             display: 'flex', 
                             alignItems: 'center', 
-                            gap: '10px' 
+                            gap: '8px' 
                         }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#1e1a6b'; e.currentTarget.style.color = '#1e1a6b'; e.currentTarget.style.background = '#f8fafc'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#374151'; e.currentTarget.style.background = 'white'; }}
                     >
-                        <CreditCard size={20} /> My Credentials
+                        <CreditCard size={18} /> My Credentials
                     </button>
                 </div>
             </div>
