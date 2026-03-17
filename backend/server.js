@@ -535,6 +535,8 @@ app.post("/credential/sign", async (req, res) => {
   }
 });
 
+
+
 app.post("/verifyCredential", async (req, res) => {
   console.log("🔍 VERIFY API HIT");
   console.log("📦 Body:", req.body);
@@ -564,9 +566,10 @@ app.post("/verifyCredential", async (req, res) => {
 
     /* ================= GET SIGNERS ================= */
     const [signers] = await db.query(
-      `SELECT signerPublicKey, signed, signedAt 
+      `SELECT signerPublicKey, signed, signedAt, isStudent, signerOrder
        FROM credential_signers 
-       WHERE credentialId = ?`,
+       WHERE credentialId = ?
+       ORDER BY signerOrder`,
       [credentialId]
     );
 
@@ -574,33 +577,45 @@ app.post("/verifyCredential", async (req, res) => {
     const allSigned = signers.every((s) => s.signed === 1);
 
     /* ================= BLOCKCHAIN VERIFY ================= */
+    // Since you anchor at creation (issueCredential), trust stored txHash
+    // Optional: Verify transaction exists on-chain
     let blockchainValid = false;
+    let onChainStatus = "NOT_CHECKED";
 
-    try {
-      // 👉 un existing smart contract function use pannu
-      // Example:
-      const onChainHash = await contract.getCredentialHash(credential.credentialId);
-
-      console.log("⛓ On-chain:", onChainHash);
-      console.log("📄 DB:", credential.txHash);
-
-      // NOTE: depends on your contract — change if needed
-      if (onChainHash) {
+    if (credential.txHash) {
+      try {
+        const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+        const receipt = await provider.getTransactionReceipt(credential.txHash);
+        
+        if (receipt) {
+          blockchainValid = receipt.status === 1; // 1 = success, 0 = failed
+          onChainStatus = receipt.status === 1 ? "CONFIRMED" : "FAILED";
+          console.log("⛓ On-chain receipt found, status:", onChainStatus);
+        } else {
+          // Transaction pending or not mined yet
+          blockchainValid = true; // Trust DB, still pending
+          onChainStatus = "PENDING";
+          console.log("⛓ Transaction pending:", credential.txHash);
+        }
+      } catch (err) {
+        console.log("⚠️ Blockchain check failed:", err.message);
+        // If chain check fails, trust the database record
         blockchainValid = true;
+        onChainStatus = "DB_TRUSTED";
       }
-    } catch (err) {
-      console.log("⚠️ Blockchain check failed:", err.message);
     }
 
     /* ================= FINAL STATUS ================= */
     let status = "INVALID";
 
-    if (credential.status === "completed" && allSigned && blockchainValid) {
+    if (allSigned && credential.txHash && blockchainValid) {
       status = "VERIFIED";
     } else if (!allSigned) {
       status = "PENDING_SIGNATURES";
+    } else if (allSigned && !credential.txHash) {
+      status = "SIGNING_COMPLETE"; // All signed but no txHash (shouldn't happen)
     } else if (!blockchainValid) {
-      status = "BLOCKCHAIN_MISMATCH";
+      status = "BLOCKCHAIN_FAILED";
     }
 
     /* ================= RESPONSE ================= */
@@ -612,10 +627,19 @@ app.post("/verifyCredential", async (req, res) => {
       institutions: JSON.parse(credential.institutionPublicKeys || "[]"),
       status,
       issuedAt: credential.issuedAt,
-      signers,
+      signers: signers.map(s => ({
+        signerPublicKey: s.signerPublicKey,
+        signed: s.signed === 1,
+        signedAt: s.signedAt,
+        isStudent: s.isStudent === 1,
+        order: s.signerOrder
+      })),
       blockchainValid,
+      onChainStatus,
       txHash: credential.txHash,
-      etherscan: `https://sepolia.etherscan.io/tx/${credential.txHash}`,
+      etherscan: credential.txHash 
+        ? `https://sepolia.etherscan.io/tx/${credential.txHash}` 
+        : null,
     });
 
   } catch (error) {
@@ -623,6 +647,217 @@ app.post("/verifyCredential", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error",
+    });
+  }
+});
+
+
+// In your verification endpoint - handle missing blockchain gracefully
+
+app.get("/verify/:credentialId", async (req, res) => {
+  try {
+    const { credentialId } = req.params;
+
+    // Get credential from DB
+    const [[credential]] = await db.query(
+      `SELECT * FROM issued_credentials WHERE credentialId = ?`,
+      [credentialId]
+    );
+
+    if (!credential) {
+      return res.status(404).json({
+        success: false,
+        status: "NOT_FOUND",
+        message: "Credential not found"
+      });
+    }
+
+    // Get signers
+    const [signers] = await db.query(
+      `SELECT * FROM credential_signers WHERE credentialId = ? ORDER BY signerOrder`,
+      [credentialId]
+    );
+
+    // Check blockchain only if txHash exists
+    let blockchainStatus = "NOT_SUBMITTED";
+    let blockchainData = null;
+
+    if (credential.txHash) {
+      try {
+        // Verify on blockchain
+        const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+        const contract = new ethers.Contract(
+          process.env.CONTRACT_ADDRESS,
+          CONTRACT_ABI,
+          provider
+        );
+
+        // Try to get credential from blockchain
+        const onChainData = await contract.credentials(credentialId);
+        
+        if (onChainData && onChainData.studentPublicKey) {
+          blockchainStatus = "VERIFIED";
+          blockchainData = onChainData;
+        } else {
+          blockchainStatus = "PENDING"; // txHash exists but not confirmed yet
+        }
+      } catch (chainErr) {
+        console.error("Blockchain check failed:", chainErr);
+        blockchainStatus = "ERROR";
+      }
+    }
+
+    // Determine overall status
+    const allSigned = signers.every(s => s.signed === 1);
+    let status = "PENDING";
+    
+    if (allSigned && credential.txHash && blockchainStatus === "VERIFIED") {
+      status = "VERIFIED";
+    } else if (allSigned && !credential.txHash) {
+      status = "SIGNED_OFFCHAIN"; // All signed but not on blockchain yet
+    } else if (allSigned) {
+      status = "SIGNING_COMPLETE";
+    }
+
+    res.json({
+      success: true,
+      status: status,
+      credential: {
+        id: credential.credentialId,
+        title: credential.title,
+        student: credential.studentPublicKey,
+        issuedAt: credential.issuedAt,
+        txHash: credential.txHash,
+        blockchainStatus: blockchainStatus
+      },
+      signers: signers.map(s => ({
+        address: s.signerPublicKey,
+        signed: s.signed === 1,
+        signedAt: s.signedAt,
+        isStudent: s.isStudent === 1
+      }))
+    });
+
+  } catch (err) {
+    console.error("Verify error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// Anchor signed credential to blockchain
+// Add this to your server.js
+
+app.post("/credential/anchor", async (req, res) => {
+  console.log("📥 ANCHOR API HIT");
+  
+  try {
+    const { credentialId } = req.body;
+
+    if (!credentialId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing credentialId"
+      });
+    }
+
+    // Get credential data
+    const [[credential]] = await db.query(
+      `SELECT * FROM issued_credentials WHERE credentialId = ?`,
+      [credentialId]
+    );
+
+    if (!credential) {
+      return res.status(404).json({
+        success: false,
+        message: "Credential not found"
+      });
+    }
+
+    // Get all signed signers
+    const [signers] = await db.query(
+      `SELECT * FROM credential_signers 
+       WHERE credentialId = ? AND signed = 1 
+       ORDER BY signerOrder`,
+      [credentialId]
+    );
+
+    if (signers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No signed signers found"
+      });
+    }
+
+    console.log(`📋 Credential: ${credentialId}`);
+    console.log(`✍️ Signed by ${signers.length} signers`);
+
+    // Check if already anchored
+    if (credential.txHash) {
+      return res.json({
+        success: true,
+        message: "Already anchored",
+        txHash: credential.txHash
+      });
+    }
+
+    // Connect to blockchain
+    const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+    const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+    
+    const contract = new ethers.Contract(
+      process.env.CONTRACT_ADDRESS,
+      [
+        "function issueCredential(string memory _credentialId, address _student, address[] memory _signers, string memory _metadata) external returns (bool)",
+        "function credentials(string memory _credentialId) external view returns (address student, address[] memory signers, bool isValid, uint256 timestamp)"
+      ],
+      wallet
+    );
+
+    // Prepare data for blockchain
+    const studentAddress = credential.studentPublicKey;
+    const signerAddresses = signers.map(s => s.signerPublicKey);
+    const metadata = JSON.stringify({
+      title: credential.title,
+      fileHash: credential.fileHash || "",
+      issuedAt: credential.issuedAt
+    });
+
+    console.log("⛓️ Submitting to blockchain...");
+    console.log("Student:", studentAddress);
+    console.log("Signers:", signerAddresses);
+
+    // Submit to blockchain
+    const tx = await contract.issueCredential(
+      credentialId,
+      studentAddress,
+      signerAddresses,
+      metadata
+    );
+
+    console.log("⏳ Waiting for confirmation...");
+    const receipt = await tx.wait();
+    
+    console.log("✅ Anchored! Tx:", receipt.hash);
+
+    // Update database with txHash
+    await db.query(
+      `UPDATE issued_credentials 
+       SET txHash = ?, status = 'completed' 
+       WHERE credentialId = ?`,
+      [receipt.hash, credentialId]
+    );
+
+    res.json({
+      success: true,
+      message: "Anchored successfully",
+      txHash: receipt.hash
+    });
+
+  } catch (err) {
+    console.error("❌ ANCHOR ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message || "Anchor failed"
     });
   }
 });
