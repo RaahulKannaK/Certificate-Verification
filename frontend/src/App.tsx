@@ -15,6 +15,7 @@ import InstitutionVerificationPage from "./app/institution/verification/page";
 import InstitutionProfilePage from "./app/institution/profile/page";
 import LoginPage from "./app/auth/login/page";
 import RegisterPage from "./app/auth/register/page";
+import VerifyCredential from "./pages/VerifyCredential";
 import "./App.css";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const AppContent = () => {
             <Route path="/auth/register" element={<RegisterPage />} />
             <Route path="/institution/verify" element={<Index />} />
             <Route path="*" element={<NotFound />} />
+            <Route path="/verify/:credentialId" element={<VerifyCredential />} />
           </Routes>
         </BrowserRouter>
       </div>
@@ -64,4 +66,4 @@ const App = () => (
   </QueryClientProvider>
 );
 
-export default App;
+export default App;
