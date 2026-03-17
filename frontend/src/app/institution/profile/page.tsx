@@ -7,7 +7,7 @@ import { Navigate } from "react-router-dom";
 const InstitutionProfilePage: React.FC = () => {
     const { user } = useAuth();
     if (!user) return <Navigate to="/" replace />;
-    
+
     return (
         <Layout>
             <InstitutionProfile />
