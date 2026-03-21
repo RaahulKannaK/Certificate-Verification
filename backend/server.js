@@ -674,7 +674,7 @@ app.post("/credential/sign", async (req, res) => {
     );
 
     const allDone = allSigners.every((s) => s.signed === 1);
-    console.log(`📊 Signers: ${allSigners.filter((s: any) => s.signed === 1).length}/${allSigners.length} completed`);
+    console.log(`📊 Signers: ${allSigners.filter((s) => s.signed === 1).length}/${allSigners.length} completed`);
 
     if (allDone) {
       console.log("🎉 All signers completed! Updating credential status...");
@@ -700,7 +700,7 @@ app.post("/credential/sign", async (req, res) => {
       },
       allComplete: allDone,
       totalSigners: allSigners.length,
-      completedSigners: allSigners.filter((s: any) => s.signed === 1).length
+      completedSigners: allSigners.filter((s) => s.signed === 1).length
     });
 
   } catch (err) {
