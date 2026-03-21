@@ -392,7 +392,7 @@ app.post("/credential/sign", async (req, res) => {
   try {
     const {
       credentialId,
-      signerPublicKey,  // This is the MetaMask address
+      signerPublicKey,
       signature,
       message,
       isSelfSign = false,
@@ -402,7 +402,7 @@ app.post("/credential/sign", async (req, res) => {
     if (!credentialId || !signerPublicKey) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: credentialId and signerPublicKey",
+        message: "Missing required fields",
       });
     }
 
@@ -416,336 +416,200 @@ app.post("/credential/sign", async (req, res) => {
         if (recoveredAddress.toLowerCase() !== signerPublicKey.toLowerCase()) {
           return res.status(400).json({
             success: false,
-            message: "Invalid signature (ECDSA failed)",
-            recovered: recoveredAddress,
-            expected: signerPublicKey,
+            message: "Invalid signature",
           });
         }
         console.log("✅ ECDSA verification passed");
       } catch (verifyErr) {
-        console.error("❌ ECDSA verification error:", verifyErr.message);
         return res.status(400).json({
           success: false,
-          message: "Signature verification failed: " + verifyErr.message,
+          message: "Signature verification failed",
         });
       }
-    } else {
-      console.log("⚠️ No ECDSA provided (fallback mode)");
     }
 
-    /* ================= UNIVERSAL SIGNER LOOKUP ================= */
-    // Step 1: Check if MetaMask is linked to any portal account (student or institution)
-    let portalPublicKey = null;
-    let matchType = null;
-    let userRole = null;
-
-    // Check linked student first
-    const [[linkedStudent]] = await db.query(
-      `SELECT walletPublicKey, 'student' as role 
-       FROM users 
-       WHERE metamaskAddress = ?`,
-      [signerPublicKey.toLowerCase()]
-    );
-
-    // Check linked institution
-    const [[linkedInstitution]] = await db.query(
-      `SELECT walletPublicKey, 'institution' as role 
-       FROM institutions 
-       WHERE metamaskAddress = ?`,
-      [signerPublicKey.toLowerCase()]
-    );
-
-    if (linkedStudent) {
-      portalPublicKey = linkedStudent.walletPublicKey;
-      matchType = 'linked_student';
-      userRole = 'student';
-      console.log("👤 Found linked student:", portalPublicKey);
-    } else if (linkedInstitution) {
-      portalPublicKey = linkedInstitution.walletPublicKey;
-      matchType = 'linked_institution';
-      userRole = 'institution';
-      console.log("🏛️ Found linked institution:", portalPublicKey);
-    } else {
-      // No linked account found
-      console.log("❌ No linked account found for MetaMask:", signerPublicKey);
-      
-      // Get expected signers to help with error message
-      const [expectedSigners] = await db.query(
-        `SELECT 
-          cs.signerPublicKey, 
-          cs.signerOrder, 
-          cs.isStudent,
-          cs.signed,
-          CASE WHEN cs.isStudent = 1 THEN 'Student' ELSE 'Institution' END as type,
-          u.metamaskAddress as studentMetamask,
-          i.metamaskAddress as institutionMetamask
-         FROM credential_signers cs
-         LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey AND cs.isStudent = 1
-         LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey AND cs.isStudent = 0
-         WHERE cs.credentialId = ?
-         ORDER BY cs.signerOrder`,
-        [credentialId]
-      );
-
-      const signerList = expectedSigners.map(s => ({
-        order: s.signerOrder,
-        type: s.type,
-        portalKey: s.signerPublicKey,
-        linkedMetamask: s.isStudent ? s.studentMetamask : s.institutionMetamask,
-        alreadySigned: s.signed === 1
-      }));
-
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized signer - MetaMask not linked",
-        yourMetamask: signerPublicKey,
-        linkedPortalKey: null,
-        matchType: 'none',
-        yourRole: null,
-        expectedSigners: signerList,
-        hint: "Your MetaMask is not linked to any portal account. Please link your MetaMask first.",
-        needsLinking: true
-      });
-    }
-
-    // Step 2: Find signer in credential_signers using the LINKED portal public key
-    console.log("🔍 Looking for signer with portal key:", portalPublicKey);
-    let [[signer]] = await db.query(
+    /* ================= SIMPLE SIGNER LOOKUP ================= */
+    // Check if signer is in credential_signers table (the source of truth)
+    const [[signerRecord]] = await db.query(
       `SELECT cs.*, 
         CASE 
           WHEN u.walletPublicKey IS NOT NULL THEN 'student'
           WHEN i.walletPublicKey IS NOT NULL THEN 'institution'
           ELSE 'unknown'
-        END as signerRole
+        END as actualRole,
+        u.metamaskAddress as studentMetamask,
+        i.metamaskAddress as institutionMetamask
        FROM credential_signers cs
        LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey
        LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey
        WHERE cs.credentialId = ? AND cs.signerPublicKey = ?`,
-      [credentialId, portalPublicKey]
+      [credentialId, signerPublicKey.toLowerCase()]
     );
 
-    // Step 3: If not found by portal key, check if this is a self-sign scenario
-    // where student is the issuer and should be able to sign
-    if (!signer && isSelfSign) {
-      console.log("🔍 Self-sign mode: checking if student is issuer...");
+    // If not found by direct match, check if user linked their MetaMask
+    let signer = signerRecord;
+    let matchType = 'direct'; // direct = imported key
+    
+    if (!signer) {
+      console.log("🔍 Not found by direct key, checking linked accounts...");
       
+      // Find who owns this MetaMask address
+      const [[linkedStudent]] = await db.query(
+        `SELECT walletPublicKey FROM users WHERE metamaskAddress = ?`,
+        [signerPublicKey.toLowerCase()]
+      );
+      
+      const [[linkedInstitution]] = await db.query(
+        `SELECT walletPublicKey FROM institutions WHERE metamaskAddress = ?`,
+        [signerPublicKey.toLowerCase()]
+      );
+      
+      const portalKey = linkedStudent?.walletPublicKey || linkedInstitution?.walletPublicKey;
+      
+      if (portalKey) {
+        // Now find signer record by portal key
+        const [[linkedSigner]] = await db.query(
+          `SELECT cs.*,
+            CASE 
+              WHEN u.walletPublicKey IS NOT NULL THEN 'student'
+              WHEN i.walletPublicKey IS NOT NULL THEN 'institution'
+              ELSE 'unknown'
+            END as actualRole
+           FROM credential_signers cs
+           LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey
+           LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey
+           WHERE cs.credentialId = ? AND cs.signerPublicKey = ?`,
+          [credentialId, portalKey.toLowerCase()]
+        );
+        
+        if (linkedSigner) {
+          signer = linkedSigner;
+          matchType = 'linked';
+          console.log("✅ Found linked signer:", portalKey);
+        }
+      }
+    }
+
+    /* ================= SELF-SIGN FALLBACK ================= */
+    if (!signer && isSelfSign) {
       const [[credential]] = await db.query(
-        `SELECT studentPublicKey, signingType 
-         FROM issued_credentials 
-         WHERE credentialId = ?`,
+        `SELECT studentPublicKey, signingType FROM issued_credentials WHERE credentialId = ?`,
         [credentialId]
       );
-
-      if (credential && credential.signingType === 'self') {
-        // For self-sign, the studentPublicKey should match our portal key
-        if (credential.studentPublicKey.toLowerCase() === portalPublicKey.toLowerCase()) {
-          // Create a virtual signer record for self-sign
+      
+      if (credential?.signingType === 'self') {
+        // Check if signer is the student (direct or linked)
+        const [[student]] = await db.query(
+          `SELECT walletPublicKey, metamaskAddress FROM users WHERE walletPublicKey = ? OR metamaskAddress = ?`,
+          [signerPublicKey.toLowerCase(), signerPublicKey.toLowerCase()]
+        );
+        
+        if (student && credential.studentPublicKey.toLowerCase() === student.walletPublicKey.toLowerCase()) {
           signer = {
-            credentialId: credentialId,
-            signerPublicKey: portalPublicKey,
+            credentialId,
+            signerPublicKey: student.walletPublicKey,
             signerOrder: 1,
             signed: 0,
             isStudent: 1,
-            signerRole: 'student'
+            actualRole: 'student'
           };
-          matchType = 'self_sign_student';
-          console.log("✅ Self-sign student matched:", portalPublicKey);
+          matchType = student.metamaskAddress?.toLowerCase() === signerPublicKey.toLowerCase() ? 'linked_self' : 'direct_self';
         }
       }
     }
 
-    // Step 4: If still not found, return unauthorized with helpful info
+    /* ================= UNAUTHORIZED ================= */
     if (!signer) {
-      console.log("❌ Signer not found for portal key:", portalPublicKey);
-
-      // Get credential details
-      const [[credential]] = await db.query(
-        `SELECT studentPublicKey, signingType, status 
-         FROM issued_credentials 
-         WHERE credentialId = ?`,
+      // Get expected signers for error message
+      const [expected] = await db.query(
+        `SELECT signerPublicKey, signerOrder, isStudent, signed 
+         FROM credential_signers WHERE credentialId = ? ORDER BY signerOrder`,
         [credentialId]
       );
-
-      // Get expected signers with their link status
-      const [expectedSigners] = await db.query(
-        `SELECT 
-          cs.signerPublicKey, 
-          cs.signerOrder, 
-          cs.isStudent,
-          cs.signed,
-          CASE WHEN cs.isStudent = 1 THEN 'Student' ELSE 'Institution' END as type,
-          u.metamaskAddress as studentMetamask,
-          i.metamaskAddress as institutionMetamask
-         FROM credential_signers cs
-         LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey AND cs.isStudent = 1
-         LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey AND cs.isStudent = 0
-         WHERE cs.credentialId = ?
-         ORDER BY cs.signerOrder`,
-        [credentialId]
-      );
-
-      // Build helpful error response
-      const signerList = expectedSigners.map(s => ({
-        order: s.signerOrder,
-        type: s.type,
-        portalKey: s.signerPublicKey,
-        linkedMetamask: s.isStudent ? s.studentMetamask : s.institutionMetamask,
-        alreadySigned: s.signed === 1
-      }));
-
-      // Determine specific error message
-      let errorHint = "";
-      if (linkedStudent) {
-        errorHint = "Your linked student account is not registered for this credential. Check if you used the correct portal account.";
-      } else if (linkedInstitution) {
-        errorHint = "Your linked institution account is not registered for this credential. Check if you were added as a signer.";
-      }
-
-      // Check if it's a sequential signing order issue
-      if (credential?.signingType === 'sequential' && expectedSigners.length > 0) {
-        const pendingSigners = expectedSigners.filter(s => s.signed === 0);
-        if (pendingSigners.length > 0) {
-          const nextSigner = pendingSigners[0];
-          errorHint += ` Next expected signer: ${nextSigner.type} (Order ${nextSigner.signerOrder}).`;
-        }
-      }
-
+      
       return res.status(403).json({
         success: false,
         message: "Unauthorized signer",
-        yourMetamask: signerPublicKey,
-        linkedPortalKey: portalPublicKey,
-        matchType: matchType,
-        yourRole: userRole,
-        credentialType: credential?.signingType,
-        expectedSigners: signerList,
-        hint: errorHint,
-        isSelfSignEligible: credential?.signingType === 'self' && credential?.studentPublicKey === portalPublicKey
+        yourKey: signerPublicKey,
+        expectedSigners: expected.map(s => ({
+          order: s.signerOrder,
+          type: s.isStudent ? 'student' : 'institution',
+          key: s.signerPublicKey,
+          signed: s.signed === 1
+        })),
+        hint: "Your address is not registered for this credential. Import your portal key or link MetaMask."
       });
     }
 
-    console.log("✅ Signer matched:", signer.signerPublicKey, "Role:", signer.signerRole, "via", matchType);
+    console.log("✅ Signer found:", signer.signerPublicKey, "Role:", signer.actualRole, "Match:", matchType);
 
-    /* ================= CHECK SIGNING ORDER (Sequential) ================= */
+    /* ================= CHECK SEQUENTIAL ORDER ================= */
     const [[credential]] = await db.query(
-      `SELECT signingType, studentPublicKey, status 
-       FROM issued_credentials 
-       WHERE credentialId = ?`,
+      `SELECT signingType FROM issued_credentials WHERE credentialId = ?`,
       [credentialId]
     );
 
-    if (credential?.signingType === "sequential") {
-      // Check if previous signers have signed
-      const [[previous]] = await db.query(
-        `SELECT * FROM credential_signers
-         WHERE credentialId = ? AND signerOrder < ?
-         AND signed = 0
-         ORDER BY signerOrder DESC LIMIT 1`,
+    if (credential?.signingType === 'sequential') {
+      const [[pending]] = await db.query(
+        `SELECT signerOrder FROM credential_signers 
+         WHERE credentialId = ? AND signed = 0 AND signerOrder < ?
+         ORDER BY signerOrder LIMIT 1`,
         [credentialId, signer.signerOrder]
       );
-
-      if (previous) {
+      
+      if (pending) {
         return res.status(400).json({
           success: false,
-          message: "Sequential signing order violation",
-          yourOrder: signer.signerOrder,
-          pendingOrder: previous.signerOrder,
-          pendingSigner: previous.signerPublicKey,
-          hint: `Wait for signer order ${previous.signerOrder} to complete first.`
+          message: "Wait for previous signer",
+          pendingOrder: pending.signerOrder
         });
       }
     }
 
-    /* ================= CHECK IF ALREADY SIGNED ================= */
+    /* ================= CHECK ALREADY SIGNED ================= */
     if (signer.signed === 1) {
       return res.status(400).json({
         success: false,
-        message: "You have already signed this credential",
-        signedAt: signer.signedAt
+        message: "Already signed",
       });
     }
 
-    /* ================= FACE VERIFICATION (Optional) ================= */
-    // Add face verification here if required
-    // const isFaceValid = await verifyFace(req);
-    // if (!isFaceValid) {
-    //   return res.status(400).json({ success: false, message: "Face verification failed" });
-    // }
+    /* ================= UPDATE SIGNATURE ================= */
+    await db.query(
+      `UPDATE credential_signers SET signed = 1, signedAt = NOW() 
+       WHERE credentialId = ? AND signerPublicKey = ?`,
+      [credentialId, signer.signerPublicKey]
+    );
 
-    /* ================= UPDATE SIGNATURE IN DB ================= */
-    try {
-      // Try with signature column
-      await db.query(
-        `UPDATE credential_signers
-         SET signed = 1,
-             signature = ?,
-             signedAt = NOW()
-         WHERE credentialId = ? AND signerPublicKey = ?`,
-        [signature || null, credentialId, signer.signerPublicKey]
-      );
-      console.log("✅ DB Updated with signature");
-    } catch (dbErr) {
-      // Fallback if signature column doesn't exist
-      if (dbErr.code === 'ER_BAD_FIELD_ERROR') {
-        console.log("⚠️ Signature column missing, updating without signature");
-        await db.query(
-          `UPDATE credential_signers
-           SET signed = 1,
-               signedAt = NOW()
-           WHERE credentialId = ? AND signerPublicKey = ?`,
-          [credentialId, signer.signerPublicKey]
-        );
-      } else {
-        throw dbErr;
-      }
-    }
-
-    /* ================= CHECK IF ALL SIGNERS COMPLETED ================= */
+    /* ================= CHECK COMPLETION ================= */
     const [allSigners] = await db.query(
       `SELECT signed FROM credential_signers WHERE credentialId = ?`,
       [credentialId]
     );
-
-    const allDone = allSigners.every((s) => s.signed === 1);
-    console.log(`📊 Signers: ${allSigners.filter((s) => s.signed === 1).length}/${allSigners.length} completed`);
-
+    
+    const allDone = allSigners.every(s => s.signed === 1);
+    
     if (allDone) {
-      console.log("🎉 All signers completed! Updating credential status...");
       await db.query(
-        `UPDATE issued_credentials
-         SET status = 'completed',
-             completedAt = NOW()
-         WHERE credentialId = ?`,
+        `UPDATE issued_credentials SET status = 'completed', completedAt = NOW() WHERE credentialId = ?`,
         [credentialId]
       );
     }
 
-    /* ================= SUCCESS RESPONSE ================= */
     res.json({
       success: true,
       message: "Signed successfully",
-      credentialId,
-      signer: {
-        portalKey: signer.signerPublicKey,
-        role: signer.signerRole || (signer.isStudent ? 'student' : 'institution'),
-        order: signer.signerOrder,
-        matchType: matchType
-      },
-      allComplete: allDone,
-      totalSigners: allSigners.length,
-      completedSigners: allSigners.filter((s) => s.signed === 1).length
+      signer: signer.signerPublicKey,
+      role: signer.actualRole,
+      matchType,
+      allComplete: allDone
     });
 
   } catch (err) {
     console.error("❌ SIGN ERROR:", err);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 app.post("/verifyCredential", async (req, res) => {
   console.log("🔍 VERIFY API HIT");
@@ -893,103 +757,7 @@ app.post("/auth/getPortalKey", async (req, res) => {
 });
 // Link MetaMask to institution account
 // Universal MetaMask linking for both students and institutions
-app.post("/auth/linkMetamask", async (req, res) => {
-  console.log("🔗 LINK METAMASK API HIT");
-  
-  try {
-    const { 
-      portalPublicKey,      // The portal key to link (0xA143...)
-      role,                 // 'student' or 'institution'
-      metamaskAddress,      // MetaMask address (0x14F6...)
-      metamaskSignature,    // MetaMask signs proof message
-      proofMessage          // The message that was signed
-    } = req.body;
 
-    // Validate
-    if (!portalPublicKey || !role || !metamaskAddress || !metamaskSignature || !proofMessage) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields"
-      });
-    }
-
-    // Verify MetaMask signature (proves MetaMask ownership)
-    let recoveredMetamask;
-    try {
-      recoveredMetamask = ethers.verifyMessage(proofMessage, metamaskSignature);
-    } catch (err) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid MetaMask signature"
-      });
-    }
-
-    if (recoveredMetamask.toLowerCase() !== metamaskAddress.toLowerCase()) {
-      return res.status(401).json({
-        success: false,
-        message: "MetaMask signature verification failed - address mismatch"
-      });
-    }
-
-    // Verify the proof message contains the portal key (proves intent to link)
-    if (!proofMessage.toLowerCase().includes(portalPublicKey.toLowerCase())) {
-      return res.status(400).json({
-        success: false,
-        message: "Proof message must include portal public key"
-      });
-    }
-
-    // Determine table
-    const table = role === 'student' ? 'users' : 'institutions';
-    const idColumn = 'walletPublicKey';
-
-    // Verify portal key exists
-    const [[existingAccount]] = await db.query(
-      `SELECT * FROM ${table} WHERE ${idColumn} = ?`,
-      [portalPublicKey]
-    );
-
-    if (!existingAccount) {
-      return res.status(404).json({
-        success: false,
-        message: `${role} account not found with key: ${portalPublicKey}`
-      });
-    }
-
-    // Check if MetaMask already linked to different account
-    const [[existingLink]] = await db.query(
-      `SELECT * FROM ${table} WHERE metamaskAddress = ? AND ${idColumn} != ?`,
-      [metamaskAddress.toLowerCase(), portalPublicKey]
-    );
-
-    if (existingLink) {
-      return res.status(409).json({
-        success: false,
-        message: `This MetaMask is already linked to another ${role} account`
-      });
-    }
-
-    // Update with linked MetaMask
-    await db.query(
-      `UPDATE ${table} SET metamaskAddress = ? WHERE ${idColumn} = ?`,
-      [metamaskAddress.toLowerCase(), portalPublicKey]
-    );
-
-    console.log(`✅ MetaMask linked: ${metamaskAddress} -> ${role}: ${portalPublicKey}`);
-
-    res.json({
-      success: true,
-      message: "MetaMask linked successfully",
-      role,
-      portalPublicKey,
-      metamaskAddress
-    });
-
-  } catch (err) {
-    console.error("❌ LINK ERROR:", err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
 
 // In your verification endpoint - handle missing blockchain gracefully
 
