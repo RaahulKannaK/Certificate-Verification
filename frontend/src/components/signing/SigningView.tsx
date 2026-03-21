@@ -385,11 +385,18 @@ const InnerPreview: React.FC<{
         const pdf = await pdfjsLib.getDocument(certificate.filePath).promise;
         const page = await pdf.getPage(1);
         const viewport = page.getViewport({ scale: 720 / page.getViewport({ scale: 1 }).width });
+        const canvas = pdfCanvasRef;
+        const context = canvas.getContext("2d")!;
         pdfCanvasRef.width = viewport.width;
         pdfCanvasRef.height = viewport.height;
         setPdfSize({ width: viewport.width, height: viewport.height });
-        await page.render({ canvasContext: pdfCanvasRef.getContext("2d")!, viewport }).promise;
-      } catch (err) {
+        await page.render({
+      canvas: canvas,          // ✅ REQUIRED FIX
+      canvasContext: context,
+      viewport: viewport
+    }).promise;
+
+    } catch (err) {
         console.error("PDF render error:", err);
       }
     };
