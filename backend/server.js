@@ -383,6 +383,8 @@ app.post("/biometric/face", async (req, res) => {
   }
 });
 
+const crypto = require('crypto');
+
 app.post("/credential/sign", async (req, res) => {
   console.log("📥 SIGN API HIT - Stage:", req.body.stage || "unknown");
   console.log("📦 Body:", req.body);
@@ -393,9 +395,9 @@ app.post("/credential/sign", async (req, res) => {
       signerPublicKey,
       signature,
       message,
-      stage = "ecdsa", // "ecdsa" | "face"
-      faceData,        // Base64 face image for stage 2
-      ecdsaToken,      // Token from stage 1 for stage 2
+      stage = "ecdsa",
+      faceData,
+      ecdsaToken,
       isSelfSign = false,
     } = req.body;
 
@@ -437,46 +439,122 @@ app.post("/credential/sign", async (req, res) => {
         });
       }
 
-      // Check if signer is authorized (same logic as before)
-      let signer = await findSigner(credentialId, signerPublicKey);
+      // Check if signer is authorized
+      let signer = null;
       
+      // Try direct match first
+      const [[directSigner]] = await db.query(
+        `SELECT cs.*, u.walletPublicKey as userKey, i.walletPublicKey as instKey
+         FROM credential_signers cs
+         LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey
+         LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey
+         WHERE cs.credentialId = ? AND LOWER(cs.signerPublicKey) = LOWER(?)`,
+        [credentialId, signerPublicKey]
+      );
+      
+      signer = directSigner;
+
+      // If not found, check linked accounts
       if (!signer) {
+        const [[linkedStudent]] = await db.query(
+          `SELECT walletPublicKey FROM users WHERE LOWER(metamaskAddress) = LOWER(?)`,
+          [signerPublicKey]
+        );
+        
+        const [[linkedInstitution]] = await db.query(
+          `SELECT walletPublicKey FROM institutions WHERE LOWER(metamaskAddress) = LOWER(?)`,
+          [signerPublicKey]
+        );
+        
+        const portalKey = linkedStudent?.walletPublicKey || linkedInstitution?.walletPublicKey;
+        
+        if (portalKey) {
+          const [[linkedSigner]] = await db.query(
+            `SELECT cs.*, u.walletPublicKey as userKey, i.walletPublicKey as instKey
+             FROM credential_signers cs
+             LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey
+             LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey
+             WHERE cs.credentialId = ? AND LOWER(cs.signerPublicKey) = LOWER(?)`,
+            [credentialId, portalKey]
+          );
+          signer = linkedSigner;
+        }
+      }
+
+      if (!signer) {
+        // Get expected signers for error message
+        const [expectedSigners] = await db.query(
+          `SELECT cs.signerPublicKey, cs.isStudent, 
+            u.walletPublicKey as uKey, u.metamaskAddress as uMeta,
+            i.walletPublicKey as iKey, i.metamaskAddress as iMeta
+           FROM credential_signers cs
+           LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey
+           LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey
+           WHERE cs.credentialId = ?`,
+          [credentialId]
+        );
+
+        const formattedSigners = expectedSigners.map(s => ({
+          portalKey: s.signerPublicKey,
+          type: s.isStudent ? 'student' : 'institution',
+          linkedMetamask: s.uMeta || s.iMeta || null
+        }));
+
         return res.status(403).json({
           success: false,
           message: "Unauthorized signer",
-          hint: "Your address is not registered for this credential",
+          yourMetamask: signerPublicKey,
+          expectedSigners: formattedSigners,
+          hint: "Your MetaMask address is not linked to any signer on this credential",
+          needsLinking: true
         });
       }
 
       // Check if already signed
-      if (signer.signed === 1) {
+      if (signer.signed === 1 || signer.signed === true) {
         return res.status(400).json({
           success: false,
           message: "Already signed",
+          signedAt: signer.signedAt
         });
       }
 
       // Check sequential order
-      const orderValid = await checkSigningOrder(credentialId, signer);
-      if (!orderValid.valid) {
-        return res.status(400).json({
-          success: false,
-          message: "Sequential signing order violation",
-          pendingOrder: orderValid.pendingOrder,
-        });
+      const [[credential]] = await db.query(
+        `SELECT signingType FROM issued_credentials WHERE credentialId = ?`,
+        [credentialId]
+      );
+
+      if (credential?.signingType === "sequential") {
+        const [[pending]] = await db.query(
+          `SELECT signerOrder FROM credential_signers 
+           WHERE credentialId = ? AND signed = 0 AND signerOrder < ?
+           ORDER BY signerOrder LIMIT 1`,
+          [credentialId, signer.signerOrder]
+        );
+
+        if (pending && pending.signerOrder < signer.signerOrder) {
+          return res.status(400).json({
+            success: false,
+            message: "Sequential signing order violation",
+            pendingOrder: pending.signerOrder,
+            yourOrder: signer.signerOrder
+          });
+        }
       }
 
       // Generate temporary token for stage 2
-      const ecdsaToken = generateToken(credentialId, signerPublicKey, signature);
+      const tokenData = `${credentialId}:${signer.signerPublicKey}:${signature}:${Date.now()}:${Math.random()}`;
+      const newEcdsaToken = crypto.createHash('sha256').update(tokenData).digest('hex').substring(0, 32);
       
       // Store pending signature temporarily
       await db.query(
         `INSERT INTO pending_signatures 
-         (credentialId, signerPublicKey, signature, message, ecdsaToken, createdAt) 
-         VALUES (?, ?, ?, ?, ?, NOW())
+         (credentialId, signerPublicKey, signature, message, ecdsaToken, createdAt, faceAttempts) 
+         VALUES (?, ?, ?, ?, ?, NOW(), 0)
          ON DUPLICATE KEY UPDATE 
-         signature = ?, message = ?, ecdsaToken = ?, createdAt = NOW()`,
-        [credentialId, signer.signerPublicKey, signature, message, ecdsaToken, signature, message, ecdsaToken]
+         signature = ?, message = ?, ecdsaToken = ?, createdAt = NOW(), faceAttempts = 0`,
+        [credentialId, signer.signerPublicKey, signature, message, newEcdsaToken, signature, message, newEcdsaToken]
       );
 
       console.log("✅ Stage 1 complete - ECDSA verified, awaiting face verification");
@@ -485,7 +563,7 @@ app.post("/credential/sign", async (req, res) => {
         success: true,
         stage: "ecdsa_complete",
         message: "ECDSA verified. Please complete face verification.",
-        ecdsaToken: ecdsaToken,
+        ecdsaToken: newEcdsaToken,
         nextStage: "face",
         expiresIn: "5 minutes"
       });
@@ -504,8 +582,8 @@ app.post("/credential/sign", async (req, res) => {
       // Verify token and get pending signature
       const [[pending]] = await db.query(
         `SELECT * FROM pending_signatures 
-         WHERE ecdsaToken = ? AND credentialId = ? AND signerPublicKey = ?`,
-        [ecdsaToken, credentialId, signerPublicKey.toLowerCase()]
+         WHERE ecdsaToken = ? AND credentialId = ? AND LOWER(signerPublicKey) = LOWER(?)`,
+        [ecdsaToken, credentialId, signerPublicKey]
       );
 
       if (!pending) {
@@ -532,13 +610,14 @@ app.post("/credential/sign", async (req, res) => {
       let faceError = null;
 
       try {
-        // Option 1: Simple face detection (check if face exists)
+        // TODO: Implement actual face verification
+        // Option 1: Check if face exists in image
         // faceVerified = await verifyFaceExists(faceData);
         
-        // Option 2: Match against stored face template
+        // Option 2: Match against stored template (recommended)
         faceVerified = await matchFaceAgainstStored(signerPublicKey, faceData);
         
-        // Option 3: Liveness detection (anti-spoofing)
+        // Option 3: Liveness detection
         // const liveness = await checkLiveness(faceData);
         // faceVerified = liveness.isLive && faceVerified;
 
@@ -551,27 +630,27 @@ app.post("/credential/sign", async (req, res) => {
       }
 
       if (!faceVerified) {
-        // Log failed attempt
+        // Increment failed attempts
         await db.query(
           `UPDATE pending_signatures 
-           SET faceAttempts = COALESCE(faceAttempts, 0) + 1,
+           SET faceAttempts = faceAttempts + 1,
                lastAttemptAt = NOW()
            WHERE ecdsaToken = ?`,
           [ecdsaToken]
         );
 
         // Check max attempts (3)
-        const [[attempts]] = await db.query(
+        const [[attemptData]] = await db.query(
           `SELECT faceAttempts FROM pending_signatures WHERE ecdsaToken = ?`,
           [ecdsaToken]
         );
 
-        if (attempts?.faceAttempts >= 3) {
+        if (attemptData?.faceAttempts >= 3) {
           await db.query(`DELETE FROM pending_signatures WHERE ecdsaToken = ?`, [ecdsaToken]);
           return res.status(403).json({
             success: false,
             message: "Too many failed face verification attempts. Please restart.",
-            attempts: attempts.faceAttempts
+            attempts: attemptData.faceAttempts
           });
         }
 
@@ -579,7 +658,7 @@ app.post("/credential/sign", async (req, res) => {
           success: false,
           message: "Face verification failed",
           error: faceError || "Face does not match registered biometric",
-          attemptsRemaining: 3 - (attempts?.faceAttempts || 0)
+          attemptsRemaining: 3 - (attemptData?.faceAttempts || 0)
         });
       }
 
@@ -589,7 +668,7 @@ app.post("/credential/sign", async (req, res) => {
       // Update credential_signers as signed
       await db.query(
         `UPDATE credential_signers 
-         SET signed = 1, signedAt = NOW()
+         SET signed = 1, signedAt = NOW(), ecdsaVerified = 1, faceVerified = 1
          WHERE credentialId = ? AND signerPublicKey = ?`,
         [credentialId, pending.signerPublicKey]
       );
@@ -597,7 +676,7 @@ app.post("/credential/sign", async (req, res) => {
       // Clean up pending signature
       await db.query(`DELETE FROM pending_signatures WHERE ecdsaToken = ?`, [ecdsaToken]);
 
-      // Log the signature with verification methods
+      // Log the signature
       await db.query(
         `INSERT INTO signature_logs 
          (credentialId, signerPublicKey, method, ecdsaSignature, verifiedAt) 
@@ -611,7 +690,7 @@ app.post("/credential/sign", async (req, res) => {
         [credentialId]
       );
       
-      const allDone = allSigners.every(s => s.signed === 1);
+      const allDone = allSigners.every(s => s.signed === 1 || s.signed === true);
       
       if (allDone) {
         await db.query(
@@ -644,9 +723,53 @@ app.post("/credential/sign", async (req, res) => {
 
   } catch (err) {
     console.error("❌ SIGN ERROR:", err);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
   }
 });
+
+// ================= FACE VERIFICATION STUBS =================
+// Replace these with your actual face recognition implementation
+
+async function matchFaceAgainstStored(signerPublicKey, faceData) {
+  // TODO: Implement with your face recognition service (AWS Rekognition, Azure Face, etc.)
+  
+  // 1. Retrieve stored face template
+  const [[user]] = await db.query(
+    `SELECT faceTemplate, faceData FROM users WHERE LOWER(walletPublicKey) = LOWER(?)`,
+    [signerPublicKey]
+  );
+  
+  const [[institution]] = await db.query(
+    `SELECT faceTemplate, faceData FROM institutions WHERE LOWER(walletPublicKey) = LOWER(?)`,
+    [signerPublicKey]
+  );
+  
+  const storedTemplate = user?.faceTemplate || institution?.faceTemplate;
+  const storedFaceData = user?.faceData || institution?.faceData;
+  
+  if (!storedTemplate && !storedFaceData) {
+    console.log("⚠️ No face template found, allowing bypass for testing");
+    return true; // REMOVE IN PRODUCTION
+  }
+
+  // TODO: Call your face comparison API
+  // Example: return await faceApi.compare(faceData, storedTemplate);
+  
+  console.log("⚠️ Face verification bypassed - implement actual matching!");
+  return true; // STUB - REMOVE IN PRODUCTION
+}
+
+async function verifyFaceExists(faceData) {
+  // Check if image is valid base64 and contains face data
+  if (!faceData || typeof faceData !== 'string') return false;
+  if (!faceData.startsWith('data:image')) return false;
+  return true;
+}
+
+async function checkLiveness(faceData) {
+  // TODO: Implement liveness detection to prevent photo spoofing
+  return { isLive: true, confidence: 0.99 };
+}
 
 
 app.post("/verifyCredential", async (req, res) => {
