@@ -466,15 +466,50 @@ app.post("/credential/sign", async (req, res) => {
       userRole = 'institution';
       console.log("🏛️ Found linked institution:", portalPublicKey);
     } else {
-      // No linked account - try direct match (portal key = metamask address)
-      // This handles cases where user signs with portal key directly in MetaMask
-      portalPublicKey = signerPublicKey;
-      matchType = 'direct';
-      userRole = isSelfSign ? 'student' : 'unknown';
-      console.log("🔍 No linked account, trying direct match with:", portalPublicKey);
+      // No linked account found
+      console.log("❌ No linked account found for MetaMask:", signerPublicKey);
+      
+      // Get expected signers to help with error message
+      const [expectedSigners] = await db.query(
+        `SELECT 
+          cs.signerPublicKey, 
+          cs.signerOrder, 
+          cs.isStudent,
+          cs.signed,
+          CASE WHEN cs.isStudent = 1 THEN 'Student' ELSE 'Institution' END as type,
+          u.metamaskAddress as studentMetamask,
+          i.metamaskAddress as institutionMetamask
+         FROM credential_signers cs
+         LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey AND cs.isStudent = 1
+         LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey AND cs.isStudent = 0
+         WHERE cs.credentialId = ?
+         ORDER BY cs.signerOrder`,
+        [credentialId]
+      );
+
+      const signerList = expectedSigners.map(s => ({
+        order: s.signerOrder,
+        type: s.type,
+        portalKey: s.signerPublicKey,
+        linkedMetamask: s.isStudent ? s.studentMetamask : s.institutionMetamask,
+        alreadySigned: s.signed === 1
+      }));
+
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized signer - MetaMask not linked",
+        yourMetamask: signerPublicKey,
+        linkedPortalKey: null,
+        matchType: 'none',
+        yourRole: null,
+        expectedSigners: signerList,
+        hint: "Your MetaMask is not linked to any portal account. Please link your MetaMask first.",
+        needsLinking: true
+      });
     }
 
-    // Step 2: Find signer in credential_signers using the portal public key
+    // Step 2: Find signer in credential_signers using the LINKED portal public key
+    console.log("🔍 Looking for signer with portal key:", portalPublicKey);
     let [[signer]] = await db.query(
       `SELECT cs.*, 
         CASE 
@@ -521,7 +556,7 @@ app.post("/credential/sign", async (req, res) => {
 
     // Step 4: If still not found, return unauthorized with helpful info
     if (!signer) {
-      console.log("❌ Signer not found for:", portalPublicKey);
+      console.log("❌ Signer not found for portal key:", portalPublicKey);
 
       // Get credential details
       const [[credential]] = await db.query(
@@ -560,9 +595,7 @@ app.post("/credential/sign", async (req, res) => {
 
       // Determine specific error message
       let errorHint = "";
-      if (!linkedStudent && !linkedInstitution) {
-        errorHint = "Your MetaMask is not linked to any portal account. Please link your MetaMask first.";
-      } else if (linkedStudent) {
+      if (linkedStudent) {
         errorHint = "Your linked student account is not registered for this credential. Check if you used the correct portal account.";
       } else if (linkedInstitution) {
         errorHint = "Your linked institution account is not registered for this credential. Check if you were added as a signer.";
@@ -581,7 +614,7 @@ app.post("/credential/sign", async (req, res) => {
         success: false,
         message: "Unauthorized signer",
         yourMetamask: signerPublicKey,
-        linkedPortalKey: portalPublicKey !== signerPublicKey ? portalPublicKey : null,
+        linkedPortalKey: portalPublicKey,
         matchType: matchType,
         yourRole: userRole,
         credentialType: credential?.signingType,
