@@ -861,6 +861,36 @@ app.post("/verifyCredential", async (req, res) => {
   }
 });
 
+app.post("/auth/getPortalKey", async (req, res) => {
+  try {
+    const { publicKey, role, password } = req.body;
+    
+    // Verify password/token (add your auth logic here)
+    // if (!verifyAuth(req)) return res.status(401).json({ error: "Unauthorized" });
+
+    const table = role === 'student' ? 'users' : 'institutions';
+    
+    const [[account]] = await db.query(
+      `SELECT privateKey FROM ${table} WHERE walletPublicKey = ?`,
+      [publicKey]
+    );
+
+    if (!account) {
+      return res.status(404).json({ success: false, message: "Account not found" });
+    }
+
+    res.json({
+      success: true,
+      publicKey: publicKey,
+      privateKey: account.privateKey, // Hex format: 0x...
+      message: "Import this private key into MetaMask to sign directly with your portal key"
+    });
+
+  } catch (err) {
+    console.error("❌ Export error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
 // Link MetaMask to institution account
 // Universal MetaMask linking for both students and institutions
 app.post("/auth/linkMetamask", async (req, res) => {
@@ -868,9 +898,9 @@ app.post("/auth/linkMetamask", async (req, res) => {
   
   try {
     const { 
-      portalPublicKey,      // The portal key to link
+      portalPublicKey,      // The portal key to link (0xA143...)
       role,                 // 'student' or 'institution'
-      metamaskAddress,      // MetaMask address
+      metamaskAddress,      // MetaMask address (0x14F6...)
       metamaskSignature,    // MetaMask signs proof message
       proofMessage          // The message that was signed
     } = req.body;
@@ -902,7 +932,7 @@ app.post("/auth/linkMetamask", async (req, res) => {
     }
 
     // Verify the proof message contains the portal key (proves intent to link)
-    if (!proofMessage.includes(portalPublicKey.toLowerCase())) {
+    if (!proofMessage.toLowerCase().includes(portalPublicKey.toLowerCase())) {
       return res.status(400).json({
         success: false,
         message: "Proof message must include portal public key"
