@@ -383,7 +383,6 @@ app.post("/biometric/face", async (req, res) => {
   }
 });
 
-const crypto = require('crypto');
 
 app.post("/credential/sign", async (req, res) => {
   console.log("📥 SIGN API HIT - Stage:", req.body.stage || "unknown");
