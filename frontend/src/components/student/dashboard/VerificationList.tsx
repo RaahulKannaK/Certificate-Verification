@@ -78,7 +78,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "pending" | "signed">("pending");
+  const [activeTab, setActiveTab] = useState<"all" | "pending" | "signed">("all");
   const [filterType, setFilterType] = useState<"all" | "self" | "institution">("all");
   const [hoveredCert, setHoveredCert] = useState<string | null>(null);
 
@@ -239,32 +239,15 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
   };
 
   return (
-    <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0", position: "relative" }}>
+    <div style={{ maxWidth: "1100px", margin: "0 auto", position: "relative" }}>
 
-      {/* Header Section */}
-      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "16px", marginBottom: "32px" }}>
-        <div>
-          <h1 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginBottom: "8px" }}>
-            My Credentials
-          </h1>
-          <p style={{ fontSize: "16px", color: "#64748b" }}>View and sign your issued digital credentials.</p>
-        </div>
-        <button
-          onClick={onStartSigning}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: "8px",
-            padding: "12px 24px", borderRadius: "12px", border: "none",
-            background: t.gradient, color: "white",
-            fontSize: "14px", fontWeight: 600, cursor: "pointer",
-            boxShadow: t.btnShadow, transition: "all 0.2s",
-          }}
-        >
-          <Edit3 size={18} /> Start Signing
-        </button>
-      </div>
-
-      {/* Stats / Filtering Controls */}
-      <div style={{ marginBottom: "32px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px" }}>
+      {/* Summary Cards Row */}
+      <div style={{
+        marginBottom: "32px",
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: "16px"
+      }}>
         {[
           { type: "all", icon: Users, label: "All Items", count: certificates.length },
           { type: "self", icon: User, label: "Self Signing", count: certificates.filter(c => c.signingType === "self").length },
@@ -274,22 +257,56 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
             key={type}
             onClick={() => setFilterType(type as any)}
             style={{
-              background: "white", borderRadius: "18px", padding: "20px",
+              background: "white", borderRadius: "14px", padding: "14px 18px",
               border: `2px solid ${filterType === type ? t.accentColor : '#f1f5f9'}`,
-              cursor: "pointer", display: "flex", alignItems: "center", gap: "16px",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: "12px",
               transition: "all 0.2s",
               boxShadow: filterType === type ? '0 10px 20px -5px rgba(30,26,107,0.1)' : 'none'
             }}
           >
-            <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: filterType === type ? t.gradient : t.iconBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon size={22} color={filterType === type ? "white" : t.iconColor} />
+            <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: filterType === type ? t.gradient : t.iconBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon size={18} color={filterType === type ? "white" : t.iconColor} />
             </div>
             <div>
-              <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>{label}</h3>
-              <p style={{ fontSize: "13px", color: "#64748b" }}>{count} items</p>
+              <h3 style={{ fontSize: "14.5px", fontWeight: 700, color: "#0f172a", margin: 0, lineHeight: 1.2 }}>{label}</h3>
+              <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0" }}>{count} items</p>
             </div>
           </div>
         ))}
+
+        {/* Start Signing Button - Compact Button Format */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button
+            onClick={onStartSigning}
+            style={{
+              background: t.gradient,
+              borderRadius: "12px",
+              padding: "12px 20px",
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              transition: "all 0.2s",
+              boxShadow: t.btnShadow,
+              color: "white",
+              width: "100%",
+              height: "fit-content"
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 12px 24px -10px rgba(30,26,107,0.3)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = t.btnShadow;
+            }}
+          >
+            <Edit3 size={18} color="white" />
+            <span style={{ fontSize: "14px", fontWeight: 700 }}>Start Signing</span>
+          </button>
+        </div>
       </div>
 
       {/* List Container */}

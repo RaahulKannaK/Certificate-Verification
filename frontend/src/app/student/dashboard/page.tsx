@@ -40,7 +40,7 @@ const StudentDashboardPage: React.FC<{ onHome?: () => void }> = ({ onHome }) => 
 
     return (
         <Layout>
-            <div style={{ padding: '20px 0' }}>
+            <div className="w-full">
                 {selectedCertId ? (
                     <SigningView
                         credentialId={selectedCertId}
