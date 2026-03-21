@@ -831,52 +831,75 @@ app.post("/verifyCredential", async (req, res) => {
 // Link MetaMask to institution account
 // Universal MetaMask linking for both students and institutions
 app.post("/auth/linkMetamask", async (req, res) => {
-  console.log("🔗 UNIVERSAL LINK METAMASK API HIT");
+  console.log("🔗 LINK METAMASK API HIT");
   
   try {
     const { 
-      publicKey,           // Portal public key (student or institution)
-      role,                // 'student' or 'institution'
-      metamaskAddress,     // MetaMask address to link
-      signature,           // Signature proving portal key ownership
-      message              // Signed message
+      portalPublicKey,      // The portal key to link
+      role,                 // 'student' or 'institution'
+      metamaskAddress,      // MetaMask address
+      metamaskSignature,    // MetaMask signs proof message
+      proofMessage          // The message that was signed
     } = req.body;
 
     // Validate
-    if (!publicKey || !role || !metamaskAddress || !signature || !message) {
+    if (!portalPublicKey || !role || !metamaskAddress || !metamaskSignature || !proofMessage) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields"
       });
     }
 
-    // Determine table based on role
-    const table = role === 'student' ? 'users' : 'institutions';
-    const idColumn = role === 'student' ? 'walletPublicKey' : 'walletPublicKey';
-
-    // Verify portal key ownership
+    // Verify MetaMask signature (proves MetaMask ownership)
+    let recoveredMetamask;
     try {
-      const recovered = ethers.verifyMessage(message, signature);
-      if (recovered.toLowerCase() !== publicKey.toLowerCase()) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid signature - portal key ownership verification failed"
-        });
-      }
+      recoveredMetamask = ethers.verifyMessage(proofMessage, metamaskSignature);
     } catch (err) {
       return res.status(400).json({
         success: false,
-        message: "Signature verification failed"
+        message: "Invalid MetaMask signature"
+      });
+    }
+
+    if (recoveredMetamask.toLowerCase() !== metamaskAddress.toLowerCase()) {
+      return res.status(401).json({
+        success: false,
+        message: "MetaMask signature verification failed - address mismatch"
+      });
+    }
+
+    // Verify the proof message contains the portal key (proves intent to link)
+    if (!proofMessage.includes(portalPublicKey.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: "Proof message must include portal public key"
+      });
+    }
+
+    // Determine table
+    const table = role === 'student' ? 'users' : 'institutions';
+    const idColumn = 'walletPublicKey';
+
+    // Verify portal key exists
+    const [[existingAccount]] = await db.query(
+      `SELECT * FROM ${table} WHERE ${idColumn} = ?`,
+      [portalPublicKey]
+    );
+
+    if (!existingAccount) {
+      return res.status(404).json({
+        success: false,
+        message: `${role} account not found with key: ${portalPublicKey}`
       });
     }
 
     // Check if MetaMask already linked to different account
-    const [[existing]] = await db.query(
+    const [[existingLink]] = await db.query(
       `SELECT * FROM ${table} WHERE metamaskAddress = ? AND ${idColumn} != ?`,
-      [metamaskAddress, publicKey]
+      [metamaskAddress.toLowerCase(), portalPublicKey]
     );
 
-    if (existing) {
+    if (existingLink) {
       return res.status(409).json({
         success: false,
         message: `This MetaMask is already linked to another ${role} account`
@@ -886,16 +909,16 @@ app.post("/auth/linkMetamask", async (req, res) => {
     // Update with linked MetaMask
     await db.query(
       `UPDATE ${table} SET metamaskAddress = ? WHERE ${idColumn} = ?`,
-      [metamaskAddress.toLowerCase(), publicKey.toLowerCase()]
+      [metamaskAddress.toLowerCase(), portalPublicKey]
     );
 
-    console.log(`✅ MetaMask linked: ${metamaskAddress} -> ${role}: ${publicKey}`);
+    console.log(`✅ MetaMask linked: ${metamaskAddress} -> ${role}: ${portalPublicKey}`);
 
     res.json({
       success: true,
       message: "MetaMask linked successfully",
       role,
-      publicKey,
+      portalPublicKey,
       metamaskAddress
     });
 
