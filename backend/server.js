@@ -383,10 +383,8 @@ app.post("/biometric/face", async (req, res) => {
   }
 });
 
-
-
 app.post("/credential/sign", async (req, res) => {
-  console.log("📥 SIGN API HIT");
+  console.log("📥 SIGN API HIT - Stage:", req.body.stage || "unknown");
   console.log("📦 Body:", req.body);
 
   try {
@@ -395,6 +393,9 @@ app.post("/credential/sign", async (req, res) => {
       signerPublicKey,
       signature,
       message,
+      stage = "ecdsa", // "ecdsa" | "face"
+      faceData,        // Base64 face image for stage 2
+      ecdsaToken,      // Token from stage 1 for stage 2
       isSelfSign = false,
     } = req.body;
 
@@ -406,8 +407,17 @@ app.post("/credential/sign", async (req, res) => {
       });
     }
 
-    /* ================= ECDSA VERIFY ================= */
-    if (signature && message) {
+    /* ================= STAGE 1: ECDSA VERIFICATION ================= */
+    if (stage === "ecdsa") {
+      
+      if (!signature || !message) {
+        return res.status(400).json({
+          success: false,
+          message: "Signature and message required for ECDSA stage",
+        });
+      }
+
+      // Verify ECDSA signature
       try {
         const recoveredAddress = ethers.verifyMessage(message, signature);
         console.log("🔐 Recovered:", recoveredAddress);
@@ -426,190 +436,218 @@ app.post("/credential/sign", async (req, res) => {
           message: "Signature verification failed",
         });
       }
-    }
 
-    /* ================= SIMPLE SIGNER LOOKUP ================= */
-    // Check if signer is in credential_signers table (the source of truth)
-    const [[signerRecord]] = await db.query(
-      `SELECT cs.*, 
-        CASE 
-          WHEN u.walletPublicKey IS NOT NULL THEN 'student'
-          WHEN i.walletPublicKey IS NOT NULL THEN 'institution'
-          ELSE 'unknown'
-        END as actualRole,
-        u.metamaskAddress as studentMetamask,
-        i.metamaskAddress as institutionMetamask
-       FROM credential_signers cs
-       LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey
-       LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey
-       WHERE cs.credentialId = ? AND cs.signerPublicKey = ?`,
-      [credentialId, signerPublicKey.toLowerCase()]
-    );
-
-    // If not found by direct match, check if user linked their MetaMask
-    let signer = signerRecord;
-    let matchType = 'direct'; // direct = imported key
-    
-    if (!signer) {
-      console.log("🔍 Not found by direct key, checking linked accounts...");
+      // Check if signer is authorized (same logic as before)
+      let signer = await findSigner(credentialId, signerPublicKey);
       
-      // Find who owns this MetaMask address
-      const [[linkedStudent]] = await db.query(
-        `SELECT walletPublicKey FROM users WHERE metamaskAddress = ?`,
-        [signerPublicKey.toLowerCase()]
-      );
-      
-      const [[linkedInstitution]] = await db.query(
-        `SELECT walletPublicKey FROM institutions WHERE metamaskAddress = ?`,
-        [signerPublicKey.toLowerCase()]
-      );
-      
-      const portalKey = linkedStudent?.walletPublicKey || linkedInstitution?.walletPublicKey;
-      
-      if (portalKey) {
-        // Now find signer record by portal key
-        const [[linkedSigner]] = await db.query(
-          `SELECT cs.*,
-            CASE 
-              WHEN u.walletPublicKey IS NOT NULL THEN 'student'
-              WHEN i.walletPublicKey IS NOT NULL THEN 'institution'
-              ELSE 'unknown'
-            END as actualRole
-           FROM credential_signers cs
-           LEFT JOIN users u ON cs.signerPublicKey = u.walletPublicKey
-           LEFT JOIN institutions i ON cs.signerPublicKey = i.walletPublicKey
-           WHERE cs.credentialId = ? AND cs.signerPublicKey = ?`,
-          [credentialId, portalKey.toLowerCase()]
-        );
-        
-        if (linkedSigner) {
-          signer = linkedSigner;
-          matchType = 'linked';
-          console.log("✅ Found linked signer:", portalKey);
-        }
-      }
-    }
-
-    /* ================= SELF-SIGN FALLBACK ================= */
-    if (!signer && isSelfSign) {
-      const [[credential]] = await db.query(
-        `SELECT studentPublicKey, signingType FROM issued_credentials WHERE credentialId = ?`,
-        [credentialId]
-      );
-      
-      if (credential?.signingType === 'self') {
-        // Check if signer is the student (direct or linked)
-        const [[student]] = await db.query(
-          `SELECT walletPublicKey, metamaskAddress FROM users WHERE walletPublicKey = ? OR metamaskAddress = ?`,
-          [signerPublicKey.toLowerCase(), signerPublicKey.toLowerCase()]
-        );
-        
-        if (student && credential.studentPublicKey.toLowerCase() === student.walletPublicKey.toLowerCase()) {
-          signer = {
-            credentialId,
-            signerPublicKey: student.walletPublicKey,
-            signerOrder: 1,
-            signed: 0,
-            isStudent: 1,
-            actualRole: 'student'
-          };
-          matchType = student.metamaskAddress?.toLowerCase() === signerPublicKey.toLowerCase() ? 'linked_self' : 'direct_self';
-        }
-      }
-    }
-
-    /* ================= UNAUTHORIZED ================= */
-    if (!signer) {
-      // Get expected signers for error message
-      const [expected] = await db.query(
-        `SELECT signerPublicKey, signerOrder, isStudent, signed 
-         FROM credential_signers WHERE credentialId = ? ORDER BY signerOrder`,
-        [credentialId]
-      );
-      
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized signer",
-        yourKey: signerPublicKey,
-        expectedSigners: expected.map(s => ({
-          order: s.signerOrder,
-          type: s.isStudent ? 'student' : 'institution',
-          key: s.signerPublicKey,
-          signed: s.signed === 1
-        })),
-        hint: "Your address is not registered for this credential. Import your portal key or link MetaMask."
-      });
-    }
-
-    console.log("✅ Signer found:", signer.signerPublicKey, "Role:", signer.actualRole, "Match:", matchType);
-
-    /* ================= CHECK SEQUENTIAL ORDER ================= */
-    const [[credential]] = await db.query(
-      `SELECT signingType FROM issued_credentials WHERE credentialId = ?`,
-      [credentialId]
-    );
-
-    if (credential?.signingType === 'sequential') {
-      const [[pending]] = await db.query(
-        `SELECT signerOrder FROM credential_signers 
-         WHERE credentialId = ? AND signed = 0 AND signerOrder < ?
-         ORDER BY signerOrder LIMIT 1`,
-        [credentialId, signer.signerOrder]
-      );
-      
-      if (pending) {
-        return res.status(400).json({
+      if (!signer) {
+        return res.status(403).json({
           success: false,
-          message: "Wait for previous signer",
-          pendingOrder: pending.signerOrder
+          message: "Unauthorized signer",
+          hint: "Your address is not registered for this credential",
         });
       }
-    }
 
-    /* ================= CHECK ALREADY SIGNED ================= */
-    if (signer.signed === 1) {
-      return res.status(400).json({
-        success: false,
-        message: "Already signed",
+      // Check if already signed
+      if (signer.signed === 1) {
+        return res.status(400).json({
+          success: false,
+          message: "Already signed",
+        });
+      }
+
+      // Check sequential order
+      const orderValid = await checkSigningOrder(credentialId, signer);
+      if (!orderValid.valid) {
+        return res.status(400).json({
+          success: false,
+          message: "Sequential signing order violation",
+          pendingOrder: orderValid.pendingOrder,
+        });
+      }
+
+      // Generate temporary token for stage 2
+      const ecdsaToken = generateToken(credentialId, signerPublicKey, signature);
+      
+      // Store pending signature temporarily
+      await db.query(
+        `INSERT INTO pending_signatures 
+         (credentialId, signerPublicKey, signature, message, ecdsaToken, createdAt) 
+         VALUES (?, ?, ?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE 
+         signature = ?, message = ?, ecdsaToken = ?, createdAt = NOW()`,
+        [credentialId, signer.signerPublicKey, signature, message, ecdsaToken, signature, message, ecdsaToken]
+      );
+
+      console.log("✅ Stage 1 complete - ECDSA verified, awaiting face verification");
+
+      return res.json({
+        success: true,
+        stage: "ecdsa_complete",
+        message: "ECDSA verified. Please complete face verification.",
+        ecdsaToken: ecdsaToken,
+        nextStage: "face",
+        expiresIn: "5 minutes"
       });
     }
 
-    /* ================= UPDATE SIGNATURE ================= */
-    await db.query(
-      `UPDATE credential_signers SET signed = 1, signedAt = NOW() 
-       WHERE credentialId = ? AND signerPublicKey = ?`,
-      [credentialId, signer.signerPublicKey]
-    );
+    /* ================= STAGE 2: FACE VERIFICATION ================= */
+    else if (stage === "face") {
+      
+      if (!ecdsaToken || !faceData) {
+        return res.status(400).json({
+          success: false,
+          message: "ECDSA token and face data required for face stage",
+        });
+      }
 
-    /* ================= CHECK COMPLETION ================= */
-    const [allSigners] = await db.query(
-      `SELECT signed FROM credential_signers WHERE credentialId = ?`,
-      [credentialId]
-    );
-    
-    const allDone = allSigners.every(s => s.signed === 1);
-    
-    if (allDone) {
+      // Verify token and get pending signature
+      const [[pending]] = await db.query(
+        `SELECT * FROM pending_signatures 
+         WHERE ecdsaToken = ? AND credentialId = ? AND signerPublicKey = ?`,
+        [ecdsaToken, credentialId, signerPublicKey.toLowerCase()]
+      );
+
+      if (!pending) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid or expired ECDSA token. Please restart signing process.",
+        });
+      }
+
+      // Check token expiry (5 minutes)
+      const tokenAge = Date.now() - new Date(pending.createdAt).getTime();
+      if (tokenAge > 5 * 60 * 1000) {
+        await db.query(`DELETE FROM pending_signatures WHERE ecdsaToken = ?`, [ecdsaToken]);
+        return res.status(400).json({
+          success: false,
+          message: "ECDSA token expired. Please restart signing process.",
+        });
+      }
+
+      // ================= FACE VERIFICATION =================
+      console.log("🔍 Starting face verification...");
+      
+      let faceVerified = false;
+      let faceError = null;
+
+      try {
+        // Option 1: Simple face detection (check if face exists)
+        // faceVerified = await verifyFaceExists(faceData);
+        
+        // Option 2: Match against stored face template
+        faceVerified = await matchFaceAgainstStored(signerPublicKey, faceData);
+        
+        // Option 3: Liveness detection (anti-spoofing)
+        // const liveness = await checkLiveness(faceData);
+        // faceVerified = liveness.isLive && faceVerified;
+
+        console.log("✅ Face verification result:", faceVerified);
+        
+      } catch (err) {
+        console.error("❌ Face verification error:", err);
+        faceError = err.message;
+        faceVerified = false;
+      }
+
+      if (!faceVerified) {
+        // Log failed attempt
+        await db.query(
+          `UPDATE pending_signatures 
+           SET faceAttempts = COALESCE(faceAttempts, 0) + 1,
+               lastAttemptAt = NOW()
+           WHERE ecdsaToken = ?`,
+          [ecdsaToken]
+        );
+
+        // Check max attempts (3)
+        const [[attempts]] = await db.query(
+          `SELECT faceAttempts FROM pending_signatures WHERE ecdsaToken = ?`,
+          [ecdsaToken]
+        );
+
+        if (attempts?.faceAttempts >= 3) {
+          await db.query(`DELETE FROM pending_signatures WHERE ecdsaToken = ?`, [ecdsaToken]);
+          return res.status(403).json({
+            success: false,
+            message: "Too many failed face verification attempts. Please restart.",
+            attempts: attempts.faceAttempts
+          });
+        }
+
+        return res.status(400).json({
+          success: false,
+          message: "Face verification failed",
+          error: faceError || "Face does not match registered biometric",
+          attemptsRemaining: 3 - (attempts?.faceAttempts || 0)
+        });
+      }
+
+      // ================= BOTH STAGES PASSED - FINALIZE SIGNATURE =================
+      console.log("✅ Both ECDSA and Face verified - Finalizing signature");
+
+      // Update credential_signers as signed
       await db.query(
-        `UPDATE issued_credentials SET status = 'completed', completedAt = NOW() WHERE credentialId = ?`,
+        `UPDATE credential_signers 
+         SET signed = 1, signedAt = NOW()
+         WHERE credentialId = ? AND signerPublicKey = ?`,
+        [credentialId, pending.signerPublicKey]
+      );
+
+      // Clean up pending signature
+      await db.query(`DELETE FROM pending_signatures WHERE ecdsaToken = ?`, [ecdsaToken]);
+
+      // Log the signature with verification methods
+      await db.query(
+        `INSERT INTO signature_logs 
+         (credentialId, signerPublicKey, method, ecdsaSignature, verifiedAt) 
+         VALUES (?, ?, 'ecdsa+face', ?, NOW())`,
+        [credentialId, pending.signerPublicKey, pending.signature]
+      );
+
+      // Check if all signers completed
+      const [allSigners] = await db.query(
+        `SELECT signed FROM credential_signers WHERE credentialId = ?`,
         [credentialId]
       );
+      
+      const allDone = allSigners.every(s => s.signed === 1);
+      
+      if (allDone) {
+        await db.query(
+          `UPDATE issued_credentials 
+           SET status = 'completed', completedAt = NOW() 
+           WHERE credentialId = ?`,
+          [credentialId]
+        );
+      }
+
+      console.log("✅ Signature finalized successfully");
+
+      return res.json({
+        success: true,
+        stage: "complete",
+        message: "Signed successfully with ECDSA + Face verification",
+        signer: pending.signerPublicKey,
+        verificationMethods: ["ecdsa", "face"],
+        allComplete: allDone
+      });
     }
 
-    res.json({
-      success: true,
-      message: "Signed successfully",
-      signer: signer.signerPublicKey,
-      role: signer.actualRole,
-      matchType,
-      allComplete: allDone
-    });
+    /* ================= INVALID STAGE ================= */
+    else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid stage. Use 'ecdsa' or 'face'",
+      });
+    }
 
   } catch (err) {
     console.error("❌ SIGN ERROR:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 app.post("/verifyCredential", async (req, res) => {
   console.log("🔍 VERIFY API HIT");
