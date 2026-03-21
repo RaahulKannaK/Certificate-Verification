@@ -798,12 +798,23 @@ app.post("/verifyCredential", async (req, res) => {
       });
     }
 
-    /* ================= GET SIGNERS ================= */
+    /* ================= GET SIGNERS WITH SIGNATURES ================= */
     const [signers] = await db.query(
-      `SELECT signerPublicKey, signed, signedAt, isStudent, signerOrder
-       FROM credential_signers 
-       WHERE credentialId = ?
-       ORDER BY signerOrder`,
+      `SELECT 
+        cs.signerPublicKey, 
+        cs.signed, 
+        cs.signedAt, 
+        cs.isStudent, 
+        cs.signerOrder,
+        sl.ecdsaSignature,
+        sl.method as signatureMethod,
+        sl.verifiedAt as signatureVerifiedAt
+       FROM credential_signers cs
+       LEFT JOIN signature_logs sl 
+         ON cs.credentialId = sl.credentialId 
+         AND cs.signerPublicKey = sl.signerPublicKey
+       WHERE cs.credentialId = ?
+       ORDER BY cs.signerOrder`,
       [credentialId]
     );
 
@@ -811,8 +822,6 @@ app.post("/verifyCredential", async (req, res) => {
     const allSigned = signers.every((s) => s.signed === 1);
 
     /* ================= BLOCKCHAIN VERIFY ================= */
-    // Since you anchor at creation (issueCredential), trust stored txHash
-    // Optional: Verify transaction exists on-chain
     let blockchainValid = false;
     let onChainStatus = "NOT_CHECKED";
 
@@ -822,18 +831,16 @@ app.post("/verifyCredential", async (req, res) => {
         const receipt = await provider.getTransactionReceipt(credential.txHash);
         
         if (receipt) {
-          blockchainValid = receipt.status === 1; // 1 = success, 0 = failed
+          blockchainValid = receipt.status === 1;
           onChainStatus = receipt.status === 1 ? "CONFIRMED" : "FAILED";
           console.log("⛓ On-chain receipt found, status:", onChainStatus);
         } else {
-          // Transaction pending or not mined yet
-          blockchainValid = true; // Trust DB, still pending
+          blockchainValid = true;
           onChainStatus = "PENDING";
           console.log("⛓ Transaction pending:", credential.txHash);
         }
       } catch (err) {
         console.log("⚠️ Blockchain check failed:", err.message);
-        // If chain check fails, trust the database record
         blockchainValid = true;
         onChainStatus = "DB_TRUSTED";
       }
@@ -847,7 +854,7 @@ app.post("/verifyCredential", async (req, res) => {
     } else if (!allSigned) {
       status = "PENDING_SIGNATURES";
     } else if (allSigned && !credential.txHash) {
-      status = "SIGNING_COMPLETE"; // All signed but no txHash (shouldn't happen)
+      status = "SIGNING_COMPLETE";
     } else if (!blockchainValid) {
       status = "BLOCKCHAIN_FAILED";
     }
@@ -866,7 +873,11 @@ app.post("/verifyCredential", async (req, res) => {
         signed: s.signed === 1,
         signedAt: s.signedAt,
         isStudent: s.isStudent === 1,
-        order: s.signerOrder
+        order: s.signerOrder,
+        // Include signature data for verification
+        ecdsaSignature: s.ecdsaSignature || null,
+        signatureMethod: s.signatureMethod || null,
+        signatureVerifiedAt: s.signatureVerifiedAt || null
       })),
       blockchainValid,
       onChainStatus,
