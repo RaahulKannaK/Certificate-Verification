@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Layout from "../layout";
 import { BiometricSetup } from "../../../components/biometric/BiometricSetup";
 import { useAuth } from "../../../contexts/AuthContext";
-import { ScanFace, CheckCircle2 } from "lucide-react";
+import { ScanFace, CheckCircle2, RefreshCw } from "lucide-react";
 import { Navigate } from "react-router-dom";
 
 const InstitutionVerificationPage: React.FC = () => {
@@ -27,14 +27,14 @@ const InstitutionVerificationPage: React.FC = () => {
         <Layout>
             <div style={{ 
                 padding: '40px 20px', 
-                minHeight: 'calc(100vh - 100px)', // Adjust based on header height
+                minHeight: 'calc(100vh - 100px)',
                 display: 'flex', 
                 flexDirection: 'column', 
                 alignItems: 'center', 
                 justifyContent: 'center',
                 textAlign: 'center'
             }}>
-                {/* Page Header - Centered */}
+                {/* Page Header */}
                 <div style={{ marginBottom: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <h1 style={{
                         fontSize: 'clamp(1.6rem, 3vw, 2.2rem)',
@@ -59,7 +59,7 @@ const InstitutionVerificationPage: React.FC = () => {
                     </p>
                 </div>
 
-                {/* Status Card - Centered */}
+                {/* Status Card */}
                 <div style={{
                     background: 'white',
                     borderRadius: '20px',
@@ -113,6 +113,7 @@ const InstitutionVerificationPage: React.FC = () => {
                     </p>
 
                     {!isSetup ? (
+                        // Not set up - show enable button
                         <button
                             onClick={() => setShowSetup(true)}
                             style={{
@@ -140,25 +141,79 @@ const InstitutionVerificationPage: React.FC = () => {
                             Enable Face Verification
                         </button>
                     ) : (
-                        <div style={{
-                            padding: '12px 20px',
-                            borderRadius: '10px',
-                            background: '#f0fdf4',
-                            border: '1px solid #bbf7d0',
-                            color: '#16a34a',
-                            fontSize: '14px',
-                            fontWeight: 600,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            width: '100%',
-                            maxWidth: '280px'
-                        }}>
-                            <CheckCircle2 size={18} color="#16a34a" />
-                            Biometric setup successfully
+                        // Already set up - show success message + re-enable button
+                        <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {/* Success status */}
+                            <div style={{
+                                padding: '12px 20px',
+                                borderRadius: '10px',
+                                background: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                color: '#16a34a',
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                            }}>
+                                <CheckCircle2 size={18} color="#16a34a" />
+                                Biometric setup successfully
+                            </div>
+
+                            {/* Re-enable / Update face button */}
+                            <button
+                                onClick={() => setShowSetup(true)}
+                                style={{
+                                    padding: '12px 20px',
+                                    borderRadius: '10px',
+                                    border: '1px solid #e2e8f0',
+                                    background: 'white',
+                                    color: '#374151',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.borderColor = '#1e1a6b';
+                                    e.currentTarget.style.color = '#1e1a6b';
+                                    e.currentTarget.style.background = '#f5f3ff';
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                    e.currentTarget.style.color = '#374151';
+                                    e.currentTarget.style.background = 'white';
+                                }}
+                            >
+                                <RefreshCw size={16} />
+                                Re-enable / Update Face
+                            </button>
                         </div>
                     )}
+                </div>
+
+                {/* Security Note */}
+                <div style={{
+                    marginTop: '24px',
+                    padding: '12px 16px',
+                    background: '#f8fafc',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    maxWidth: '440px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    textAlign: 'left'
+                }}>
+                    <ScanFace size={16} color="#64748b" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: 1.5 }}>
+                        Your biometric data is encrypted and stored securely. You can update your face recognition data at any time.
+                    </p>
                 </div>
             </div>
         </Layout>

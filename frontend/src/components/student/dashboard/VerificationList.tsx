@@ -12,27 +12,35 @@ import {
   Copy,
   ExternalLink,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  Fingerprint,
+  Key,
+  ChevronRight,
+  Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../contexts/AuthContext";
 import { ethers } from "ethers";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import ImportToMetamask from "./ImportToMetamask";
+
 /* ================= TYPES ================= */
 export interface Signer {
   signerPublicKey: string;
   signerOrder: number;
   signed: boolean;
   isStudent: boolean;
-  name?: string; // Optional: if we can resolve name from backend
+  name?: string;
 }
 
 export interface Certificate {
   id: string;
   name: string;
-  issuer: string; // Student who issued (resolved from studentPublicKey)
+  issuer: string;
   issuerEmail: string;
-  walletAddress: string; // studentPublicKey
+  walletAddress: string;
   date: string;
   status: "pending" | "signed" | "completed";
   type: string;
@@ -41,43 +49,210 @@ export interface Certificate {
   txHash?: string;
   signers: Signer[];
   filePath?: string;
-  institutionKeys: string[]; // Raw institution public keys
+  institutionKeys: string[];
 }
 
 type SigningType = "self" | "sequential" | "parallel";
+type SigningStage = "idle" | "ecdsa" | "face" | "complete" | "error";
 
-/* ================= PROPS ================= */
 interface VerificationListProps {
-  onSign: (certificate: Certificate, signingType: SigningType) => void;
+  onSign?: (certificate: Certificate, signingType: SigningType) => void;
+  onNavigateToSigningView?: (credentialId: string) => void; // NEW: Navigate to SigningView
 }
 
 /* ================= THEME ================= */
 const t = {
-    pageBg: "#f5f3ff",
-    gradient: "linear-gradient(135deg, #1e1a6b, #2d2870)",
-    btnShadow: "0 4px 12px rgba(30,26,107,0.20)",
-    btnShadowHover: "0 8px 20px rgba(30,26,107,0.32)",
-    cardBorder: "#c4b5fd",
-    cardHoverBg: "#f5f3ff",
-    iconColor: "#1e1a6b",
-    iconBg: "#f5f3ff",
-    badgePending: { bg: "#fef9c3", color: "#a16207", border: "#fde68a" },
-    badgeSigned: { bg: "#f0fdf4", color: "#16a34a", border: "#86efac" },
-    tabActiveBg: "#1e1a6b",
-    inputBorder: "#c4b5fd",
-    inputFocus: "#1e1a6b",
-    accentColor: "#1e1a6b",
-    outlineBorder: "#c4b5fd",
-    outlineHover: "#1e1a6b",
+  pageBg: "#f5f3ff",
+  gradient: "linear-gradient(135deg, #1e1a6b, #2d2870)",
+  btnShadow: "0 4px 12px rgba(30,26,107,0.20)",
+  btnShadowHover: "0 8px 20px rgba(30,26,107,0.32)",
+  cardBorder: "#c4b5fd",
+  cardHoverBg: "#f5f3ff",
+  iconColor: "#1e1a6b",
+  iconBg: "#f5f3ff",
+  badgePending: { bg: "#fef9c3", color: "#a16207", border: "#fde68a" },
+  badgeSigned: { bg: "#f0fdf4", color: "#16a34a", border: "#86efac" },
+  tabActiveBg: "#1e1a6b",
+  inputBorder: "#c4b5fd",
+  inputFocus: "#1e1a6b",
+  accentColor: "#1e1a6b",
+  outlineBorder: "#c4b5fd",
+  outlineHover: "#1e1a6b",
+  stageColors: {
+    pending: "#94a3b8",
+    active: "#1e1a6b",
+    complete: "#16a34a",
+    error: "#dc2626"
+  }
+};
+
+/* ================= STAGE ROADMAP COMPONENT ================= */
+const SigningStageRoadmap: React.FC<{
+  currentStage: SigningStage;
+  stageError?: string;
+}> = ({ currentStage, stageError }) => {
+  const stages = [
+    { id: "ecdsa", label: "Wallet Signature", icon: Key, description: "Sign with MetaMask" },
+    { id: "face", label: "Biometric Verify", icon: Fingerprint, description: "Face verification" },
+    { id: "complete", label: "Complete", icon: CheckCircle2, description: "Document signed" }
+  ];
+
+  const getStageStatus = (stageId: string) => {
+    const stageOrder = ["ecdsa", "face", "complete"];
+    const currentIndex = stageOrder.indexOf(currentStage === "idle" ? "ecdsa" : currentStage);
+    const stageIndex = stageOrder.indexOf(stageId);
+    
+    if (currentStage === "error") return "error";
+    if (stageIndex < currentIndex) return "complete";
+    if (stageIndex === currentIndex) return "active";
+    return "pending";
+  };
+
+  return (
+    <div style={{ 
+      background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+      borderRadius: "16px",
+      padding: "24px",
+      border: "1px solid #e2e8f0",
+      marginBottom: "20px"
+    }}>
+      <div style={{ 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "space-between",
+        position: "relative"
+      }}>
+        {/* Connecting Line */}
+        <div style={{
+          position: "absolute",
+          top: "24px",
+          left: "10%",
+          right: "10%",
+          height: "3px",
+          background: "#e2e8f0",
+          zIndex: 0
+        }} />
+        
+        {/* Active Progress Line */}
+        <div style={{
+          position: "absolute",
+          top: "24px",
+          left: "10%",
+          width: currentStage === "ecdsa" ? "0%" : currentStage === "face" ? "50%" : "80%",
+          height: "3px",
+          background: "linear-gradient(90deg, #1e1a6b, #16a34a)",
+          zIndex: 0,
+          transition: "width 0.5s ease"
+        }} />
+
+        {stages.map((stage, index) => {
+          const status = getStageStatus(stage.id);
+          const Icon = stage.icon;
+          
+          return (
+            <div key={stage.id} style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "8px",
+              zIndex: 1,
+              flex: 1
+            }}>
+              <div style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: status === "complete" ? "#16a34a" : 
+                           status === "active" ? "#1e1a6b" : 
+                           status === "error" ? "#dc2626" : "#fff",
+                border: `3px solid ${status === "complete" ? "#16a34a" : 
+                                      status === "active" ? "#1e1a6b" : 
+                                      status === "error" ? "#dc2626" : "#cbd5e1"}`,
+                boxShadow: status === "active" ? "0 0 0 4px rgba(30,26,107,0.1)" : "none",
+                transition: "all 0.3s ease"
+              }}>
+                {status === "complete" ? (
+                  <CheckCircle2 size={24} color="white" />
+                ) : status === "error" ? (
+                  <AlertCircle size={24} color="white" />
+                ) : (
+                  <Icon size={24} color={status === "active" ? "white" : "#94a3b8"} />
+                )}
+              </div>
+              
+              <div style={{ textAlign: "center" }}>
+                <p style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: status === "active" ? "#1e1a6b" : 
+                         status === "complete" ? "#16a34a" :
+                         status === "error" ? "#dc2626" : "#64748b",
+                  marginBottom: "2px"
+                }}>
+                  {stage.label}
+                </p>
+                <p style={{
+                  fontSize: "11px",
+                  color: "#94a3b8",
+                  maxWidth: "100px"
+                }}>
+                  {status === "active" && currentStage === "ecdsa" ? "Confirm in MetaMask..." :
+                   status === "active" && currentStage === "face" ? "Preparing..." :
+                   stage.description}
+                </p>
+              </div>
+
+              {status === "active" && currentStage !== "complete" && (
+                <div style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: "#1e1a6b",
+                  animation: "pulse 1.5s infinite",
+                  marginTop: "4px"
+                }} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {stageError && (
+        <div style={{
+          marginTop: "16px",
+          padding: "12px 16px",
+          background: "#fef2f2",
+          border: "1px solid #fecaca",
+          borderRadius: "8px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          color: "#dc2626",
+          fontSize: "13px"
+        }}>
+          <AlertCircle size={16} />
+          {stageError}
+        </div>
+      )}
+    </div>
+  );
 };
 
 /* ================= COMPONENT ================= */
-const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
+const VerificationList: React.FC<VerificationListProps> = ({ 
+  onSign, 
+  onNavigateToSigningView 
+}) => {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "pending" | "signed">("pending");
   const [filterType, setFilterType] = useState<"all" | "self" | "institution">("all");
@@ -86,91 +261,97 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
   // Preview Modal State
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const navigate = useNavigate();
+
+  // Signing Stage State - NEW
+  const [signingStage, setSigningStage] = useState<SigningStage>("idle");
+  const [stageError, setStageError] = useState<string>("");
+  const [signingCertId, setSigningCertId] = useState<string | null>(null);
+
+  // Import Modal State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importTarget, setImportTarget] = useState<{
+    portalPublicKey: string;
+    role: 'student' | 'institution';
+  } | null>(null);
+  const [pendingSignData, setPendingSignData] = useState<{
+    certificate: Certificate;
+    signerData?: Signer;
+  } | null>(null);
 
   /* ================= FETCH ISSUED CERTIFICATES ================= */
-  useEffect(() => {
+  const fetchCertificates = async () => {
     if (!user?.walletPublicKey) return;
-
-    const fetchCertificates = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/getIssuedCredentials`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+    
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/getIssuedCredentials`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             walletPublicKey: user.walletPublicKey,
             role: user.role
           }),
-          }
-        );
+        }
+      );
 
-        const data = await res.json();
-        if (!data.success) {
-          toast.error("Failed to fetch certificates");
-          return;
+      const data = await res.json();
+      if (!data.success) {
+        toast.error("Failed to fetch certificates");
+        return;
+      }
+
+      const mapped: Certificate[] = data.data.map((c: any) => {
+        const isSelfSign = c.signingType === "self";
+        
+        let issuerName = "Unknown";
+        if (c.studentName) {
+          issuerName = c.studentName;
+        } else if (c.studentPublicKey) {
+          issuerName = `${c.studentPublicKey.slice(0, 6)}...${c.studentPublicKey.slice(-4)}`;
         }
 
-        // Map backend data to frontend Certificate type
-        const mapped: Certificate[] = data.data.map((c: any) => {
-          // The issuer is the student who created this credential (studentPublicKey)
-          // For self-sign, it's the same person. For sequential/parallel, student initiates
-          const isSelfSign = c.signingType === "self";
-          
-          // Resolve issuer name - try to get from joined data or use shortened key
-          let issuerName = "Unknown";
-          if (c.studentName) {
-            issuerName = c.studentName;
-          } else if (c.studentPublicKey) {
-            issuerName = `${c.studentPublicKey.slice(0, 6)}...${c.studentPublicKey.slice(-4)}`;
-          }
+        const instKeys = c.institutionPublicKeys ? JSON.parse(c.institutionPublicKeys) : [];
 
-          // Parse institution keys
-          const instKeys = c.institutionPublicKeys ? JSON.parse(c.institutionPublicKeys) : [];
+        const mappedSigners: Signer[] = (c.signers || []).map((s: any) => ({
+          signerPublicKey: s.signerPublicKey,
+          signerOrder: s.signerOrder,
+          signed: s.signed === 1 || s.signed === true,
+          isStudent: s.isStudent === 1 || s.isStudent === true,
+          name: s.isStudent ? (c.studentName || "Student") : `Institution ${s.signerOrder || 1}`
+        }));
 
-          // Map Signers from credential_signers table
-          // For self-sign: only the student
-          // For sequential/parallel: student + institutions
-          const mappedSigners: Signer[] = (c.signers || []).map((s: any) => ({
-            signerPublicKey: s.signerPublicKey,
-            signerOrder: s.signerOrder,
-            signed: s.signed === 1 || s.signed === true,
-            isStudent: s.isStudent === 1 || s.isStudent === true,
-            name: s.isStudent ? (c.studentName || "Student") : `Institution ${s.signerOrder || 1}`
-          }));
+        mappedSigners.sort((a, b) => a.signerOrder - b.signerOrder);
 
-          // Sort signers by order for sequential display
-          mappedSigners.sort((a, b) => a.signerOrder - b.signerOrder);
+        return {
+          id: c.credentialId,
+          name: c.title || "Untitled Certificate",
+          issuer: issuerName,
+          issuerEmail: c.studentEmail || "",
+          walletAddress: c.studentPublicKey,
+          date: new Date(c.issuedAt).toLocaleDateString(),
+          status: c.status === "completed" ? "signed" : (c.status || "pending"),
+          type: c.signingType || "self",
+          signingType: c.signingType || "self",
+          description: c.purpose || "No description available for this credential.",
+          txHash: c.txHash || null,
+          signers: mappedSigners,
+          filePath: c.filePath,
+          institutionKeys: instKeys
+        };
+      });
 
-          return {
-            id: c.credentialId,
-            name: c.title || "Untitled Certificate",
-            issuer: issuerName, // Student who issued
-            issuerEmail: c.studentEmail || "",
-            walletAddress: c.studentPublicKey,
-            date: new Date(c.issuedAt).toLocaleDateString(),
-            status: c.status === "completed" ? "signed" : (c.status || "pending"),
-            type: c.signingType || "self",
-            signingType: c.signingType || "self",
-            description: c.purpose || "No description available for this credential.",
-            txHash: c.txHash || null,
-            signers: mappedSigners,
-            filePath: c.filePath,
-            institutionKeys: instKeys
-          };
-        });
+      setCertificates(mapped);
+    } catch (err) {
+      console.error("❌ Error fetching certificates:", err);
+      toast.error("Error fetching certificates");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        setCertificates(mapped);
-      } catch (err) {
-        console.error("❌ Error fetching certificates:", err);
-        toast.error("Error fetching certificates");
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchCertificates();
   }, [user]);
 
@@ -190,27 +371,305 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
   });
 
   /* ================= HANDLERS ================= */
-  const handleStartSigning = (certificate: Certificate) => {
+  const handleSignDocument = async (certificate: Certificate, signerData?: Signer) => {
+    console.log("========================================");
+    console.log("🔥 handleSignDocument STARTED");
+    console.log("========================================");
+    console.log("📋 Certificate ID:", certificate?.id);
+    console.log("👤 Signer Data:", signerData);
+    console.log("🔗 User Wallet:", user?.walletPublicKey);
+    
+    // Reset states
+    setStageError("");
+    setSigningStage("ecdsa");
+    setSigningCertId(certificate.id);
+    
+    try {
+      setProcessing(true);
+      console.log("⏳ Processing set to true");
+
+      if (!window.ethereum) {
+        console.error("❌ MetaMask not found");
+        toast.error("MetaMask not installed");
+        setSigningStage("error");
+        setStageError("MetaMask not found");
+        return;
+      }
+      console.log("✅ MetaMask found");
+      
+      await window.ethereum.request({
+        method: "wallet_requestPermissions",
+        params: [{ eth_accounts: {} }],
+      });
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
+        });
+
+      console.log("👤 Selected Account:", accounts[0]);
+      /* 🔐 Connect wallet */
+      console.log("🔐 Connecting to MetaMask...");
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      console.log("   Provider created");
+      
+      const signer = await provider.getSigner();
+      console.log("   Signer obtained");
+      
+      const walletAddress = await signer.getAddress();
+      console.log("   Wallet Address:", walletAddress);
+
+      /* 🧾 Create message */
+      const message = `WSIGN_PROTOCOL_V1\nCredential:${certificate.id}\nSigner:${walletAddress}`;
+      console.log("📝 Message to sign:", message);
+
+      /* ✍️ Sign with MetaMask */
+      console.log("⏳ Calling signer.signMessage() - MetaMask popup should appear...");
+      let signature: string;
+      try {
+        signature = await signer.signMessage(message);
+        console.log("✅ SIGNATURE SUCCESS:", signature.substring(0, 40) + "...");
+        console.log("   Full length:", signature.length, "chars");
+      } catch (signErr: any) {
+        console.error("❌ SIGNING FAILED:", signErr.message);
+        setSigningStage("error");
+        if (signErr.code === 4001) {
+          setStageError("User rejected signature in MetaMask");
+          toast.error("User rejected signature in MetaMask");
+        } else {
+          setStageError("MetaMask signing failed: " + signErr.message);
+          toast.error("MetaMask signing failed: " + signErr.message);
+        }
+        return;
+      }
+
+      /* 🚀 Prepare payload for STAGE 1: ECDSA */
+      const payload = {
+        credentialId: certificate.id,
+        signerPublicKey: walletAddress,
+        signature: signature,
+        message: message,
+        stage: "ecdsa", // STAGE 1
+        isSelfSign: signerData?.isStudent || false,
+      };
+      console.log("📦 PAYLOAD TO BACKEND (Stage 1 - ECDSA):", JSON.stringify(payload, null, 2));
+
+      /* 🚀 Send to backend - STAGE 1 */
+      const apiUrl = `${import.meta.env.VITE_API_URL}/credential/sign`;
+      console.log("🌐 API URL:", apiUrl);
+      
+      console.log("⏳ Sending Stage 1 to backend...");
+      const res = await axios.post(apiUrl, payload);
+      console.log("✅ BACKEND RESPONSE (Stage 1):", res.data);
+
+      if (res.data.success && res.data.stage === "ecdsa_complete") {
+        // STAGE 1 COMPLETE - Move to Face Verification
+        console.log("✅ Stage 1 Complete! Moving to Face Verification...");
+        setSigningStage("face");
+        
+        toast.success("Wallet verified! Redirecting to biometric verification...");
+        
+        // Close modal if open
+        setIsPreviewOpen(false);
+        
+        // Navigate to SigningView for Stage 2 (Face Verification)
+        setTimeout(() => {
+          if (onNavigateToSigningView) {
+            onNavigateToSigningView(certificate.id);
+          } else {
+            // Fallback: navigate directly
+            navigate(`/sign/${certificate.id}`, { 
+              state: { 
+                ecdsaToken: res.data.ecdsaToken,
+                stage: "face",
+                certificate: certificate 
+              } 
+            });
+          }
+        }, 1500);
+        
+      } else {
+        console.error("❌ Backend rejected Stage 1:", res.data.message);
+        setSigningStage("error");
+        setStageError(res.data.message || "Stage 1 verification failed");
+        toast.error("❌ Sign failed: " + res.data.message);
+      }
+    } catch (err: any) {
+      console.error("========================================");
+      console.error("❌ ERROR in handleSignDocument:");
+      console.error("   Error:", err);
+      console.error("   Response:", err.response);
+      console.error("   Status:", err.response?.status);
+      console.error("   Data:", err.response?.data);
+      console.error("========================================");
+      
+      setSigningStage("error");
+      
+      // Check if it's an axios error with response
+      if (err.response) {
+        const status = err.response.status;
+        const errorData = err.response.data;
+        
+        console.log(`📛 HTTP ${status} Error:`, errorData);
+        
+        // 403 - Unauthorized/Not Linked
+        if (status === 403) {
+          const { 
+            yourMetamask, 
+            linkedPortalKey, 
+            matchType, 
+            expectedSigners, 
+            hint,
+            needsLinking 
+          } = errorData;
+
+          // Show toast notification
+          toast.error(
+            <div>
+              <p>Your MetaMask ({yourMetamask?.slice(0, 6)}...) is not linked.</p>
+              <p style={{ fontSize: "12px", marginTop: "8px" }}>
+                Import your portal key to MetaMask to sign.
+              </p>
+            </div>,
+            { duration: 8000 }
+          );
+
+          // CRITICAL: Check if we have expectedSigners
+          if (expectedSigners && expectedSigners.length > 0) {
+            console.log("🎯 expectedSigners found:", expectedSigners);
+            
+            // Find the best slot to import
+            const userRoleLower = user?.role?.toLowerCase();
+            let targetSlot = expectedSigners.find((s: any) => 
+              !s.linkedMetamask && s.type?.toLowerCase() === userRoleLower
+            );
+            
+            // Fallback to any unlinked slot
+            if (!targetSlot) {
+              targetSlot = expectedSigners.find((s: any) => !s.linkedMetamask);
+            }
+            
+            // Fallback to first slot if all linked
+            if (!targetSlot) {
+              targetSlot = expectedSigners[0];
+            }
+
+            if (targetSlot) {
+              console.log("✅ Opening import modal for:", targetSlot);
+              
+              const role = targetSlot.type?.toLowerCase() === 'student' ? 'student' : 'institution';
+              
+              // Save pending data for retry
+              setPendingSignData({ certificate, signerData });
+              
+              // SET STATE TO SHOW MODAL
+              setImportTarget({
+                portalPublicKey: targetSlot.portalKey,
+                role: role
+              });
+              setShowImportModal(true);
+              
+              console.log("🔓 showImportModal set to TRUE");
+              return; // Exit early
+            }
+          } else {
+            console.error("❌ No expectedSigners in 403 response!");
+            setStageError("Configuration error: No signers found");
+            toast.error("Configuration error: No signers found for this credential");
+          }
+          
+          return;
+        }
+        
+        // 400 - Bad Request (validation, already signed, etc.)
+        if (status === 400) {
+          const { message, pendingOrder, signedAt } = errorData;
+          
+          if (pendingOrder) {
+            setStageError(`Wait for signer order ${pendingOrder} to complete first`);
+            toast.error(
+              <div>
+                <p>Sequential signing order violation</p>
+                <p style={{ fontSize: "12px", marginTop: "8px", color: "#64748b" }}>
+                  Wait for signer order {pendingOrder} to complete first.
+                </p>
+              </div>,
+              { duration: 8000 }
+            );
+          } else if (signedAt) {
+            setStageError("You have already signed this credential");
+            toast.error("You have already signed this credential");
+          } else {
+            setStageError(message || "Invalid request");
+            toast.error(message || "Invalid request");
+          }
+          return;
+        }
+      }
+      
+      // Generic error
+      setStageError(err.message || "Error signing document");
+      toast.error(err.message || "Error signing document");
+      
+    } finally {
+      if (signingStage !== "face") {
+        setProcessing(false);
+      }
+      console.log("🏁 handleSignDocument FINISHED");
+      console.log("========================================");
+    }
+  };
+
+  const handleStartSigning = async (certificate: Certificate) => {
+    console.log("========================================");
+    console.log("🚀 handleStartSigning CALLED");
+    console.log("   Certificate:", certificate.id);
+    console.log("   User biometricSetup:", user?.biometricSetup);
+    console.log("   Certificate status:", certificate.status);
+    console.log("========================================");
+
     if (!user?.biometricSetup) {
+      console.log("❌ Biometric not setup");
       toast.error("Please complete biometric setup first");
       return;
     }
     if (certificate.status !== "pending") {
+      console.log("❌ Certificate not pending");
       toast.info("Certificate already signed");
       return;
     }
-    onSign(certificate, certificate.signingType);
-    setIsPreviewOpen(false);
+
+    // Find current user's signer data
+    const currentSigner = certificate.signers.find(s => {
+      const match = s.signerPublicKey.toLowerCase() === user?.walletPublicKey?.toLowerCase();
+      console.log("   Checking signer:", s.signerPublicKey, "Match:", match);
+      return match;
+    });
+    
+    console.log("👤 Current Signer found:", currentSigner);
+
+    // Call sign with ECDSA (Stage 1)
+    console.log("⏳ Calling handleSignDocument...");
+    await handleSignDocument(certificate, currentSigner);
+    console.log("✅ handleSignDocument completed");
   };
 
   const openPreview = (cert: Certificate) => {
     setSelectedCert(cert);
     setIsPreviewOpen(true);
+    // Reset signing stage when opening preview
+    setSigningStage("idle");
+    setStageError("");
+    setSigningCertId(null);
   };
 
   const closePreview = () => {
     setIsPreviewOpen(false);
-    setTimeout(() => setSelectedCert(null), 300);
+    setTimeout(() => {
+      setSelectedCert(null);
+      setSigningStage("idle");
+      setStageError("");
+      setSigningCertId(null);
+      setProcessing(false);
+    }, 300);
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -218,62 +677,10 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
     toast.success(`${label} copied to clipboard`);
   };
 
-  const handleSignDocument = async (box) => {
-    try {
-      setProcessing(true);
-
-      if (!window.ethereum) {
-        alert("MetaMask not installed");
-        return;
-      }
-
-      /* 🔐 Connect wallet */
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-
-      const walletAddress = await signer.getAddress();
-
-      /* 🧾 Create message */
-      const message = `WSIGN_PROTOCOL_V1
-  Credential:${credentialId}
-  Signer:${walletAddress}`;
-
-      /* ✍️ Sign */
-      const signature = await signer.signMessage(message);
-
-      console.log("Signature:", signature);
-
-      /* 🚀 Send to backend */
-      const endpoint = box.isStudent
-        ? `${import.meta.env.VITE_API_URL}/credential/selfSign`
-        : `${import.meta.env.VITE_API_URL}/credential/sign`;
-
-      const res = await axios.post(endpoint, {
-        credentialId,
-        signerPublicKey: walletAddress,
-        signature,
-        message,
-        isSelfSign: box.isStudent || false,
-      });
-
-      if (res.data.success) {
-        toast.success("Signed successfully");
-      } else {
-        toast.error("Sign failed");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error signing");
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   // Check if current user can sign this credential
   const canUserSign = (cert: Certificate): boolean => {
     if (cert.status !== "pending") return false;
     
-    // Find if current user is in the signers list and hasn't signed yet
     const userSigner = cert.signers.find(s => 
       s.signerPublicKey.toLowerCase() === user?.walletPublicKey?.toLowerCase()
     );
@@ -281,7 +688,6 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
     if (!userSigner) return false;
     if (userSigner.signed) return false;
     
-    // For sequential, check if it's their turn (all previous must be signed)
     if (cert.signingType === "sequential") {
       const previousSigners = cert.signers.filter(s => s.signerOrder < userSigner.signerOrder);
       const allPreviousSigned = previousSigners.every(s => s.signed);
@@ -290,6 +696,9 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
     
     return true;
   };
+
+  // Check if currently signing
+  const isCurrentlySigning = signingStage !== "idle" && signingStage !== "error" && signingCertId === selectedCert?.id;
 
   return (
     <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0", position: "relative" }}>
@@ -392,6 +801,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                   const isHovered = hoveredCert === cert.id;
                   const badge = cert.status === "pending" ? t.badgePending : t.badgeSigned;
                   const userCanSign = canUserSign(cert);
+                  const isSigningThisCert = signingCertId === cert.id && signingStage !== "idle";
                   
                   return (
                     <div
@@ -405,12 +815,24 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                         background: isHovered ? "#f8fafc" : "transparent",
                         border: `1px solid ${isHovered ? "#e2e8f0" : "transparent"}`,
                         transition: "all 0.2s",
-                        cursor: "pointer"
+                        cursor: "pointer",
+                        opacity: isSigningThisCert ? 0.7 : 1
                       }}
                     >
                       <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-                        <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <FileText size={20} color={t.accentColor} />
+                        <div style={{ 
+                          width: "44px", 
+                          height: "44px", 
+                          borderRadius: "12px", 
+                          background: isSigningThisCert ? "#dbeafe" : "#f1f5f9", 
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          position: "relative"
+                        }}>
+                          {isSigningThisCert ? (
+                            <Loader2 size={20} color="#2563eb" style={{ animation: "spin 1s linear infinite" }} />
+                          ) : (
+                            <FileText size={20} color={t.accentColor} />
+                          )}
                         </div>
                         <div>
                           <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>{cert.name}</h3>
@@ -435,24 +857,49 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                           textTransform: "capitalize",
                         }}>{cert.status}</span>
 
-                        {userCanSign ? (
+                        {isSigningThisCert ? (
+                          <div style={{
+                            padding: "9px 20px",
+                            borderRadius: "10px",
+                            background: "#dbeafe",
+                            color: "#2563eb",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}>
+                            <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                            {signingStage === "ecdsa" ? "Signing..." : "Redirecting..."}
+                          </div>
+                        ) : userCanSign ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              console.log("🖱️ Sign Now clicked for:", cert.id);
                               handleStartSigning(cert);
                             }}
+                            disabled={processing}
                             style={{
                               padding: "9px 20px", borderRadius: "10px", border: "none",
                               background: t.gradient,
                               color: "white",
-                              fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                              fontSize: "13px", fontWeight: 600, cursor: processing ? "not-allowed" : "pointer",
                               transition: "all 0.2s",
                               display: "flex",
                               alignItems: "center",
-                              gap: "6px"
+                              gap: "6px",
+                              opacity: processing ? 0.7 : 1
                             }}
                           >
-                            Sign Now
+                            {processing ? (
+                              <>
+                                <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                                Signing...
+                              </>
+                            ) : (
+                              "Sign Now"
+                            )}
                           </button>
                         ) : (
                           <button
@@ -558,7 +1005,16 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                 flexDirection: "column",
                 gap: "24px"
               }}>
-                {/* Document Info Card - REMOVED "Issued By" */}
+                
+                {/* SIGNING STAGE ROADMAP - SHOW WHEN SIGNING IS ACTIVE */}
+                {isCurrentlySigning && (
+                  <SigningStageRoadmap 
+                    currentStage={signingStage} 
+                    stageError={stageError}
+                  />
+                )}
+
+                {/* Document Info Card */}
                 <div style={{
                   background: "#f8fafc",
                   borderRadius: "16px",
@@ -573,7 +1029,6 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                   </p>
                   
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                    {/* REMOVED Issued By Field */}
                     <div>
                       <p style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "4px" }}>Issue Date</p>
                       <p style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>{selectedCert.date}</p>
@@ -607,7 +1062,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                   </div>
                 </div>
 
-                {/* Signer Status Section - ENHANCED */}
+                {/* Signer Status Section */}
                 {selectedCert.signers && selectedCert.signers.length > 0 && (
                   <div style={{
                     background: "white",
@@ -639,7 +1094,6 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                             border: `2px solid ${signer.signed ? "#86efac" : (isCurrentUser ? "#bfdbfe" : "#e2e8f0")}`,
                             position: "relative"
                           }}>
-                            {/* Order Badge for Sequential */}
                             {showOrder && (
                               <div style={{
                                 position: "absolute",
@@ -770,7 +1224,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                       fontFamily: "monospace",
                       wordBreak: "break-all"
                     }}>
-                      <span style={{ fontWeight: 600 }}>Tx Hash: </span>
+                      <span style={{ fontWeight: "600" }}>Tx Hash: </span>
                       {selectedCert.txHash}
                     </div>
                   )}
@@ -846,24 +1300,40 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
                 {canUserSign(selectedCert) ? (
                   <button
                     onClick={() => handleStartSigning(selectedCert)}
+                    disabled={processing || isCurrentlySigning}
                     style={{
                       padding: "10px 24px",
                       borderRadius: "10px",
                       border: "none",
-                      background: t.gradient,
+                      background: isCurrentlySigning ? "#cbd5e1" : t.gradient,
                       color: "white",
                       fontSize: "14px",
                       fontWeight: 600,
-                      cursor: "pointer",
+                      cursor: (processing || isCurrentlySigning) ? "not-allowed" : "pointer",
                       boxShadow: t.btnShadow,
                       transition: "all 0.2s",
                       display: "flex",
                       alignItems: "center",
-                      gap: "8px"
+                      gap: "8px",
+                      opacity: (processing || isCurrentlySigning) ? 0.7 : 1
                     }}
                   >
-                    <CheckCircle2 size={18} />
-                    Sign Document
+                    {isCurrentlySigning ? (
+                      <>
+                        <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+                        {signingStage === "ecdsa" ? "Confirm in MetaMask..." : "Processing..."}
+                      </>
+                    ) : processing ? (
+                      <>
+                        <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+                        Signing...
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={18} />
+                        Sign Document
+                      </>
+                    )}
                   </button>
                 ) : (
                   <button
@@ -900,12 +1370,49 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign }) => {
           </div>
         )}
 
+        {/* ================= IMPORT TO METAMASK MODAL ================= */}
+        {showImportModal && importTarget && (
+          <ImportToMetamask
+            portalPublicKey={importTarget.portalPublicKey}
+            role={importTarget.role}
+            onImported={() => {
+              console.log("✅ Key imported, closing modal and retrying sign");
+              setShowImportModal(false);
+              setImportTarget(null);
+              
+              // Retry signing with pending data
+              if (pendingSignData) {
+                toast.success("Account imported! Retrying sign...");
+                setTimeout(() => {
+                  handleSignDocument(
+                    pendingSignData.certificate, 
+                    pendingSignData.signerData
+                  );
+                  setPendingSignData(null);
+                }, 2000); // Give user time to switch accounts
+              }
+            }}
+            onClose={() => {
+              console.log("❌ Import modal closed");
+              setShowImportModal(false);
+              setImportTarget(null);
+              setPendingSignData(null);
+              setSigningStage("idle");
+              setProcessing(false);
+            }}
+          />
+        )}
+
         <style>{`
             @keyframes spin { to { transform: rotate(360deg); } }
             @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
             @keyframes slideUp { 
               from { transform: translateY(20px); opacity: 0; } 
               to { transform: translateY(0); opacity: 1; } 
+            }
+            @keyframes pulse {
+              0%, 100% { opacity: 1; transform: scale(1); }
+              50% { opacity: 0.5; transform: scale(1.2); }
             }
         `}</style>
     </div>
