@@ -66,7 +66,7 @@ const StudentDashboard: React.FC<DashboardProps> = ({ onStartSigning, onShowCred
                     >
                         Start Signing
                     </button>
-                    <button 
+                    <button
                         onClick={onShowCredentials}
                         style={{ 
                             padding: '12px 32px', 

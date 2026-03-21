@@ -12,10 +12,19 @@ import {
   Copy,
   ExternalLink,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  Fingerprint,
+  Key,
+  ChevronRight,
+  Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../contexts/AuthContext";
+import { ethers } from "ethers";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import ImportToMetamask from "./ImportToMetamask";
 
 /* ================= TYPES ================= */
 export interface Signer {
@@ -23,15 +32,15 @@ export interface Signer {
   signerOrder: number;
   signed: boolean;
   isStudent: boolean;
-  name?: string; // Optional: if we can resolve name from backend
+  name?: string;
 }
 
 export interface Certificate {
   id: string;
   name: string;
-  issuer: string; // Student who issued (resolved from studentPublicKey)
+  issuer: string;
   issuerEmail: string;
-  walletAddress: string; // studentPublicKey
+  walletAddress: string;
   date: string;
   status: "pending" | "signed" | "completed";
   type: string;
@@ -40,12 +49,12 @@ export interface Certificate {
   txHash?: string;
   signers: Signer[];
   filePath?: string;
-  institutionKeys: string[]; // Raw institution public keys
+  institutionKeys: string[];
 }
 
 type SigningType = "self" | "sequential" | "parallel";
+type SigningStage = "idle" | "ecdsa" | "face" | "complete" | "error";
 
-/* ================= PROPS ================= */
 interface VerificationListProps {
   onSign: (certificate: Certificate, signingType: SigningType) => void;
   onStartSigning?: () => void;
@@ -77,6 +86,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
 
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "pending" | "signed">("all");
   const [filterType, setFilterType] = useState<"all" | "self" | "institution">("all");
@@ -86,29 +96,54 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
+  // Signing Stage State - NEW
+  const [signingStage, setSigningStage] = useState<SigningStage>("idle");
+  const [stageError, setStageError] = useState<string>("");
+  const [signingCertId, setSigningCertId] = useState<string | null>(null);
+
+  // Import Modal State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importTarget, setImportTarget] = useState<{
+    portalPublicKey: string;
+    role: 'student' | 'institution';
+  } | null>(null);
+  const [pendingSignData, setPendingSignData] = useState<{
+    certificate: Certificate;
+    signerData?: Signer;
+  } | null>(null);
+
   /* ================= FETCH ISSUED CERTIFICATES ================= */
-  useEffect(() => {
+  const fetchCertificates = async () => {
     if (!user?.walletPublicKey) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/getIssuedCredentials`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            walletPublicKey: user.walletPublicKey,
+            role: user.role
+          }),
+        }
+      );
 
-    const fetchCertificates = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/getIssuedCredentials`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              walletPublicKey: user.walletPublicKey,
-              role: user.role
-            }),
-          }
-        );
+      const data = await res.json();
+      if (!data.success) {
+        toast.error("Failed to fetch certificates");
+        return;
+      }
 
-        const data = await res.json();
-        if (!data.success) {
-          toast.error("Failed to fetch certificates");
-          return;
+      const mapped: Certificate[] = data.data.map((c: any) => {
+        const isSelfSign = c.signingType === "self";
+        
+        let issuerName = "Unknown";
+        if (c.studentName) {
+          issuerName = c.studentName;
+        } else if (c.studentPublicKey) {
+          issuerName = `${c.studentPublicKey.slice(0, 6)}...${c.studentPublicKey.slice(-4)}`;
         }
 
         // Map backend data to frontend Certificate type
@@ -125,50 +160,44 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
             issuerName = `${c.studentPublicKey.slice(0, 6)}...${c.studentPublicKey.slice(-4)}`;
           }
 
-          // Parse institution keys
-          const instKeys = c.institutionPublicKeys ? JSON.parse(c.institutionPublicKeys) : [];
+        const mappedSigners: Signer[] = (c.signers || []).map((s: any) => ({
+          signerPublicKey: s.signerPublicKey,
+          signerOrder: s.signerOrder,
+          signed: s.signed === 1 || s.signed === true,
+          isStudent: s.isStudent === 1 || s.isStudent === true,
+          name: s.isStudent ? (c.studentName || "Student") : `Institution ${s.signerOrder || 1}`
+        }));
 
-          // Map Signers from credential_signers table
-          // For self-sign: only the student
-          // For sequential/parallel: student + institutions
-          const mappedSigners: Signer[] = (c.signers || []).map((s: any) => ({
-            signerPublicKey: s.signerPublicKey,
-            signerOrder: s.signerOrder,
-            signed: s.signed === 1 || s.signed === true,
-            isStudent: s.isStudent === 1 || s.isStudent === true,
-            name: s.isStudent ? (c.studentName || "Student") : `Institution ${s.signerOrder || 1}`
-          }));
+        mappedSigners.sort((a, b) => a.signerOrder - b.signerOrder);
 
-          // Sort signers by order for sequential display
-          mappedSigners.sort((a, b) => a.signerOrder - b.signerOrder);
+        return {
+          id: c.credentialId,
+          name: c.title || "Untitled Certificate",
+          issuer: issuerName,
+          issuerEmail: c.studentEmail || "",
+          walletAddress: c.studentPublicKey,
+          date: new Date(c.issuedAt).toLocaleDateString(),
+          status: c.status === "completed" ? "signed" : (c.status || "pending"),
+          type: c.signingType || "self",
+          signingType: c.signingType || "self",
+          description: c.purpose || "No description available for this credential.",
+          txHash: c.txHash || null,
+          signers: mappedSigners,
+          filePath: c.filePath,
+          institutionKeys: instKeys
+        };
+      });
 
-          return {
-            id: c.credentialId,
-            name: c.title || "Untitled Certificate",
-            issuer: issuerName, // Student who issued
-            issuerEmail: c.studentEmail || "",
-            walletAddress: c.studentPublicKey,
-            date: new Date(c.issuedAt).toLocaleDateString(),
-            status: c.status === "completed" ? "signed" : (c.status || "pending"),
-            type: c.signingType || "self",
-            signingType: c.signingType || "self",
-            description: c.purpose || "No description available for this credential.",
-            txHash: c.txHash || null,
-            signers: mappedSigners,
-            filePath: c.filePath,
-            institutionKeys: instKeys
-          };
-        });
+      setCertificates(mapped);
+    } catch (err) {
+      console.error("❌ Error fetching certificates:", err);
+      toast.error("Error fetching certificates");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        setCertificates(mapped);
-      } catch (err) {
-        console.error("❌ Error fetching certificates:", err);
-        toast.error("Error fetching certificates");
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchCertificates();
   }, [user]);
 
@@ -188,27 +217,305 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
   });
 
   /* ================= HANDLERS ================= */
-  const handleStartSigning = (certificate: Certificate) => {
+  const handleSignDocument = async (certificate: Certificate, signerData?: Signer) => {
+    console.log("========================================");
+    console.log("🔥 handleSignDocument STARTED");
+    console.log("========================================");
+    console.log("📋 Certificate ID:", certificate?.id);
+    console.log("👤 Signer Data:", signerData);
+    console.log("🔗 User Wallet:", user?.walletPublicKey);
+    
+    // Reset states
+    setStageError("");
+    setSigningStage("ecdsa");
+    setSigningCertId(certificate.id);
+    
+    try {
+      setProcessing(true);
+      console.log("⏳ Processing set to true");
+
+      if (!window.ethereum) {
+        console.error("❌ MetaMask not found");
+        toast.error("MetaMask not installed");
+        setSigningStage("error");
+        setStageError("MetaMask not found");
+        return;
+      }
+      console.log("✅ MetaMask found");
+      
+      await window.ethereum.request({
+        method: "wallet_requestPermissions",
+        params: [{ eth_accounts: {} }],
+      });
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
+        });
+
+      console.log("👤 Selected Account:", accounts[0]);
+      /* 🔐 Connect wallet */
+      console.log("🔐 Connecting to MetaMask...");
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      console.log("   Provider created");
+      
+      const signer = await provider.getSigner();
+      console.log("   Signer obtained");
+      
+      const walletAddress = await signer.getAddress();
+      console.log("   Wallet Address:", walletAddress);
+
+      /* 🧾 Create message */
+      const message = `WSIGN_PROTOCOL_V1\nCredential:${certificate.id}\nSigner:${walletAddress}`;
+      console.log("📝 Message to sign:", message);
+
+      /* ✍️ Sign with MetaMask */
+      console.log("⏳ Calling signer.signMessage() - MetaMask popup should appear...");
+      let signature: string;
+      try {
+        signature = await signer.signMessage(message);
+        console.log("✅ SIGNATURE SUCCESS:", signature.substring(0, 40) + "...");
+        console.log("   Full length:", signature.length, "chars");
+      } catch (signErr: any) {
+        console.error("❌ SIGNING FAILED:", signErr.message);
+        setSigningStage("error");
+        if (signErr.code === 4001) {
+          setStageError("User rejected signature in MetaMask");
+          toast.error("User rejected signature in MetaMask");
+        } else {
+          setStageError("MetaMask signing failed: " + signErr.message);
+          toast.error("MetaMask signing failed: " + signErr.message);
+        }
+        return;
+      }
+
+      /* 🚀 Prepare payload for STAGE 1: ECDSA */
+      const payload = {
+        credentialId: certificate.id,
+        signerPublicKey: walletAddress,
+        signature: signature,
+        message: message,
+        stage: "ecdsa", // STAGE 1
+        isSelfSign: signerData?.isStudent || false,
+      };
+      console.log("📦 PAYLOAD TO BACKEND (Stage 1 - ECDSA):", JSON.stringify(payload, null, 2));
+
+      /* 🚀 Send to backend - STAGE 1 */
+      const apiUrl = `${import.meta.env.VITE_API_URL}/credential/sign`;
+      console.log("🌐 API URL:", apiUrl);
+      
+      console.log("⏳ Sending Stage 1 to backend...");
+      const res = await axios.post(apiUrl, payload);
+      console.log("✅ BACKEND RESPONSE (Stage 1):", res.data);
+
+      if (res.data.success && res.data.stage === "ecdsa_complete") {
+        // STAGE 1 COMPLETE - Move to Face Verification
+        console.log("✅ Stage 1 Complete! Moving to Face Verification...");
+        setSigningStage("face");
+        
+        toast.success("Wallet verified! Redirecting to biometric verification...");
+        
+        // Close modal if open
+        setIsPreviewOpen(false);
+        
+        // Navigate to SigningView for Stage 2 (Face Verification)
+        setTimeout(() => {
+          if (onNavigateToSigningView) {
+            onNavigateToSigningView(certificate.id);
+          } else {
+            // Fallback: navigate directly
+            navigate(`/sign/${certificate.id}`, { 
+              state: { 
+                ecdsaToken: res.data.ecdsaToken,
+                stage: "face",
+                certificate: certificate 
+              } 
+            });
+          }
+        }, 1500);
+        
+      } else {
+        console.error("❌ Backend rejected Stage 1:", res.data.message);
+        setSigningStage("error");
+        setStageError(res.data.message || "Stage 1 verification failed");
+        toast.error("❌ Sign failed: " + res.data.message);
+      }
+    } catch (err: any) {
+      console.error("========================================");
+      console.error("❌ ERROR in handleSignDocument:");
+      console.error("   Error:", err);
+      console.error("   Response:", err.response);
+      console.error("   Status:", err.response?.status);
+      console.error("   Data:", err.response?.data);
+      console.error("========================================");
+      
+      setSigningStage("error");
+      
+      // Check if it's an axios error with response
+      if (err.response) {
+        const status = err.response.status;
+        const errorData = err.response.data;
+        
+        console.log(`📛 HTTP ${status} Error:`, errorData);
+        
+        // 403 - Unauthorized/Not Linked
+        if (status === 403) {
+          const { 
+            yourMetamask, 
+            linkedPortalKey, 
+            matchType, 
+            expectedSigners, 
+            hint,
+            needsLinking 
+          } = errorData;
+
+          // Show toast notification
+          toast.error(
+            <div>
+              <p>Your MetaMask ({yourMetamask?.slice(0, 6)}...) is not linked.</p>
+              <p style={{ fontSize: "12px", marginTop: "8px" }}>
+                Import your portal key to MetaMask to sign.
+              </p>
+            </div>,
+            { duration: 8000 }
+          );
+
+          // CRITICAL: Check if we have expectedSigners
+          if (expectedSigners && expectedSigners.length > 0) {
+            console.log("🎯 expectedSigners found:", expectedSigners);
+            
+            // Find the best slot to import
+            const userRoleLower = user?.role?.toLowerCase();
+            let targetSlot = expectedSigners.find((s: any) => 
+              !s.linkedMetamask && s.type?.toLowerCase() === userRoleLower
+            );
+            
+            // Fallback to any unlinked slot
+            if (!targetSlot) {
+              targetSlot = expectedSigners.find((s: any) => !s.linkedMetamask);
+            }
+            
+            // Fallback to first slot if all linked
+            if (!targetSlot) {
+              targetSlot = expectedSigners[0];
+            }
+
+            if (targetSlot) {
+              console.log("✅ Opening import modal for:", targetSlot);
+              
+              const role = targetSlot.type?.toLowerCase() === 'student' ? 'student' : 'institution';
+              
+              // Save pending data for retry
+              setPendingSignData({ certificate, signerData });
+              
+              // SET STATE TO SHOW MODAL
+              setImportTarget({
+                portalPublicKey: targetSlot.portalKey,
+                role: role
+              });
+              setShowImportModal(true);
+              
+              console.log("🔓 showImportModal set to TRUE");
+              return; // Exit early
+            }
+          } else {
+            console.error("❌ No expectedSigners in 403 response!");
+            setStageError("Configuration error: No signers found");
+            toast.error("Configuration error: No signers found for this credential");
+          }
+          
+          return;
+        }
+        
+        // 400 - Bad Request (validation, already signed, etc.)
+        if (status === 400) {
+          const { message, pendingOrder, signedAt } = errorData;
+          
+          if (pendingOrder) {
+            setStageError(`Wait for signer order ${pendingOrder} to complete first`);
+            toast.error(
+              <div>
+                <p>Sequential signing order violation</p>
+                <p style={{ fontSize: "12px", marginTop: "8px", color: "#64748b" }}>
+                  Wait for signer order {pendingOrder} to complete first.
+                </p>
+              </div>,
+              { duration: 8000 }
+            );
+          } else if (signedAt) {
+            setStageError("You have already signed this credential");
+            toast.error("You have already signed this credential");
+          } else {
+            setStageError(message || "Invalid request");
+            toast.error(message || "Invalid request");
+          }
+          return;
+        }
+      }
+      
+      // Generic error
+      setStageError(err.message || "Error signing document");
+      toast.error(err.message || "Error signing document");
+      
+    } finally {
+      if (signingStage !== "face") {
+        setProcessing(false);
+      }
+      console.log("🏁 handleSignDocument FINISHED");
+      console.log("========================================");
+    }
+  };
+
+  const handleStartSigning = async (certificate: Certificate) => {
+    console.log("========================================");
+    console.log("🚀 handleStartSigning CALLED");
+    console.log("   Certificate:", certificate.id);
+    console.log("   User biometricSetup:", user?.biometricSetup);
+    console.log("   Certificate status:", certificate.status);
+    console.log("========================================");
+
     if (!user?.biometricSetup) {
+      console.log("❌ Biometric not setup");
       toast.error("Please complete biometric setup first");
       return;
     }
     if (certificate.status !== "pending") {
+      console.log("❌ Certificate not pending");
       toast.info("Certificate already signed");
       return;
     }
-    onSign(certificate, certificate.signingType);
-    setIsPreviewOpen(false);
+
+    // Find current user's signer data
+    const currentSigner = certificate.signers.find(s => {
+      const match = s.signerPublicKey.toLowerCase() === user?.walletPublicKey?.toLowerCase();
+      console.log("   Checking signer:", s.signerPublicKey, "Match:", match);
+      return match;
+    });
+    
+    console.log("👤 Current Signer found:", currentSigner);
+
+    // Call sign with ECDSA (Stage 1)
+    console.log("⏳ Calling handleSignDocument...");
+    await handleSignDocument(certificate, currentSigner);
+    console.log("✅ handleSignDocument completed");
   };
 
   const openPreview = (cert: Certificate) => {
     setSelectedCert(cert);
     setIsPreviewOpen(true);
+    // Reset signing stage when opening preview
+    setSigningStage("idle");
+    setStageError("");
+    setSigningCertId(null);
   };
 
   const closePreview = () => {
     setIsPreviewOpen(false);
-    setTimeout(() => setSelectedCert(null), 300);
+    setTimeout(() => {
+      setSelectedCert(null);
+      setSigningStage("idle");
+      setStageError("");
+      setSigningCertId(null);
+      setProcessing(false);
+    }, 300);
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -237,6 +544,9 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
 
     return true;
   };
+
+  // Check if currently signing
+  const isCurrentlySigning = signingStage !== "idle" && signingStage !== "error" && signingCertId === selectedCert?.id;
 
   return (
     <div style={{ maxWidth: "1100px", margin: "0 auto", position: "relative" }}>
@@ -833,6 +1143,10 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
             @keyframes slideUp { 
               from { transform: translateY(20px); opacity: 0; } 
               to { transform: translateY(0); opacity: 1; } 
+            }
+            @keyframes pulse {
+              0%, 100% { opacity: 1; transform: scale(1); }
+              50% { opacity: 0.5; transform: scale(1.2); }
             }
         `}</style>
     </div>
