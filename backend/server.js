@@ -651,7 +651,7 @@ app.post("/credential/sign", async (req, res) => {
         [signature || null, credentialId, signer.signerPublicKey]
       );
       console.log("✅ DB Updated with signature");
-    } catch (dbErr: any) {
+    } catch (dbErr) {
       // Fallback if signature column doesn't exist
       if (dbErr.code === 'ER_BAD_FIELD_ERROR') {
         console.log("⚠️ Signature column missing, updating without signature");
@@ -703,7 +703,7 @@ app.post("/credential/sign", async (req, res) => {
       completedSigners: allSigners.filter((s: any) => s.signed === 1).length
     });
 
-  } catch (err: any) {
+  } catch (err) {
     console.error("❌ SIGN ERROR:", err);
     res.status(500).json({
       success: false,
