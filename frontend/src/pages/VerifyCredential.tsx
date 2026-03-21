@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { ethers } from "ethers";
 import { 
   CheckCircle2, 
   XCircle, 
@@ -9,7 +10,13 @@ import {
   ExternalLink,
   ShieldCheck,
   FileText,
-  Users
+  Users,
+  Key,
+  Copy,
+  Check,
+  Eye,
+  Lock,
+  RefreshCw
 } from "lucide-react";
 
 const VerifyCredential = () => {
@@ -18,6 +25,10 @@ const VerifyCredential = () => {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [anchoring, setAnchoring] = useState(false);
+  const [selectedSigner, setSelectedSigner] = useState<any>(null);
+  const [verificationResult, setVerificationResult] = useState<any>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     if (credentialId) {
@@ -51,13 +62,63 @@ const VerifyCredential = () => {
       
       if (res.data.success) {
         alert("✅ Anchored to blockchain! Tx: " + res.data.txHash);
-        verifyCredential(credentialId); // Refresh
+        verifyCredential(credentialId);
       }
-    } catch (err) {
+    } catch (err: any) {
       alert("❌ Anchor failed: " + err.message);
     } finally {
       setAnchoring(false);
     }
+  };
+
+  // Perform ECDSA verification
+  const verifySignature = async (signer: any) => {
+    setSelectedSigner(signer);
+    setVerifying(true);
+    setVerificationResult(null);
+
+    try {
+      // Construct the message exactly as it was signed
+      const message = `WSIGN_PROTOCOL_V1\nCredential:${credentialId}\nSigner:${signer.signerPublicKey}`;
+      
+      // Get signature from signer data (now returned from backend)
+      const signature = signer.ecdsaSignature;
+      
+      if (!signature) {
+        throw new Error("Signature not available in verification data");
+      }
+
+      // Perform ECDSA recovery
+      const recoveredAddress = ethers.verifyMessage(message, signature);
+      
+      // Check if recovered address matches claimed signer
+      const isValid = recoveredAddress.toLowerCase() === signer.signerPublicKey.toLowerCase();
+
+      setVerificationResult({
+        valid: isValid,
+        recovered: recoveredAddress,
+        claimed: signer.signerPublicKey,
+        message: message,
+        signature: signature,
+        messageHash: ethers.hashMessage(message),
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (err: any) {
+      setVerificationResult({
+        valid: false,
+        error: err.message,
+        claimed: signer.signerPublicKey
+      });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   /* ================= UI ================= */
@@ -128,7 +189,6 @@ const VerifyCredential = () => {
     );
   }
 
-  // Status configurations
   const statusConfig = {
     VERIFIED: {
       color: "#16a34a",
@@ -184,7 +244,7 @@ const VerifyCredential = () => {
       padding: "40px 20px"
     }}>
       <div style={{ 
-        maxWidth: "800px", 
+        maxWidth: "900px", 
         margin: "0 auto",
         background: "white",
         borderRadius: "24px",
@@ -275,7 +335,7 @@ const VerifyCredential = () => {
             </div>
           </div>
 
-          {/* Signers */}
+          {/* Signers with Individual Verification */}
           <div style={{ marginBottom: "24px" }}>
             <h3 style={{ 
               margin: "0 0 16px 0", 
@@ -288,46 +348,271 @@ const VerifyCredential = () => {
               <Users size={18} color="#1e1a6b" />
               Signers ({result.signers.filter((s: any) => s.signed).length}/{result.signers.length})
             </h3>
-            
+
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {result.signers.map((signer: any, index: number) => (
                 <div key={index} style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
                   padding: "16px",
                   background: signer.signed ? "#f0fdf4" : "#f8fafc",
                   borderRadius: "12px",
                   border: `2px solid ${signer.signed ? "#86efac" : "#e2e8f0"}`
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <div style={{
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "50%",
-                      background: signer.signed ? "#16a34a" : "#94a3b8",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: "14px",
-                      fontWeight: 700
-                    }}>
-                      {index + 1}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <div style={{
+                        width: "36px",
+                        height: "36px",
+                        borderRadius: "50%",
+                        background: signer.signed ? "#16a34a" : "#94a3b8",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        fontSize: "14px",
+                        fontWeight: 700
+                      }}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 600, color: "#0f172a", fontSize: "14px" }}>
+                          {signer.isStudent ? "Student" : `Institution ${index}`}
+                          {signer.signed && (
+                            <span style={{ 
+                              marginLeft: "8px", 
+                              fontSize: "11px", 
+                              color: "#16a34a",
+                              background: "#dcfce7",
+                              padding: "2px 8px",
+                              borderRadius: "99px"
+                            }}>
+                              ECDSA + Face Verified
+                            </span>
+                          )}
+                        </p>
+                        <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#64748b", fontFamily: "monospace" }}>
+                          {signer.signerPublicKey?.slice(0, 12)}...{signer.signerPublicKey?.slice(-6)}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 600, color: "#0f172a", fontSize: "14px" }}>
-                        {signer.isStudent ? "Student" : `Institution ${index}`}
-                      </p>
-                      <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#64748b", fontFamily: "monospace" }}>
-                        {signer.signerPublicKey?.slice(0, 10)}...{signer.signerPublicKey?.slice(-4)}
-                      </p>
+                    
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      {signer.signed ? (
+                        <>
+                          <CheckCircle2 size={24} color="#16a34a" />
+                          {/* Verify Button - Only show if signature available */}
+                          {signer.ecdsaSignature && (
+                            <button
+                              onClick={() => verifySignature(signer)}
+                              style={{
+                                padding: "8px 16px",
+                                background: selectedSigner?.signerPublicKey === signer.signerPublicKey && verificationResult ? "#dcfce7" : "#f5f3ff",
+                                color: "#1e1a6b",
+                                border: "1px solid #c4b5fd",
+                                borderRadius: "8px",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px"
+                              }}
+                            >
+                              <Key size={14} />
+                              {selectedSigner?.signerPublicKey === signer.signerPublicKey && verificationResult ? "Hide" : "Verify ECDSA"}
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <Clock size={24} color="#94a3b8" />
+                          <span style={{ fontSize: "13px", fontWeight: 600, color: "#64748b" }}>Pending</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {signer.signed ? (
-                    <CheckCircle2 size={24} color="#16a34a" />
-                  ) : (
-                    <Clock size={24} color="#94a3b8" />
+
+                  {/* Show verification details if this signer is selected */}
+                  {selectedSigner?.signerPublicKey === signer.signerPublicKey && verificationResult && (
+                    <div style={{
+                      marginTop: "16px",
+                      padding: "20px",
+                      background: "white",
+                      borderRadius: "12px",
+                      border: `2px solid ${verificationResult.valid ? "#86efac" : "#fecaca"}`
+                    }}>
+                      <h4 style={{ 
+                        margin: "0 0 16px 0", 
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        color: verificationResult.valid ? "#16a34a" : "#dc2626",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px"
+                      }}>
+                        {verificationResult.valid ? (
+                          <><CheckCircle2 size={18} /> Signature Validated</>
+                        ) : (
+                          <><AlertTriangle size={18} /> Verification Failed</>
+                        )}
+                      </h4>
+
+                      {verificationResult.valid ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                          {/* Public Key */}
+                          <div>
+                            <p style={{ margin: "0 0 6px 0", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                              Signer Public Address (Recovered from Signature):
+                            </p>
+                            <div style={{
+                              padding: "12px",
+                              background: "#f0fdf4",
+                              borderRadius: "8px",
+                              fontFamily: "monospace",
+                              fontSize: "13px",
+                              color: "#166534",
+                              wordBreak: "break-all",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center"
+                            }}>
+                              <span>{verificationResult.recovered}</span>
+                              <button
+                                onClick={() => copyToClipboard(verificationResult.recovered, 'address')}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  padding: "4px",
+                                  color: "#16a34a"
+                                }}
+                              >
+                                {copiedField === 'address' ? <Check size={16} /> : <Copy size={16} />}
+                              </button>
+                            </div>
+                            <p style={{ margin: "4px 0 0 0", fontSize: "11px", color: "#16a34a" }}>
+                              ✓ Matches claimed signer address
+                            </p>
+                          </div>
+
+                          {/* Message */}
+                          <div>
+                            <p style={{ margin: "0 0 6px 0", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                              Signed Message:
+                            </p>
+                            <div style={{
+                              padding: "12px",
+                              background: "#f8fafc",
+                              borderRadius: "8px",
+                              fontFamily: "monospace",
+                              fontSize: "12px",
+                              color: "#0f172a",
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-all",
+                              border: "1px solid #e2e8f0"
+                            }}>
+                              {verificationResult.message}
+                            </div>
+                            <button
+                              onClick={() => copyToClipboard(verificationResult.message, 'message')}
+                              style={{
+                                marginTop: "8px",
+                                padding: "6px 12px",
+                                background: "#f1f5f9",
+                                border: "none",
+                                borderRadius: "6px",
+                                fontSize: "12px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                color: "#64748b"
+                              }}
+                            >
+                              {copiedField === 'message' ? <Check size={14} /> : <Copy size={14} />}
+                              Copy Message
+                            </button>
+                          </div>
+
+                          {/* Signature */}
+                          <div>
+                            <p style={{ margin: "0 0 6px 0", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                              ECDSA Signature:
+                            </p>
+                            <div style={{
+                              padding: "12px",
+                              background: "#f8fafc",
+                              borderRadius: "8px",
+                              fontFamily: "monospace",
+                              fontSize: "11px",
+                              color: "#0f172a",
+                              wordBreak: "break-all",
+                              border: "1px solid #e2e8f0"
+                            }}>
+                              {verificationResult.signature.slice(0, 60)}...
+                            </div>
+                            <button
+                              onClick={() => copyToClipboard(verificationResult.signature, 'signature')}
+                              style={{
+                                marginTop: "8px",
+                                padding: "6px 12px",
+                                background: "#f1f5f9",
+                                border: "none",
+                                borderRadius: "6px",
+                                fontSize: "12px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                color: "#64748b"
+                              }}
+                            >
+                              {copiedField === 'signature' ? <Check size={14} /> : <Copy size={14} />}
+                              Copy Full Signature
+                            </button>
+                          </div>
+
+                          {/* Message Hash */}
+                          <div>
+                            <p style={{ margin: "0 0 6px 0", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                              Message Hash (Keccak-256):
+                            </p>
+                            <div style={{
+                              padding: "12px",
+                              background: "#f8fafc",
+                              borderRadius: "8px",
+                              fontFamily: "monospace",
+                              fontSize: "11px",
+                              color: "#64748b",
+                              wordBreak: "break-all"
+                            }}>
+                              {verificationResult.messageHash}
+                            </div>
+                          </div>
+
+                          {/* Verification Timestamp */}
+                          <p style={{ margin: "8px 0 0 0", fontSize: "11px", color: "#94a3b8" }}>
+                            Verified at: {new Date(verificationResult.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      ) : (
+                        <p style={{ color: "#dc2626", fontSize: "14px" }}>
+                          {verificationResult.error || "Signature verification failed"}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Loading state */}
+                  {selectedSigner?.signerPublicKey === signer.signerPublicKey && verifying && (
+                    <div style={{
+                      marginTop: "16px",
+                      padding: "20px",
+                      textAlign: "center",
+                      color: "#64748b"
+                    }}>
+                      <RefreshCw size={24} style={{ animation: "spin 1s linear infinite", margin: "0 auto 8px" }} />
+                      <p style={{ fontSize: "14px" }}>Verifying ECDSA signature...</p>
+                    </div>
                   )}
                 </div>
               ))}
@@ -355,7 +640,7 @@ const VerifyCredential = () => {
             
             {result.txHash ? (
               <a 
-                href={result.etherscan || `https://etherscan.io/tx/${result.txHash}`}
+                href={result.etherscan || `https://sepolia.etherscan.io/tx/${result.txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
