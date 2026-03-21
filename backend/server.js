@@ -871,7 +871,7 @@ app.post("/auth/getPortalKey", async (req, res) => {
     const table = role === 'student' ? 'users' : 'institutions';
     
     const [[account]] = await db.query(
-      `SELECT privateKey FROM ${table} WHERE walletPublicKey = ?`,
+      `SELECT walletPrivateKeyEncrypted FROM ${table} WHERE walletPublicKey = ?`,
       [publicKey]
     );
 
