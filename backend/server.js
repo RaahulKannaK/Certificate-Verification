@@ -710,7 +710,7 @@ app.post("/credential/sign", async (req, res) => {
            VALUES (?, ?, ?, NOW())
            ON DUPLICATE KEY UPDATE 
            signatureImageUrl = VALUES(signatureImageUrl), 
-           uploadedAt = NOW()`,
+           signedAt = NOW()`,
           [credentialId, pending.signerPublicKey, signatureImageUrl]
         );
         console.log("✅ Signature image URL stored in database");
