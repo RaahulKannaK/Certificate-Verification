@@ -398,6 +398,7 @@ app.post("/credential/sign", async (req, res) => {
       faceData,
       ecdsaToken,
       isSelfSign = false,
+      signatureImage, // Base64 signature image from frontend
     } = req.body;
 
     /* ================= VALIDATION ================= */
@@ -568,7 +569,7 @@ app.post("/credential/sign", async (req, res) => {
       });
     }
 
-    /* ================= STAGE 2: FACE VERIFICATION ================= */
+    /* ================= STAGE 2: FACE VERIFICATION + SIGNATURE UPLOAD ================= */
     else if (stage === "face") {
       
       if (!ecdsaToken || !faceData) {
@@ -609,17 +610,7 @@ app.post("/credential/sign", async (req, res) => {
       let faceError = null;
 
       try {
-        // TODO: Implement actual face verification
-        // Option 1: Check if face exists in image
-        // faceVerified = await verifyFaceExists(faceData);
-        
-        // Option 2: Match against stored template (recommended)
         faceVerified = await matchFaceAgainstStored(signerPublicKey, faceData);
-        
-        // Option 3: Liveness detection
-        // const liveness = await checkLiveness(faceData);
-        // faceVerified = liveness.isLive && faceVerified;
-
         console.log("✅ Face verification result:", faceVerified);
         
       } catch (err) {
@@ -661,6 +652,45 @@ app.post("/credential/sign", async (req, res) => {
         });
       }
 
+      // ================= SIGNATURE IMAGE UPLOAD TO CLOUDINARY =================
+      console.log("🖊️ Processing signature image...");
+      
+      let signatureImageUrl = null;
+      
+      if (signatureImage && signatureImage.startsWith('data:image')) {
+        try {
+          // Upload signature image to Cloudinary
+          const uploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              {
+                folder: `signatures/${credentialId}`,
+                public_id: `signer_${signerPublicKey.substring(0, 10)}_${Date.now()}`,
+                resource_type: 'image',
+                format: 'png'
+              },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+              }
+            );
+            
+            // Convert base64 to buffer and stream to Cloudinary
+            const base64Data = signatureImage.replace(/^data:image\/\w+;base64,/, '');
+            const buffer = Buffer.from(base64Data, 'base64');
+            streamifier.createReadStream(buffer).pipe(stream);
+          });
+          
+          signatureImageUrl = uploadResult.secure_url;
+          console.log("✅ Signature uploaded to Cloudinary:", signatureImageUrl);
+          
+        } catch (uploadErr) {
+          console.error("❌ Signature upload failed:", uploadErr);
+          // Continue even if signature upload fails - we can still complete the signing
+        }
+      } else {
+        console.log("⚠️ No signature image provided or invalid format");
+      }
+
       // ================= BOTH STAGES PASSED - FINALIZE SIGNATURE =================
       console.log("✅ Both ECDSA and Face verified - Finalizing signature");
 
@@ -671,6 +701,20 @@ app.post("/credential/sign", async (req, res) => {
          WHERE credentialId = ? AND signerPublicKey = ?`,
         [credentialId, pending.signerPublicKey]
       );
+
+      // Store signature image URL in database (if upload succeeded)
+      if (signatureImageUrl) {
+        await db.query(
+          `INSERT INTO signature_images 
+           (credentialId, signerPublicKey, signatureImageUrl, uploadedAt) 
+           VALUES (?, ?, ?, NOW())
+           ON DUPLICATE KEY UPDATE 
+           signatureImageUrl = VALUES(signatureImageUrl), 
+           uploadedAt = NOW()`,
+          [credentialId, pending.signerPublicKey, signatureImageUrl]
+        );
+        console.log("✅ Signature image URL stored in database");
+      }
 
       // Clean up pending signature
       await db.query(`DELETE FROM pending_signatures WHERE ecdsaToken = ?`, [ecdsaToken]);
@@ -691,6 +735,8 @@ app.post("/credential/sign", async (req, res) => {
       
       const allDone = allSigners.every(s => s.signed === 1 || s.signed === true);
       
+      // If all signed, trigger merge and upload final document
+      let finalDocumentUrl = null;
       if (allDone) {
         await db.query(
           `UPDATE issued_credentials 
@@ -698,6 +744,16 @@ app.post("/credential/sign", async (req, res) => {
            WHERE credentialId = ?`,
           [credentialId]
         );
+        
+        // Auto-merge signatures into final PDF
+        try {
+          console.log("🔄 All signers completed - Merging signatures...");
+          finalDocumentUrl = await mergeSignatures(credentialId);
+          console.log("✅ Final document created:", finalDocumentUrl);
+        } catch (mergeErr) {
+          console.error("❌ Auto-merge failed:", mergeErr.message);
+          // Don't fail the signing if merge fails - can be retried later
+        }
       }
 
       console.log("✅ Signature finalized successfully");
@@ -708,7 +764,9 @@ app.post("/credential/sign", async (req, res) => {
         message: "Signed successfully with ECDSA + Face verification",
         signer: pending.signerPublicKey,
         verificationMethods: ["ecdsa", "face"],
-        allComplete: allDone
+        allComplete: allDone,
+        finalDocumentUrl: finalDocumentUrl,
+        signatureImageUrl: signatureImageUrl
       });
     }
 
@@ -1151,14 +1209,34 @@ async function mergeSignatures(credentialId) {
     [credentialId]
   );
 
-  // Get all signatures with their field positions
+  if (!cred) throw new Error("Credential not found");
+
+  // Get all signatures with their field positions - FIXED JOIN
   const [signatures] = await db.query(
-    `SELECT si.signatureImageUrl, sf.xRatio, sf.yRatio, sf.widthRatio, sf.heightRatio
-     FROM signature_images si
-     JOIN signature_fields sf ON si.signerPublicKey = sf.signerPublicKey
-     WHERE si.credentialId = ? AND sf.credentialId = ?`,
-    [credentialId, credentialId]
+    `SELECT 
+       si.signatureImageUrl, 
+       sf.xRatio, 
+       sf.yRatio, 
+       sf.widthRatio, 
+       sf.heightRatio,
+       cs.signerPublicKey
+     FROM credential_signers cs
+     JOIN signature_fields sf 
+       ON cs.credentialId = sf.credentialId 
+       AND cs.signerPublicKey = sf.signerPublicKey
+     LEFT JOIN signature_images si 
+       ON cs.credentialId = si.credentialId 
+       AND cs.signerPublicKey = si.signerPublicKey
+     WHERE cs.credentialId = ? 
+       AND cs.signed = 1`,
+    [credentialId]
   );
+
+  console.log(`Found ${signatures.length} signatures for ${credentialId}`);
+
+  if (signatures.length === 0) {
+    throw new Error(`No signatures found for credential ${credentialId}`);
+  }
 
   // Download original PDF
   const pdfResponse = await axios.get(cred.filePath, { 
@@ -1173,6 +1251,11 @@ async function mergeSignatures(credentialId) {
 
   // Add each signature
   for (const sig of signatures) {
+    if (!sig.signatureImageUrl) {
+      console.warn(`⚠️ Missing signature image for ${sig.signerPublicKey}, skipping...`);
+      continue;
+    }
+    
     try {
       const imgResponse = await axios.get(sig.signatureImageUrl, { 
         responseType: 'arraybuffer',
@@ -1210,9 +1293,15 @@ async function mergeSignatures(credentialId) {
   });
 
   console.log("✅ Final document uploaded:", finalResult.secure_url);
+  
+  // Update credential with final document URL
+  await db.query(
+    `UPDATE issued_credentials SET finalFilePath = ? WHERE credentialId = ?`,
+    [finalResult.secure_url, credentialId]
+  );
+  
   return finalResult.secure_url;
 }
-
 
 // server.js or routes.js
 
