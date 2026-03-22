@@ -706,7 +706,7 @@ app.post("/credential/sign", async (req, res) => {
       if (signatureImageUrl) {
         await db.query(
           `INSERT INTO signature_images 
-           (credentialId, signerPublicKey, signatureImageUrl, uploadedAt) 
+           (credentialId, signerPublicKey, signatureImageUrl, signedAt) 
            VALUES (?, ?, ?, NOW())
            ON DUPLICATE KEY UPDATE 
            signatureImageUrl = VALUES(signatureImageUrl), 
