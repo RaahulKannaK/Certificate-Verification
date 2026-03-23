@@ -112,8 +112,6 @@ export const SigningSetup: React.FC<SigningSetupProps> = ({ onBack }) => {
   /* ================= UI ================= */
   return (
     <div style={{ minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'fixed', top: '-100px', right: '-100px', width: '500px', height: '500px', borderRadius: '50%', background: t.blob1, zIndex: 0, pointerEvents: 'none' }} />
-      <div style={{ position: 'fixed', bottom: '-80px', left: '-80px', width: '420px', height: '420px', borderRadius: '50%', background: t.blob2, zIndex: 0, pointerEvents: 'none' }} />
 
       <div style={{ position: 'relative', zIndex: 1 }} className="container mx-auto px-6 py-8">
         <ThemeButton

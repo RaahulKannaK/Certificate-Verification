@@ -154,16 +154,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
                 {/* ── SCROLLABLE CONTENT ── */}
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '32px', position: 'relative' }}>
-                    {/* Background decorations */}
-                    <div style={{
-                        position: 'absolute',
-                        top: '-10%',
-                        right: '-10%',
-                        width: '400px',
-                        height: '400px',
-                        background: 'radial-gradient(circle, rgba(30,26,107,0.03) 0%, transparent 70%)',
-                        zIndex: -1
-                    }} />
 
                     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                         {children}

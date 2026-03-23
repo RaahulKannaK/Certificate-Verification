@@ -601,7 +601,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
               transition: "all 0.2s",
               boxShadow: t.btnShadow,
               color: "white",
-              width: "100%",
+              width: "fit-content",
               height: "fit-content"
             }}
             onMouseEnter={e => {
