@@ -83,6 +83,7 @@ const t = {
 /* ================= COMPONENT ================= */
 const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSigning }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,28 +138,17 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
       }
 
       const mapped: Certificate[] = data.data.map((c: any) => {
+        // The issuer is the student who created this credential (studentPublicKey)
+        // For self-sign, it's the same person. For sequential/parallel, student initiates
         const isSelfSign = c.signingType === "self";
-        
+
+        // Resolve issuer name - try to get from joined data or use shortened key
         let issuerName = "Unknown";
         if (c.studentName) {
           issuerName = c.studentName;
         } else if (c.studentPublicKey) {
           issuerName = `${c.studentPublicKey.slice(0, 6)}...${c.studentPublicKey.slice(-4)}`;
         }
-
-        // Map backend data to frontend Certificate type
-        const mapped: Certificate[] = data.data.map((c: any) => {
-          // The issuer is the student who created this credential (studentPublicKey)
-          // For self-sign, it's the same person. For sequential/parallel, student initiates
-          const isSelfSign = c.signingType === "self";
-
-          // Resolve issuer name - try to get from joined data or use shortened key
-          let issuerName = "Unknown";
-          if (c.studentName) {
-            issuerName = c.studentName;
-          } else if (c.studentPublicKey) {
-            issuerName = `${c.studentPublicKey.slice(0, 6)}...${c.studentPublicKey.slice(-4)}`;
-          }
 
         const mappedSigners: Signer[] = (c.signers || []).map((s: any) => ({
           signerPublicKey: s.signerPublicKey,
@@ -169,6 +159,8 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
         }));
 
         mappedSigners.sort((a, b) => a.signerOrder - b.signerOrder);
+
+        const instKeys = c.institutionKeys || [];
 
         return {
           id: c.credentialId,
@@ -313,23 +305,15 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
         
         toast.success("Wallet verified! Redirecting to biometric verification...");
         
-        // Close modal if open
-        setIsPreviewOpen(false);
-        
         // Navigate to SigningView for Stage 2 (Face Verification)
         setTimeout(() => {
-          if (onNavigateToSigningView) {
-            onNavigateToSigningView(certificate.id);
-          } else {
-            // Fallback: navigate directly
-            navigate(`/sign/${certificate.id}`, { 
-              state: { 
-                ecdsaToken: res.data.ecdsaToken,
-                stage: "face",
-                certificate: certificate 
-              } 
-            });
-          }
+          navigate(`/sign/${certificate.id}`, { 
+            state: { 
+              ecdsaToken: res.data.ecdsaToken,
+              stage: "face",
+              certificate: certificate 
+            } 
+          });
         }, 1500);
         
       } else {

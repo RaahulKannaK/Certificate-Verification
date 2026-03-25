@@ -1824,10 +1824,18 @@ app.post("/getIssuedCredentials", async (req, res) => {
       return res.status(400).json({ success: false, message: "Missing walletPublicKey" });
     }
 
-    // Step 1: Get all credentials (simple, no joins)
-    const [allCreds] = await db.query(`SELECT * FROM issued_credentials ORDER BY issuedAt DESC`);
+    // Fetch all needed data concurrently
+    const [
+      [allCreds],
+      [allUsers],
+      [allInst]
+    ] = await Promise.all([
+      db.query(`SELECT * FROM issued_credentials ORDER BY issuedAt DESC`),
+      db.query(`SELECT walletPublicKey, firstName, lastName FROM users`),
+      db.query(`SELECT walletPublicKey, institutionName FROM institutions`),
+    ]);
 
-    // Step 2: Filter in JavaScript to avoid collation issues
+    // Filter in JavaScript to avoid collation issues
     const credentials = allCreds.filter(c => {
       const studentMatch = c.studentPublicKey?.toLowerCase() === walletPublicKey.toLowerCase();
       
@@ -1846,20 +1854,23 @@ app.post("/getIssuedCredentials", async (req, res) => {
 
     const credentialIds = credentials.map(c => c.credentialId);
 
-    // Step 3: Get signers for these credentials
-    const [allSigners] = await db.query(`SELECT * FROM credential_signers`);
-    const signers = allSigners.filter(s => credentialIds.includes(s.credentialId));
-
-    // Step 4: Get names
-    const [allUsers] = await db.query(`SELECT walletPublicKey, firstName, lastName FROM users`);
-    const [allInst] = await db.query(`SELECT walletPublicKey, institutionName FROM institutions`);
+    // Get signers ONLY for these credentials
+    const placeholders = credentialIds.map(() => '?').join(',');
+    const [signers] = await db.query(
+      `SELECT * FROM credential_signers WHERE credentialId IN (${placeholders})`,
+      credentialIds
+    );
 
     const nameMap = {};
     allUsers.forEach(u => {
-      nameMap[u.walletPublicKey?.toLowerCase()] = `${u.firstName} ${u.lastName}`;
+      if (u.walletPublicKey) {
+        nameMap[u.walletPublicKey.toLowerCase()] = `${u.firstName} ${u.lastName}`;
+      }
     });
     allInst.forEach(i => {
-      nameMap[i.walletPublicKey?.toLowerCase()] = i.institutionName;
+      if (i.walletPublicKey) {
+        nameMap[i.walletPublicKey.toLowerCase()] = i.institutionName;
+      }
     });
 
     // Format response
@@ -1912,11 +1923,26 @@ app.get("/issuedCredential/:credentialId", async (req, res) => {
     const { credentialId } = req.params;
     console.log("📥 Fetch issued credential:", credentialId);
 
-    // Get credential from issued_credentials (master table)
-    const [[credential]] = await db.query(
-      `SELECT * FROM issued_credentials WHERE credentialId = ?`,
-      [credentialId]
-    );
+    // Fetch master credential, signature fields, and signers concurrently
+    const [
+      [credentialRows],
+      [signatureFields],
+      [signers]
+    ] = await Promise.all([
+      db.query(`SELECT * FROM issued_credentials WHERE credentialId = ?`, [credentialId]),
+      db.query(
+        `SELECT signerPublicKey, xRatio, yRatio, widthRatio, heightRatio, color, isStudent
+         FROM signature_fields WHERE credentialId = ?`,
+        [credentialId]
+      ),
+      db.query(
+        `SELECT signerPublicKey, signerOrder, signed, isStudent
+         FROM credential_signers WHERE credentialId = ? ORDER BY signerOrder`,
+        [credentialId]
+      )
+    ]);
+
+    const credential = credentialRows[0];
 
     if (!credential) {
       return res.status(404).json({
@@ -1924,25 +1950,6 @@ app.get("/issuedCredential/:credentialId", async (req, res) => {
         message: "Credential not found",
       });
     }
-
-    // Get signature fields
-    const [signatureFields] = await db.query(
-      `SELECT signerPublicKey,
-              xRatio, yRatio, widthRatio, heightRatio,
-              color, isStudent
-       FROM signature_fields
-       WHERE credentialId = ?`,
-      [credentialId]
-    );
-
-    // Get signers from credential_signers (clean schema - no duplicate columns)
-    const [signers] = await db.query(
-      `SELECT signerPublicKey, signerOrder, signed, isStudent
-       FROM credential_signers
-       WHERE credentialId = ?
-       ORDER BY signerOrder`,
-      [credentialId]
-    );
 
     // Parse JSON fields if needed
     const institutionPublicKeys = credential.institutionPublicKeys
