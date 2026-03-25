@@ -5,8 +5,6 @@ import {
     ScanFace,
     User,
     LogOut,
-    Menu,
-    X,
 } from "lucide-react";
 
 export interface MenuItem {
@@ -21,17 +19,17 @@ interface SidebarProps {
     logout: () => void;
     pathname: string;
     menuItems: MenuItem[];
-    onToggle: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, logout, pathname, menuItems, onToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, logout, pathname, menuItems }) => {
 
     const sidebarWidth = isOpen ? "260px" : "80px";
 
     return (
         <aside
-            className={`transition-all duration-300 ease-in-out ${isOpen ? 'w-[260px]' : 'w-[80px]'} md:w-[260px]`}
             style={{
+                width: sidebarWidth,
+                transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 backgroundColor: '#1e1a6b',
                 color: 'white',
                 display: 'flex',
@@ -40,52 +38,27 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, logout, pathname, menuI
                 boxShadow: '4px 0 10px rgba(0,0,0,0.05)'
             }}
         >
-            {/* Top Section */}
-            <div style={{ 
-                padding: '24px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: isOpen ? 'space-between' : 'center', 
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-                minHeight: '82px'
-            }}>
-                <div className={`${isOpen ? 'flex' : 'hidden'} md:flex`} style={{ alignItems: 'center', gap: '12px' }}>
-                    <div style={{
-                        minWidth: '32px',
-                        height: '32px',
-                        background: 'white',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden'
-                    }}>
-                        <img src="/images/logo.png" alt="Signemic Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                    </div>
-                    <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px' }}>Signemic</span>
+            {/* Logo Section */}
+            <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{
+                    minWidth: '32px',
+                    height: '32px',
+                    background: 'white',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden'
+                }}>
+                    <img src="/images/logo.png" alt="Signemic Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
-
-                <button
-                    onClick={onToggle}
-                    className="flex md:hidden"
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'rgba(255,255,255,0.7)',
-                        cursor: 'pointer',
-                        padding: '6px',
-                        borderRadius: '8px',
-                        transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                    {isOpen ? <X size={20} /> : <Menu size={20} />}
-                </button>
+                {isOpen && (
+                    <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px' }}>Signemic</span>
+                )}
             </div>
 
             {/* Navigation Items */}
-            <nav style={{ flex: 1, padding: '24px 12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <nav style={{ flex: 1, padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {menuItems.map((item) => {
                     const isActive = pathname === item.path;
                     const isVerification = item.name === "Face Verification";
@@ -97,14 +70,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, logout, pathname, menuI
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '12px',
-                                    padding: '14px 16px',
-                                    borderRadius: '12px',
-                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    padding: '12px',
+                                    borderRadius: '10px',
+                                    transition: 'all 0.2s',
                                     textDecoration: 'none',
                                     color: isActive ? 'white' : 'rgba(255,255,255,0.7)',
-                                    background: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
-                                    fontWeight: isActive ? 600 : 400,
-                                    boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.1)' : 'none'
+                                    background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                    fontWeight: isActive ? 600 : 400
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!isActive) {
@@ -120,9 +92,28 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, logout, pathname, menuI
                                 }}
                             >
                                 <div style={{ minWidth: '20px' }}>{item.icon}</div>
-                                <span className={`${isOpen ? 'inline' : 'hidden'} md:inline`}>{item.name}</span>
+                                {isOpen && <span>{item.name}</span>}
                             </Link>
 
+                            {isVerification && isOpen && user.biometricSetup && (
+                                <div style={{
+                                    paddingLeft: '44px',
+                                    paddingBottom: '8px',
+                                    marginTop: '-4px'
+                                }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '11px',
+                                        color: '#22c55e',
+                                        fontWeight: 500
+                                    }}>
+                                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
+                                        Face Recognition Enabled
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     );
                 })}
@@ -156,7 +147,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, logout, pathname, menuI
                     }}
                 >
                     <LogOut size={20} />
-                    <span className={`${isOpen ? 'inline' : 'hidden'} md:inline`}>Logout</span>
+                    {isOpen && <span>Logout</span>}
                 </button>
             </div>
         </aside>
