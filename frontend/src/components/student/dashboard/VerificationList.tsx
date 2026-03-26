@@ -251,6 +251,7 @@ const VerificationList: React.FC<VerificationListProps> = ({
   onNavigateToSigningView 
 }) => {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -312,17 +313,16 @@ const VerificationList: React.FC<VerificationListProps> = ({
       }
 
       const mapped: Certificate[] = data.data.map((c: any) => {
-        // The issuer is the student who created this credential (studentPublicKey)
-        // For self-sign, it's the same person. For sequential/parallel, student initiates
         const isSelfSign = c.signingType === "self";
-
-        // Resolve issuer name - try to get from joined data or use shortened key
+        
         let issuerName = "Unknown";
         if (c.studentName) {
           issuerName = c.studentName;
         } else if (c.studentPublicKey) {
           issuerName = `${c.studentPublicKey.slice(0, 6)}...${c.studentPublicKey.slice(-4)}`;
         }
+
+        const instKeys = c.institutionPublicKeys ? JSON.parse(c.institutionPublicKeys) : [];
 
         const mappedSigners: Signer[] = (c.signers || []).map((s: any) => ({
           signerPublicKey: s.signerPublicKey,
@@ -333,8 +333,6 @@ const VerificationList: React.FC<VerificationListProps> = ({
         }));
 
         mappedSigners.sort((a, b) => a.signerOrder - b.signerOrder);
-
-        const instKeys = c.institutionKeys || [];
 
         return {
           id: c.credentialId,
@@ -479,15 +477,23 @@ const VerificationList: React.FC<VerificationListProps> = ({
         
         toast.success("Wallet verified! Redirecting to biometric verification...");
         
+        // Close modal if open
+        setIsPreviewOpen(false);
+        
         // Navigate to SigningView for Stage 2 (Face Verification)
         setTimeout(() => {
-          navigate(`/sign/${certificate.id}`, { 
-            state: { 
-              ecdsaToken: res.data.ecdsaToken,
-              stage: "face",
-              certificate: certificate 
-            } 
-          });
+          if (onNavigateToSigningView) {
+            onNavigateToSigningView(certificate.id);
+          } else {
+            // Fallback: navigate directly
+            navigate(`/sign/${certificate.id}`, { 
+              state: { 
+                ecdsaToken: res.data.ecdsaToken,
+                stage: "face",
+                certificate: certificate 
+              } 
+            });
+          }
         }, 1500);
         
       } else {
@@ -791,28 +797,21 @@ const VerificationList: React.FC<VerificationListProps> = ({
           <button
             onClick={handleBackFromVerify}
             style={{
-              background: t.gradient,
-              borderRadius: "12px",
-              padding: "12px 20px",
-              border: "none",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              transition: "all 0.2s",
-              boxShadow: 'none',
-              color: "white",
-              width: "fit-content",
-              height: "fit-content"
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
+              position: 'absolute',
+              top: '24px',
+              left: '24px',
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: 'none',
+              background: '#f1f5f9',
+              color: '#374151',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              zIndex: 10
             }}
             onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; }}
             onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; }}
@@ -827,28 +826,32 @@ const VerificationList: React.FC<VerificationListProps> = ({
     );
   }
 
-      {/* List Container */}
-      <div style={{ background: "white", borderRadius: "24px", border: `1px solid #e2e8f0`, boxShadow: "none", overflow: "hidden" }}>
-
-        {/* List Toolbar */}
-        <div style={{ padding: "24px", borderBottom: `1px solid #f1f5f9`, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "20px" }}>
-          <div style={{ display: "flex", gap: "8px", background: "#f8fafc", padding: "4px", borderRadius: "10px" }}>
-            {(["all", "pending", "signed"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer",
-                  fontSize: "13px", fontWeight: 600, transition: "all 0.2s", textTransform: "capitalize",
-                  background: activeTab === tab ? "white" : "transparent",
-                  color: activeTab === tab ? t.accentColor : "#64748b",
-                  boxShadow: activeTab === tab ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
-                }}
-              >
-                {tab}
-              </button>
-            ))}
+  return (
+    <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0", position: "relative" }}>
+        
+        {/* Header Section with Issue Certificate Button */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "16px", marginBottom: "32px" }}>
+          <div>
+            <h1 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginBottom: "8px" }}>
+              My Credentials
+            </h1>
+            <p style={{ fontSize: "16px", color: "#64748b" }}>View and manage your digital credentials.</p>
           </div>
+          <button
+              onClick={handleIssueCertificate}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "8px",
+                padding: "12px 24px", borderRadius: "12px", border: "none",
+                background: t.gradient, color: "white",
+                fontSize: "14px", fontWeight: 600, cursor: "pointer",
+                boxShadow: t.btnShadow, transition: "all 0.2s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = t.btnShadowHover; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = t.btnShadow; }}
+            >
+              <Plus size={18} /> Issue Certificate
+            </button>
+        </div>
 
         {/* Stats / Filtering Controls */}
         <div style={{ marginBottom: "32px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px" }}>
@@ -1066,9 +1069,10 @@ const VerificationList: React.FC<VerificationListProps> = ({
             backdropFilter: "blur(4px)",
             zIndex: 50,
             display: "flex",
-            flexDirection: "column",
-            boxShadow: "none",
-            animation: "slideUp 0.3s ease-out"
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            animation: "fadeIn 0.2s ease-out"
           }}>
             <div style={{
               background: "white",
@@ -1397,8 +1401,6 @@ const VerificationList: React.FC<VerificationListProps> = ({
                     fontSize: "14px",
                     fontWeight: 600,
                     cursor: "pointer",
-                    boxShadow: 'none',
-                    transition: "all 0.2s",
                     display: "flex",
                     alignItems: "center",
                     gap: "6px"
