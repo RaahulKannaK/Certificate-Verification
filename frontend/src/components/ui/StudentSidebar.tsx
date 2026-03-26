@@ -35,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, logout, pathname, menuI
                 display: 'flex',
                 flexDirection: 'column',
                 zIndex: 50,
-                boxShadow: '4px 0 10px rgba(0,0,0,0.05)'
+                boxShadow: 'none'
             }}
         >
             {/* Logo Section */}
@@ -75,8 +75,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, user, logout, pathname, menuI
                                     transition: 'all 0.2s',
                                     textDecoration: 'none',
                                     color: isActive ? 'white' : 'rgba(255,255,255,0.7)',
-                                    background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                                    fontWeight: isActive ? 600 : 400
+                                    background: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
+                                    fontWeight: isActive ? 600 : 400,
+                                    boxShadow: 'none'
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!isActive) {

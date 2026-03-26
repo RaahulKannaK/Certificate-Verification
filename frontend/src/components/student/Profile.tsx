@@ -83,12 +83,15 @@ const StudentProfile: React.FC = () => {
         <div style={{ 
             display: 'flex', 
             flexDirection: 'column', 
-            alignItems: 'center', 
+            alignItems: 'flex-start', 
             width: '100%',
-            paddingBottom: '40px'
+            maxWidth: '1200px',
+            margin: '0 auto',
+            padding: '40px 48px',
+            textAlign: 'left'
         }}>
             {/* Page Header */}
-            <div style={{ marginBottom: "32px", textAlign: "center" }}>
+            <div style={{ marginBottom: "40px", textAlign: "left" }}>
                 <h1 style={{
                     fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900,
                     color: "#0f172a", marginBottom: "10px",
@@ -97,25 +100,25 @@ const StudentProfile: React.FC = () => {
                 }}>
                     My Profile
                 </h1>
-                <p style={{ fontSize: "14px", color: "#64748b", lineHeight: 1.6, maxWidth: "500px", margin: "0 auto" }}>
+                <p style={{ fontSize: "15px", color: "#64748b", lineHeight: 1.6, maxWidth: "600px", margin: "0" }}>
                     Your account information and security settings.
                 </p>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px", width: "100%", maxWidth: "540px", textAlign: "left" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "32px", width: "100%", maxWidth: "800px", textAlign: "left" }}>
 
                 {/* Avatar + Name Banner */}
                 <div style={{
                     display: "flex", alignItems: "center", gap: "20px",
                     background: "white", borderRadius: "20px",
                     padding: "24px 28px", border: "1px solid #e2e8f0",
-                    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+                    boxShadow: "none",
                 }}>
                     <div style={{
                         width: "60px", height: "60px", borderRadius: "50%",
                         background: `linear-gradient(135deg, ${accent}, #2c258e)`,
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0, boxShadow: "0 6px 20px rgba(30,26,107,0.22)",
+                        flexShrink: 0, boxShadow: "none",
                     }}>
                         <span style={{ fontSize: "24px", fontWeight: 800, color: "white" }}>
                             {fullName.charAt(0).toUpperCase()}
@@ -137,7 +140,7 @@ const StudentProfile: React.FC = () => {
                 <div style={{
                     background: "white", borderRadius: "20px",
                     border: "1px solid #e2e8f0", overflow: "hidden",
-                    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+                    boxShadow: "none",
                 }}>
                     <div style={{ padding: "20px 28px", borderBottom: "1px solid #f1f5f9" }}>
                         <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>Account Details</h3>
@@ -169,7 +172,7 @@ const StudentProfile: React.FC = () => {
                 <div style={{
                     background: "white", borderRadius: "20px",
                     border: "1px solid #e2e8f0",
-                    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+                    boxShadow: "none",
                     padding: "20px 28px",
                 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
@@ -207,7 +210,7 @@ const StudentProfile: React.FC = () => {
                 <div style={{
                     background: "white", borderRadius: "20px",
                     border: "1px solid #e2e8f0",
-                    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+                    boxShadow: "none",
                     overflow: "hidden",
                 }}>
                     <button
@@ -296,7 +299,7 @@ const StudentProfile: React.FC = () => {
                                         cursor: isSubmitting ? "not-allowed" : "pointer",
                                         display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                                         opacity: isSubmitting ? 0.7 : 1,
-                                        boxShadow: "0 4px 14px rgba(30,26,107,0.22)",
+                                        boxShadow: "none",
                                     }}
                                 >
                                     {isSubmitting ? <><Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Updating...</> : "Update Password"}

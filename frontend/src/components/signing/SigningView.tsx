@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useLocation } from "react-router-dom"; // Only addition
 import Button from "../ui/ThemeButton";
 import { BiometricVerify } from "../biometric/BiometricVerify";
 import {
@@ -68,10 +69,75 @@ const getTheme = (role: string) => {
   };
 };
 
+/* ================= STAGE ROADMAP COMPONENT - ONLY ADDITION ================= */
+const SigningStageRoadmap: React.FC<{
+  currentStage: "ecdsa" | "face" | "complete";
+}> = ({ currentStage }) => {
+  const stages = [
+    { id: "ecdsa", label: "Wallet Signature", icon: Key },
+    { id: "face", label: "Biometric Verify", icon: User },
+    { id: "complete", label: "Complete", icon: CheckCircle2 }
+  ];
+
+  const getStageStatus = (stageId: string) => {
+    const stageOrder = ["ecdsa", "face", "complete"];
+    const currentIndex = stageOrder.indexOf(currentStage);
+    const stageIndex = stageOrder.indexOf(stageId);
+    
+    if (stageIndex < currentIndex) return "complete";
+    if (stageIndex === currentIndex) return "active";
+    return "pending";
+  };
+
+  return (
+    <div className="bg-white border rounded-2xl p-6 mb-6">
+      <div className="flex items-center justify-between relative">
+        {/* Line */}
+        <div className="absolute top-5 left-10 right-10 h-0.5 bg-slate-200" />
+        <div 
+          className="absolute top-5 left-10 h-0.5 bg-indigo-600 transition-all duration-500" 
+          style={{ width: currentStage === "ecdsa" ? "0%" : currentStage === "face" ? "50%" : "100%" }}
+        />
+
+        {stages.map((stage) => {
+          const status = getStageStatus(stage.id);
+          const Icon = stage.icon;
+          
+          return (
+            <div key={stage.id} className="flex flex-col items-center gap-2 z-10 flex-1">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                status === "complete" ? "bg-green-500 border-green-500" : 
+                status === "active" ? "bg-indigo-600 border-indigo-600 ring-4 ring-indigo-100" : 
+                "bg-white border-slate-300"
+              }`}>
+                {status === "complete" ? (
+                  <CheckCircle2 size={20} className="text-white" />
+                ) : (
+                  <Icon size={20} className={status === "active" ? "text-white" : "text-slate-400"} />
+                )}
+              </div>
+              <span className={`text-xs font-semibold ${
+                status === "active" ? "text-indigo-600" : 
+                status === "complete" ? "text-green-600" : "text-slate-400"
+              }`}>
+                {stage.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 /* ================= MAIN COMPONENT ================= */
 export const SigningView: React.FC<SigningViewProps> = ({ credentialId, onBack }) => {
   const { user } = useAuth();
+  const location = useLocation(); // Only addition
   const t = getTheme(user?.role || "student");
+
+  // Get ECDSA token from navigation state
+  const ecdsaToken = location.state?.ecdsaToken;
 
   const [certificate, setCertificate] = useState<CertificateData | null>(null);
   const [signatureData, setSignatureData] = useState<{image: string, x: number, y: number, width: number, height: number} | null>(null);
@@ -140,6 +206,10 @@ export const SigningView: React.FC<SigningViewProps> = ({ credentialId, onBack }
     if (!isMyTurn) return toast.error("Not your signing turn");
     if (!signatureData) return toast.error("Please provide signature first");
     if (!isSetupComplete) { setShowSetupPrompt(true); return; }
+    if (!ecdsaToken) {
+      toast.error("Session expired. Please restart signing process.");
+      return;
+    }
     setCurrentStep("verification");
   };
 
@@ -148,14 +218,17 @@ export const SigningView: React.FC<SigningViewProps> = ({ credentialId, onBack }
       setIsSubmitting(true);
       const isSelfSign = certificate?.signingType === "self";
       
+      // STAGE 2: Send face verification with ECDSA token
       const res = await fetch(`${import.meta.env.VITE_API_URL}/credential/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           credentialId: certificate?.credentialId,
           signerPublicKey: user?.walletPublicKey,
-          faceImage,
-          signatureImage: signatureData?.image, // Send signature image
+          stage: "face",
+          ecdsaToken: ecdsaToken,
+          faceData: faceImage,
+          signatureImage: signatureData?.image,
           isSelfSign,
         }),
       });
@@ -163,7 +236,7 @@ export const SigningView: React.FC<SigningViewProps> = ({ credentialId, onBack }
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
       
-      toast.success(data.allSigned ? "All signed! Final document created." : (isSelfSign ? "Self-signed successfully" : "Signed successfully"));
+      toast.success(data.allComplete ? "All signed! Final document created." : (isSelfSign ? "Self-signed successfully" : "Signed successfully"));
       setCurrentStep("complete");
       setTimeout(onBack, 2000);
     } catch (err: any) {
@@ -174,26 +247,37 @@ export const SigningView: React.FC<SigningViewProps> = ({ credentialId, onBack }
     }
   };
 
+  // STAGE 2: Face Verification Screen
   if (currentStep === "verification" && certificate?.credentialId && user?.walletPublicKey) {
     return (
-      <BiometricVerify 
-        credentialId={certificate.credentialId} 
-        signerPublicKey={user.walletPublicKey} 
-        onComplete={handleVerificationComplete} 
-        onFailed={() => setCurrentStep("signature")} 
-        onCancel={() => setCurrentStep("signature")} 
-      />
+      <div className="max-w-4xl mx-auto px-6 py-10">
+        {/* Stage Roadmap - Only addition */}
+        <SigningStageRoadmap currentStage="face" />
+        
+        <BiometricVerify 
+          credentialId={certificate.credentialId} 
+          signerPublicKey={user.walletPublicKey} 
+          onComplete={handleVerificationComplete} 
+          onFailed={() => setCurrentStep("signature")} 
+          onCancel={() => setCurrentStep("signature")} 
+        />
+      </div>
     );
   }
 
   if (currentStep === "complete") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="w-20 h-20 rounded-full bg-green-50 border-2 border-green-300 flex items-center justify-center mb-5">
-          <CheckCircle2 size={44} className="text-green-600" />
+      <div className="max-w-4xl mx-auto px-6 py-10">
+        {/* Stage Roadmap - Only addition */}
+        <SigningStageRoadmap currentStage="complete" />
+        
+        <div className="flex flex-col items-center justify-center min-h-[40vh]">
+          <div className="w-20 h-20 rounded-full bg-green-50 border-2 border-green-300 flex items-center justify-center mb-5">
+            <CheckCircle2 size={44} className="text-green-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Signed Successfully</h2>
+          <p className="text-slate-500">Returning to dashboard…</p>
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Signed Successfully</h2>
-        <p className="text-slate-500">Returning to dashboard…</p>
       </div>
     );
   }
@@ -207,8 +291,12 @@ export const SigningView: React.FC<SigningViewProps> = ({ credentialId, onBack }
     );
   }
 
+  // STAGE 1 COMPLETE - Signature Input Screen
   return (
     <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
+      {/* Stage Roadmap - Only addition */}
+      <SigningStageRoadmap currentStage="ecdsa" />
+
       <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 border rounded-xl hover:bg-slate-50 transition-colors">
           <ArrowLeft size={18} />
@@ -218,6 +306,15 @@ export const SigningView: React.FC<SigningViewProps> = ({ credentialId, onBack }
             {certificate.signingType === "self" ? "Self-Sign Certificate" : "Sign Certificate"}
           </h1>
           <p className="text-slate-500">Digital signature for {certificate.title}</p>
+        </div>
+      </div>
+
+      {/* Success message for Stage 1 */}
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
+        <CheckCircle2 size={24} className="text-green-600" />
+        <div>
+          <p className="font-semibold text-green-800">Wallet Verified</p>
+          <p className="text-sm text-green-600">ECDSA signature validated. Complete signature below.</p>
         </div>
       </div>
 
@@ -233,12 +330,19 @@ export const SigningView: React.FC<SigningViewProps> = ({ credentialId, onBack }
         </Button>
         <Button 
           onClick={handleVerifyAndSign} 
-          disabled={!signatureData || isSubmitting || !isMyTurn} 
+          disabled={!signatureData || isSubmitting || !isMyTurn || !ecdsaToken} 
           className="flex-1 border-none"
         >
           {isSubmitting ? "Signing..." : (isMyTurn ? "Verify & Sign" : "Waiting for others")}
         </Button>
       </div>
+
+      {!ecdsaToken && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
+          <AlertCircle size={16} className="inline mr-2" />
+          Session expired. Please restart signing from the documents list.
+        </div>
+      )}
 
       <Dialog open={showSetupPrompt} onOpenChange={setShowSetupPrompt}>
         <DialogContent>
@@ -256,7 +360,7 @@ export const SigningView: React.FC<SigningViewProps> = ({ credentialId, onBack }
   );
 };
 
-/* ================= INNER PREVIEW ================= */
+/* ================= INNER PREVIEW - UNCHANGED ================= */
 const InnerPreview: React.FC<{ 
   certificate: any, 
   myPublicKey?: string, 
@@ -281,11 +385,18 @@ const InnerPreview: React.FC<{
         const pdf = await pdfjsLib.getDocument(certificate.filePath).promise;
         const page = await pdf.getPage(1);
         const viewport = page.getViewport({ scale: 720 / page.getViewport({ scale: 1 }).width });
+        const canvas = pdfCanvasRef;
+        const context = canvas.getContext("2d")!;
         pdfCanvasRef.width = viewport.width;
         pdfCanvasRef.height = viewport.height;
         setPdfSize({ width: viewport.width, height: viewport.height });
-        await page.render({ canvasContext: pdfCanvasRef.getContext("2d")!, viewport }).promise;
-      } catch (err) {
+        await page.render({
+      canvas: canvas,          // ✅ REQUIRED FIX
+      canvasContext: context,
+      viewport: viewport
+    }).promise;
+
+    } catch (err) {
         console.error("PDF render error:", err);
       }
     };
