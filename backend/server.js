@@ -120,21 +120,59 @@ app.post("/signup", async (req, res) => {
 // 🔐 LOGIN (Email + Password + Public Key) - DEBUG VERSION
 // ==========================================================
 app.post("/login", async (req, res) => {
-  const { email, password, publicKey } = req.body;
+  console.log("========================================");
+  console.log("🔥 LOGIN ENDPOINT HIT");
+  console.log("========================================");
+  console.log("📥 RAW REQUEST BODY:", JSON.stringify(req.body, null, 2));
+  
+  // Accept both publicKey and walletAddress
+  const { email, password, publicKey, walletAddress } = req.body;
+  
+  // Use whichever is provided
+  const address = publicKey || walletAddress;
+  
+  console.log("📤 EXTRACTED FIELDS:");
+  console.log("   - email:", email);
+  console.log("   - password:", password ? "***" : "MISSING/EMPTY");
+  console.log("   - publicKey:", publicKey);
+  console.log("   - walletAddress:", walletAddress);
+  console.log("   - using address:", address);
 
   try {
-    // Parallelize user and institution lookups
+    // Validate input
+    if (!email || !password || !address) {
+      console.log("❌ VALIDATION FAILED:");
+      console.log("   - email missing:", !email);
+      console.log("   - password missing:", !password);
+      console.log("   - address missing:", !address);
+      
+      return res.status(400).json({ 
+        message: "Email, password, and wallet address are required",
+        received: {
+          hasEmail: !!email,
+          hasPassword: !!password,
+          hasPublicKey: !!publicKey,
+          hasWalletAddress: !!walletAddress
+        }
+      });
+    }
+
+    console.log("✅ VALIDATION PASSED - Searching database...");
+
+    // Use 'address' in queries
     const [userResult, instResult] = await Promise.all([
       db.query(
         "SELECT id, firstName, lastName, age, phone, email, role, walletPublicKey, password FROM users WHERE email = ? AND walletPublicKey = ?",
-        [email, publicKey]
+        [email, address]
       ),
       db.query(
         "SELECT id, institutionName AS firstName, '' AS lastName, null AS age, phone, email, 'institution' AS role, walletPublicKey, password FROM institutions WHERE email = ? AND walletPublicKey = ?",
-        [email, publicKey]
+        [email, address]
       )
     ]);
 
+    // ... rest of your code stays the same, just replace walletAddress with 'address'
+    
     const userRows = userResult[0];
     const instRows = instResult[0];
 
@@ -142,20 +180,27 @@ app.post("/login", async (req, res) => {
 
     if (userRows.length) {
       foundUser = userRows[0];
+      console.log("✅ USER FOUND in users table");
     } else if (instRows.length) {
       foundUser = instRows[0];
+      console.log("✅ USER FOUND in institutions table");
     }
 
     if (!foundUser) {
-      return res.status(404).json({ message: "User or institution not found" });
+      console.log("❌ NO USER FOUND");
+      return res.status(404).json({ 
+        message: "User or institution not found with provided credentials"
+      });
     }
 
-    // Verify password (plain text as per existing logic)
+    // Verify password
     if (foundUser.password !== password) {
+      console.log("❌ PASSWORD MISMATCH");
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    // Success - Remove password from response
+    console.log("✅ LOGIN SUCCESSFUL");
+
     const { password: _, ...userWithoutPassword } = foundUser;
 
     return res.json({
@@ -163,10 +208,7 @@ app.post("/login", async (req, res) => {
       user: userWithoutPassword
     });
   } catch (err) {
-    console.error("❌ Login Error Details:", err);
-    console.error("Error Code:", err.code);
-    console.error("Error Message:", err.message);
-    console.error("Error Stack:", err.stack);
+    console.error("❌ ERROR:", err);
     res.status(500).json({
       message: "Server error during login",
       error: err.message
