@@ -195,8 +195,8 @@ export const BiometricSetup: React.FC<BiometricSetupProps> = ({
   /* ================= CAMERA UI ================= */
   if (showCamera) {
     return (
-      <div style={{ position: "fixed", inset: 0, background: "rgba(255,255,255,0.1)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-        <div style={{ background: "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderRadius: "24px", border: `1px solid ${t.cardBorder}`, boxShadow: t.cardShadow, padding: "32px", maxWidth: "500px", width: "100%", position: "relative" }}>
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+        <div style={{ background: "white", borderRadius: "24px", border: `1px solid ${t.cardBorder}`, boxShadow: "none", padding: "32px", maxWidth: "500px", width: "100%", position: "relative" }}>
 
           {/* Close */}
           <button
@@ -272,7 +272,7 @@ export const BiometricSetup: React.FC<BiometricSetupProps> = ({
       <div style={{ position: "fixed", bottom: "-80px", left: "-80px", width: "420px", height: "420px", borderRadius: "50%", background: t.blob2, zIndex: 0, pointerEvents: "none" }} />
 
       <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "420px" }}>
-        <div style={{ background: "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderRadius: "24px", border: `1px solid ${t.cardBorder}`, boxShadow: t.cardShadow, padding: "40px 36px" }}>
+        <div style={{ background: "white", borderRadius: "24px", border: `1px solid ${t.cardBorder}`, boxShadow: "none", padding: "40px 36px" }}>
 
           {/* Header */}
           <div style={{ textAlign: "center", marginBottom: "32px" }}>

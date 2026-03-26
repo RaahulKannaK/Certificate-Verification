@@ -256,32 +256,26 @@
 
   /* Card borders — 3 purple shade levels */
   .card-student {
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     border: 1.5px solid var(--s-border-light);
     /* #ddd6fe */
-    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.07);
+    box-shadow: none;
     border-radius: var(--radius);
   }
 
   .card-student-mid {
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     border: 1.5px solid var(--s-border-mid);
     /* #c4b5fd */
-    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.11);
+    box-shadow: none;
     border-radius: var(--radius);
   }
 
   .card-student-strong {
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     border: 1.5px solid var(--s-border-strong);
     /* #a78bfa */
-    box-shadow: 0 6px 26px rgba(124, 58, 237, 0.16);
+    box-shadow: none;
     border-radius: var(--radius);
   }
 
@@ -290,19 +284,19 @@
     background: var(--gradient-student);
     color: #ffffff;
     border: none;
-    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.38);
+    box-shadow: none;
     border-radius: var(--radius);
     transition: box-shadow 0.2s ease, transform 0.15s ease;
   }
 
   .btn-student:hover:not(:disabled) {
-    box-shadow: 0 6px 24px rgba(124, 58, 237, 0.54);
+    box-shadow: none;
     transform: translateY(-1px);
   }
 
   .btn-student:active:not(:disabled) {
     transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.28);
+    box-shadow: none;
   }
 
   /* Gradient text — student */
@@ -348,7 +342,7 @@
 
   /* Glow — student */
   .glow-student {
-    box-shadow: var(--shadow-glow-student);
+    box-shadow: none;
   }
 
   /* Pulse glow — student */
@@ -360,12 +354,12 @@
 
     0%,
     100% {
-      box-shadow: 0 0 18px rgba(124, 58, 237, 0.18);
+      box-shadow: none;
       opacity: 0.6;
     }
 
     50% {
-      box-shadow: 0 0 46px rgba(124, 58, 237, 0.50);
+      box-shadow: none;
       opacity: 1;
     }
   }
@@ -390,32 +384,26 @@
 
   /* Card borders — 3 green shade levels */
   .card-institution {
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     border: 1.5px solid var(--i-border-light);
     /* #bbf7d0 */
-    box-shadow: 0 4px 20px rgba(22, 163, 74, 0.07);
+    box-shadow: none;
     border-radius: var(--radius);
   }
 
   .card-institution-mid {
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     border: 1.5px solid var(--i-border-mid);
     /* #86efac */
-    box-shadow: 0 4px 20px rgba(22, 163, 74, 0.11);
+    box-shadow: none;
     border-radius: var(--radius);
   }
 
   .card-institution-strong {
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     border: 1.5px solid var(--i-border-strong);
     /* #4ade80 */
-    box-shadow: 0 6px 26px rgba(22, 163, 74, 0.16);
+    box-shadow: none;
     border-radius: var(--radius);
   }
 
@@ -424,19 +412,19 @@
     background: var(--gradient-inst);
     color: #ffffff;
     border: none;
-    box-shadow: 0 4px 14px rgba(22, 163, 74, 0.38);
+    box-shadow: none;
     border-radius: var(--radius);
     transition: box-shadow 0.2s ease, transform 0.15s ease;
   }
 
   .btn-institution:hover:not(:disabled) {
-    box-shadow: 0 6px 24px rgba(22, 163, 74, 0.54);
+    box-shadow: none;
     transform: translateY(-1px);
   }
 
   .btn-institution:active:not(:disabled) {
     transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(22, 163, 74, 0.28);
+    box-shadow: none;
   }
 
   /* Gradient text — institution */
@@ -482,7 +470,7 @@
 
   /* Glow — institution */
   .glow-institution {
-    box-shadow: var(--shadow-glow-inst);
+    box-shadow: none;
   }
 
   /* Pulse glow — institution */
@@ -494,12 +482,12 @@
 
     0%,
     100% {
-      box-shadow: 0 0 18px rgba(22, 163, 74, 0.16);
+      box-shadow: none;
       opacity: 0.6;
     }
 
     50% {
-      box-shadow: 0 0 46px rgba(22, 163, 74, 0.46);
+      box-shadow: none;
       opacity: 1;
     }
   }
@@ -508,13 +496,9 @@
      NEW — Navbar: white floating box (same for both roles)
   ═══════════════════════════════════════════════════════════════ */
   .navbar-glass {
-    background: rgba(255, 255, 255, 0.93);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: #ffffff;
     border: 1px solid rgba(255, 255, 255, 0.70);
-    box-shadow:
-      0 2px 12px rgba(0, 0, 0, 0.08),
-      0 1px 3px rgba(0, 0, 0, 0.04);
+    box-shadow: none;
     border-radius: 1rem;
   }
 }

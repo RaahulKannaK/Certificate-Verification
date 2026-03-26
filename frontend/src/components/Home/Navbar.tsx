@@ -73,8 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <nav style={{
                 width: "100%",
                 maxWidth: "1100px",
-                background: "#ffffff",
-                backdropFilter: "blur(12px)",
+                background: scrolled ? "rgba(255, 255, 255, 0.98)" : "transparent",
                 borderRadius: "16px",
                 border: "1px solid rgba(30, 26, 107, 0.1)",
                 boxShadow: "0 10px 30px rgba(0, 0, 0, 0.05)",
@@ -231,7 +230,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {menuOpen && (
                     <div style={{
                         position: "fixed", top: "80px", left: "24px", right: "24px", zIndex: 49,
-                        background: "#fff", backdropFilter: "blur(16px)",
+                        background: "#fff",
                         borderRadius: "14px", border: "1px solid rgba(30, 26, 107, 0.1)",
                         padding: "16px 20px",
                         display: "flex", flexDirection: "column", gap: "10px",

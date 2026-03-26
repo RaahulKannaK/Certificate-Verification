@@ -163,7 +163,7 @@ const VerifyCredential: React.FC<VerifyCredentialProps> = ({
           borderRadius: "24px",
           textAlign: "center",
           maxWidth: "400px",
-          boxShadow: "0 10px 40px rgba(0,0,0,0.1)"
+          boxShadow: "none"
         }}>
           <XCircle size={isEmbedded ? 48 : 64} color="#dc2626" style={{ marginBottom: "16px" }} />
           <h2 style={{ color: "#dc2626", marginBottom: "8px", fontSize: isEmbedded ? "20px" : "24px" }}>Invalid Credential</h2>
@@ -250,9 +250,12 @@ const VerifyCredential: React.FC<VerifyCredentialProps> = ({
     }}>
       {/* Header */}
       <div style={{ 
-        background: "linear-gradient(135deg, #1e1a6b, #2d2870)",
-        padding: isEmbedded ? "24px" : "32px",
-        color: "white"
+        maxWidth: "900px", 
+        margin: "0 auto",
+        background: "white",
+        borderRadius: "24px",
+        overflow: "hidden",
+        boxShadow: "none"
       }}>
         <h1 style={{ margin: 0, fontSize: isEmbedded ? "20px" : "24px", display: "flex", alignItems: "center", gap: "12px" }}>
           <ShieldCheck size={isEmbedded ? 24 : 28} />
