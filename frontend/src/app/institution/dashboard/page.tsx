@@ -31,39 +31,12 @@ const InstitutionDashboardPage: React.FC<{ onHome?: () => void }> = ({ onHome })
             <Layout>
                 <div style={{ padding: '20px 0' }}>
                     <div style={{
-                        background: 'white',
-                        borderRadius: '20px',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                        padding: '32px',
+                        /* Flattened container */
+                        padding: '16px 0',
                         position: 'relative',
-                        minHeight: '600px'
+                        minHeight: 'auto'
                     }}>
-                        <button
-                            onClick={() => setShowSigning(false)}
-                            style={{
-                                position: 'absolute',
-                                top: '24px',
-                                left: '24px',
-                                padding: '8px 16px',
-                                borderRadius: '10px',
-                                border: 'none',
-                                background: '#f1f5f9',
-                                color: '#374151',
-                                fontSize: '14px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                zIndex: 10
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; }}
-                        >
-                            ← Back to Credentials
-                        </button>
-                        <div style={{ marginTop: '20px' }}>
+                        <div style={{ marginTop: '0px' }}>
                             <SigningSetup onBack={() => setShowSigning(false)} />
                         </div>
                     </div>
