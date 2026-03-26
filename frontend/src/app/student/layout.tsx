@@ -7,6 +7,8 @@ import {
     LogOut,
     Copy,
     Check,
+    Menu,
+    X,
     Shield
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,8 +23,8 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { user, logout } = useAuth();
     const { pathname } = useLocation();
-    const [copiedKey, setCopiedKey] = React.useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+    const [copiedKey, setCopiedKey] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     if (!user) return <Navigate to="/" replace />;
 
@@ -50,7 +52,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 logout={logout} 
                 pathname={pathname}
                 menuItems={menuItems}
-                onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
             />
 
             {/* ── MAIN CONTENT AREA ── */}
@@ -68,26 +69,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         zIndex: 40
                     }}
                 >
-                    <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.5px', margin: 0 }}>
-                        Credentials
-                    </h2>
-
-                    {/* Right - Profile & Key */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        {user.biometricSetup && (
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                background: '#f0fdf4',
-                                padding: '6px 12px',
+                        <button
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#64748b',
+                                cursor: 'pointer',
+                                padding: '8px',
                                 borderRadius: '8px',
-                                border: '1px solid #dcfce7'
-                            }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#166534' }}>Face enabled</span>
-                            </div>
-                        )}
+                                display: 'flex'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                            {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+                        </button>
+                        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>
+                            {menuItems.find(item => pathname === item.path)?.name || "Dashboard"}
+                        </h2>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -154,6 +158,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
                 {/* ── SCROLLABLE CONTENT ── */}
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '32px', position: 'relative' }}>
+                    {/* Background decorations */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '-10%',
+                        right: '-10%',
+                        width: '400px',
+                        height: '400px',
+                        background: 'radial-gradient(circle, rgba(30,26,107,0.03) 0%, transparent 70%)',
+                        zIndex: -1
+                    }} />
 
                     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                         {children}

@@ -1,21 +1,28 @@
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
-import { Sparkles, CreditCard } from "lucide-react";
+import VerificationList from "./VerificationList";
+import { SigningSetup } from "../../signing/SigningSetup";
+import { BiometricSetup } from "../../biometric/BiometricSetup";
+import { toast } from "sonner";
 
 interface DashboardProps {
-    onStartSigning: () => void;
-    onShowCredentials: () => void;
+    onShowCredentials?: () => void;
 }
 
-const StudentDashboard: React.FC<DashboardProps> = ({ onStartSigning, onShowCredentials }) => {
+const StudentDashboard: React.FC<DashboardProps> = ({ onShowCredentials }) => {
     const { user } = useAuth();
+    const [showSigning, setShowSigning] = useState(false);
+    const [showBiometricSetup, setShowBiometricSetup] = useState(false);
 
     if (!user) return null;
 
-    const t = {
-        btnShadow: "0 6px 20px rgba(30,26,107,0.24)",
-        btnShadowHover: "0 10px 28px rgba(30,26,107,0.36)",
-        actionBorder: "#e2e8f0",
+    const handleStartSigning = () => {
+        if (!user.biometricSetup) {
+            toast.info("Please set up biometric authentication first");
+            setShowBiometricSetup(true);
+            return;
+        }
+        setShowSigning(true);
     };
 
     return (
@@ -67,28 +74,54 @@ const StudentDashboard: React.FC<DashboardProps> = ({ onStartSigning, onShowCred
                         Start Signing
                     </button>
                     <button
-                        onClick={onShowCredentials}
-                        style={{ 
-                            padding: '12px 32px', 
-                            borderRadius: '12px', 
-                            border: `1.5px solid #e2e8f0`, 
-                            background: 'white', 
-                            color: '#374151', 
-                            fontSize: '15px', 
-                            fontWeight: 600, 
-                            cursor: 'pointer', 
-                            transition: 'all 0.2s', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '8px' 
+                        onClick={() => setShowSigning(false)}
+                        style={{
+                            position: 'absolute',
+                            top: '24px',
+                            left: '24px',
+                            padding: '8px 16px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            background: '#f1f5f9',
+                            color: '#374151',
+                            fontSize: '14px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            zIndex: 10
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#1e1a6b'; e.currentTarget.style.color = '#1e1a6b'; e.currentTarget.style.background = '#f8fafc'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#374151'; e.currentTarget.style.background = 'white'; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; }}
                     >
-                        <CreditCard size={18} /> My Credentials
+                        ← Back to Credentials
                     </button>
+                    <div style={{ marginTop: '20px' }}>
+                        <SigningSetup onBack={() => setShowSigning(false)} />
+                    </div>
                 </div>
             </div>
+        );
+    }
+
+    // Show BiometricSetup
+    if (showBiometricSetup) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-6 bg-[#f8fafc]">
+                <BiometricSetup onComplete={() => setShowBiometricSetup(false)} onSkip={() => setShowBiometricSetup(false)} />
+            </div>
+        );
+    }
+
+    // Main Dashboard - Show VerificationList with Issue Certificate button
+    return (
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0" }}>
+            {/* Header with Issue Certificate Button */}
+
+
+            {/* VerificationList as main content */}
+            <VerificationList />
         </div>
     );
 };

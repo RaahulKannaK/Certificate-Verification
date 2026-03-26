@@ -306,7 +306,8 @@ export const SigningEditor: React.FC<SigningEditorProps> = ({
           ))}
         </div>
 
-        <div style={{ background: "white", borderRadius: "16px", border: `1px solid ${t.docBorder}`, boxShadow: "0 4px 20px rgba(0,0,0,0.06)", overflow: "auto", position: "relative" }}>
+        {/* PDF Document */}
+        <div style={{ background: "white", borderRadius: "16px", border: `1px solid ${t.docBorder}`, boxShadow: "0 4px 20px rgba(0,0,0,0.06)", overflow: "auto" }}>
           <div ref={containerRef} style={{ position: "relative", width: DOC_WIDTH, height: "75vh", margin: "0 auto" }} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
             <canvas ref={canvasRef} width={pdfSize.width} height={pdfSize.height} style={{ width: "100%", height: "100%" }} />
             {signatureBoxes.map((box) => {
@@ -339,8 +340,59 @@ export const SigningEditor: React.FC<SigningEditorProps> = ({
             })}
           </div>
         </div>
+
+        {/* Issue Credential Button - NOW AT THE BOTTOM */}
+        {mode === "issue" && (
+          <div style={{ 
+            background: "white", 
+            borderRadius: "16px", 
+            border: `1px solid ${t.docBorder}`, 
+            boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+            padding: "24px",
+            display: "flex",
+            justifyContent: "center"
+          }}>
+            <button 
+              onClick={handleIssueCredential} 
+              disabled={processing} 
+              style={{ 
+                padding: "16px 48px", 
+                borderRadius: "14px", 
+                border: "none", 
+                background: processing ? "#e2e8f0" : t.gradient, 
+                color: processing ? "#94a3b8" : "white", 
+                fontSize: "16px", 
+                fontWeight: 700, 
+                cursor: processing ? "not-allowed" : "pointer", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                gap: "10px",
+                boxShadow: processing ? "none" : t.btnShadow,
+                transition: "all 0.2s",
+                minWidth: "300px"
+              }}
+              onMouseEnter={e => {
+                if (!processing) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = t.btnShadowHover;
+                }
+              }}
+              onMouseLeave={e => {
+                if (!processing) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = t.btnShadow;
+                }
+              }}
+            >
+              <CheckCircle size={22} /> 
+              {processing ? "Issuing Credential..." : (signingType === "self" ? "Issue Self-Signed Credential" : "Issue Credential")}
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* RIGHT COLUMN - Sidebar */}
       <div style={{ width: "300px", flexShrink: 0 }}>
         <div style={{ background: "white", borderRadius: "18px", border: `1px solid ${t.sidebarBorder}`, boxShadow: "none", padding: "24px", position: "sticky", top: "24px" }}>
           <h3 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "16px", fontWeight: 700, color: "#0f172a", marginBottom: "16px" }}>{signingType === "self" ? "Self Signing" : "Signers"}</h3>
@@ -376,11 +428,6 @@ export const SigningEditor: React.FC<SigningEditorProps> = ({
               })
             )}
           </div>
-          {mode === "issue" && (
-            <button onClick={handleIssueCredential} disabled={processing} style={{ width: "100%", marginTop: "20px", padding: "13px", borderRadius: "12px", border: "none", background: processing ? "#e2e8f0" : t.gradient, color: processing ? "#94a3b8" : "white", fontSize: "15px", fontWeight: 700, cursor: processing ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-              <CheckCircle size={18} /> {processing ? "Issuing..." : (signingType === "self" ? "Issue Self-Signed Credential" : "Issue Credential")}
-            </button>
-          )}
         </div>
       </div>
     </div>

@@ -48,7 +48,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="flex h-screen bg-[#f8fafc] overflow-hidden">
             <Sidebar 
                 isOpen={isSidebarOpen} 
-                onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
                 user={user} 
                 logout={logout} 
                 pathname={pathname}
@@ -73,7 +72,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <button
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                            className="md:hidden"
                             style={{
                                 background: 'transparent',
                                 border: 'none',
@@ -88,26 +86,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         >
                             {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
                         </button>
-                        <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.5px', margin: 0 }}>
-                            Credentials
+                        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>
+                            {menuItems.find(item => pathname === item.path)?.name || "Institution Dashboard"}
                         </h2>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        {user.biometricSetup && (
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                background: '#f0fdf4',
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                border: '1px solid #dcfce7'
-                            }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#166534' }}>Face enabled</span>
-                            </div>
-                        )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -117,7 +101,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             borderRadius: '10px',
                             border: '1px solid #e2e8f0'
                         }}>
-                            <span style={{ fontSize: '12px', fontWeight: 500, color: '#64748b' }}>Public Key:</span>
+                            <span style={{ fontSize: '12px', fontWeight: 500, color: '#64748b' }}>Institution Key:</span>
                             <span style={{
                                 fontSize: '12px',
                                 fontWeight: 600,
@@ -174,6 +158,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
                 {/* ── SCROLLABLE CONTENT ── */}
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '32px', position: 'relative' }}>
+                    {/* Background decorations - subtle green tint for Institution */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '-10%',
+                        right: '-10%',
+                        width: '400px',
+                        height: '400px',
+                        background: 'radial-gradient(circle, rgba(22,163,74,0.03) 0%, transparent 70%)',
+                        zIndex: -1
+                    }} />
 
                     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                         {children}
