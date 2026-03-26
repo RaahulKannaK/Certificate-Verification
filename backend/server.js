@@ -119,20 +119,68 @@ app.post("/signup", async (req, res) => {
 // 🔐 LOGIN (Email + Password + Public Key) - DEBUG VERSION
 // ==========================================================
 app.post("/login", async (req, res) => {
-  const { email, password, publicKey } = req.body;
-
+  console.log("========================================");
+  console.log("🔥 LOGIN ENDPOINT HIT");
+  console.log("========================================");
+  console.log("📥 RAW REQUEST BODY:", JSON.stringify(req.body, null, 2));
+  console.log("📥 REQUEST HEADERS:", req.headers['content-type']);
+  
+  const { email, password, walletAddress } = req.body;
+  
+  console.log("📤 EXTRACTED FIELDS:");
+  console.log("   - email:", email);
+  console.log("   - password:", password ? "***" : "MISSING/EMPTY");
+  console.log("   - walletAddress:", walletAddress);
+  
+  // Check what fields are actually present
+  console.log("📋 ALL BODY KEYS:", Object.keys(req.body));
+  
   try {
+    // Validate input
+    if (!email || !password || !walletAddress) {
+      console.log("❌ VALIDATION FAILED:");
+      console.log("   - email missing:", !email);
+      console.log("   - password missing:", !password);
+      console.log("   - walletAddress missing:", !walletAddress);
+      
+      return res.status(400).json({ 
+        message: "Email, password, and wallet address are required",
+        received: {
+          hasEmail: !!email,
+          hasPassword: !!password,
+          hasWalletAddress: !!walletAddress
+        }
+      });
+    }
+
+    console.log("✅ VALIDATION PASSED - Searching database...");
+
     // Parallelize user and institution lookups
+    console.log("🔍 RUNNING DATABASE QUERIES...");
+    console.log("   - Searching users table with:", email, walletAddress);
+    console.log("   - Searching institutions table with:", email, walletAddress);
+    
     const [userResult, instResult] = await Promise.all([
       db.query(
         "SELECT id, firstName, lastName, age, phone, email, role, walletPublicKey, password FROM users WHERE email = ? AND walletPublicKey = ?",
-        [email, publicKey]
+        [email, walletAddress]
       ),
       db.query(
         "SELECT id, institutionName AS firstName, '' AS lastName, null AS age, phone, email, 'institution' AS role, walletPublicKey, password FROM institutions WHERE email = ? AND walletPublicKey = ?",
-        [email, publicKey]
+        [email, walletAddress]
       )
     ]);
+
+    console.log("📊 QUERY RESULTS:");
+    console.log("   - Users found:", userResult[0].length);
+    console.log("   - Institutions found:", instResult[0].length);
+    
+    if (userResult[0].length > 0) {
+      console.log("   - First user:", { ...userResult[0][0], password: "***" });
+    }
+    if (instResult[0].length > 0) {
+      console.log("   - First institution:", { ...instResult[0][0], password: "***" });
+    }
 
     const userRows = userResult[0];
     const instRows = instResult[0];
@@ -141,34 +189,74 @@ app.post("/login", async (req, res) => {
 
     if (userRows.length) {
       foundUser = userRows[0];
+      console.log("✅ USER FOUND in users table");
     } else if (instRows.length) {
       foundUser = instRows[0];
+      console.log("✅ USER FOUND in institutions table");
     }
 
     if (!foundUser) {
-      return res.status(404).json({ message: "User or institution not found" });
+      console.log("❌ NO USER FOUND - Checking if email exists without wallet...");
+      
+      // Debug: Check if email exists with different wallet
+      const [emailCheck] = await db.query(
+        "SELECT walletPublicKey FROM users WHERE email = ? UNION SELECT walletPublicKey FROM institutions WHERE email = ?",
+        [email, email]
+      );
+      
+      if (emailCheck.length > 0) {
+        console.log("   - Email exists but with different wallet:", emailCheck[0].walletPublicKey);
+        console.log("   - Expected wallet:", walletAddress);
+      } else {
+        console.log("   - Email not found in any table");
+      }
+      
+      return res.status(404).json({ 
+        message: "User or institution not found with provided credentials",
+        debug: {
+          emailChecked: email,
+          walletChecked: walletAddress,
+          emailExists: emailCheck.length > 0
+        }
+      });
     }
 
     // Verify password (plain text as per existing logic)
+    console.log("🔐 CHECKING PASSWORD...");
+    console.log("   - Stored password:", foundUser.password);
+    console.log("   - Provided password:", password);
+    console.log("   - Match:", foundUser.password === password);
+    
     if (foundUser.password !== password) {
+      console.log("❌ PASSWORD MISMATCH");
       return res.status(401).json({ message: "Invalid password" });
     }
 
+    console.log("✅ PASSWORD MATCHED - Login successful");
+
     // Success - Remove password from response
     const { password: _, ...userWithoutPassword } = foundUser;
+
+    console.log("📤 SENDING SUCCESS RESPONSE");
+    console.log("========================================");
 
     return res.json({
       message: "✅ Login successful!",
       user: userWithoutPassword
     });
   } catch (err) {
-    console.error("❌ Login Error Details:", err);
-    console.error("Error Code:", err.code);
-    console.error("Error Message:", err.message);
-    console.error("Error Stack:", err.stack);
+    console.error("========================================");
+    console.error("❌ UNEXPECTED ERROR IN LOGIN:");
+    console.error("   Error:", err);
+    console.error("   Code:", err.code);
+    console.error("   Message:", err.message);
+    console.error("   Stack:", err.stack);
+    console.error("========================================");
+    
     res.status(500).json({
       message: "Server error during login",
-      error: err.message
+      error: err.message,
+      code: err.code
     });
   }
 });
