@@ -14,16 +14,28 @@ const LoginPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (formData: LoginFormData) => {
-        if (!formData.email.trim()) { toast.error("Please enter your email"); return; }
-        if (!formData.password.trim()) { toast.error("Please enter your password"); return; }
-        if (!formData.publicKey.trim()) { toast.error("Please enter your public key"); return; }
+        // Validate all fields
+        if (!formData.email?.trim()) { 
+            toast.error("Please enter your email"); 
+            return; 
+        }
+        if (!formData.password?.trim()) { 
+            toast.error("Please enter your password"); 
+            return; 
+        }
+        if (!formData.publicKey?.trim()) { 
+            toast.error("Please connect your wallet"); 
+            return; 
+        }
 
         try {
             setLoading(true);
+            
+            // 🔥 KEY FIX: Send walletAddress instead of publicKey to match server expectation
             const res = await api.post(`${import.meta.env.VITE_API_URL}/login`, {
                 email: formData.email.trim(),
                 password: formData.password,
-                publicKey: formData.publicKey.trim(),
+                walletAddress: formData.publicKey.trim(), // Changed from publicKey to walletAddress
             });
 
             const data = res.data;
@@ -44,8 +56,9 @@ const LoginPage: React.FC = () => {
                 toast.error("Invalid credentials. Please check and try again.");
             }
         } catch (err: any) {
+            console.error("Login error:", err);
             if (err?.response?.status === 401) toast.error("Invalid password");
-            else if (err?.response?.status === 404) toast.error("User not found. Check your email and public key.");
+            else if (err?.response?.status === 404) toast.error("User not found. Check your email and wallet address.");
             else toast.error(err?.response?.data?.message || "Server error during login");
         } finally {
             setLoading(false);
@@ -86,7 +99,7 @@ const LoginPage: React.FC = () => {
                         Login
                     </h1>
                     <p style={{ fontFamily: "WeSignFont", fontSize: "18px", color: "#1d1d1e", maxWidth: "450px", lineHeight: 1.6 }}>
-                        Enter your public key to access your dashboard (student or institution)
+                        Connect your wallet to access your dashboard (student or institution)
                     </p>
                 </div>
             </div>

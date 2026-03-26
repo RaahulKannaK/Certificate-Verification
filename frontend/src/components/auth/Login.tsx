@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Mail, Lock, Wallet, LogIn, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -6,7 +6,7 @@ import { Mail, Lock, Wallet, LogIn, AlertCircle, CheckCircle2 } from "lucide-rea
 export interface LoginFormData {
   email: string;
   password: string;
-  publicKey: string; // Keeping as publicKey to match your server
+  publicKey: string;
 }
 
 interface LoginProps {
@@ -23,26 +23,51 @@ const Login: React.FC<LoginProps> = ({ onSubmit, loading = false }) => {
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [hasMetaMask, setHasMetaMask] = useState<boolean>(false);
+  const [hasMetaMask, setHasMetaMask] = useState<boolean | null>(null); // null = checking
 
-  // Check for MetaMask on mount
+  // 🔧 IMPROVED: More robust MetaMask detection with multiple checks
+  const checkMetaMask = useCallback(() => {
+    const ethereum = (window as any).ethereum;
+    
+    // Check multiple conditions for MetaMask
+    const isMetaMaskInstalled = !!(
+      ethereum && 
+      (ethereum.isMetaMask || ethereum.providers?.some((p: any) => p.isMetaMask))
+    );
+    
+    console.log("MetaMask check:", { 
+      isMetaMaskInstalled, 
+      ethereum: !!ethereum,
+      isMetaMask: ethereum?.isMetaMask,
+      providers: ethereum?.providers?.length 
+    });
+    
+    setHasMetaMask(isMetaMaskInstalled);
+    return isMetaMaskInstalled ? ethereum : null;
+  }, []);
+
+  // Check for MetaMask on mount and when window loads
   useEffect(() => {
-    const checkMetaMask = () => {
-      const ethereum = (window as any).ethereum;
-      const isMetaMaskInstalled = !!(ethereum && ethereum.isMetaMask);
-      console.log("MetaMask detected:", isMetaMaskInstalled);
-      setHasMetaMask(isMetaMaskInstalled);
-    };
-
+    // Immediate check
     checkMetaMask();
-    window.addEventListener('load', checkMetaMask);
-    const timeoutCheck = setTimeout(checkMetaMask, 1000);
+    
+    // Check after short delays (MetaMask injects asynchronously)
+    const timers = [500, 1000, 2000].map(delay => 
+      setTimeout(checkMetaMask, delay)
+    );
+    
+    // Also check when window finishes loading
+    if (document.readyState === 'complete') {
+      checkMetaMask();
+    } else {
+      window.addEventListener('load', checkMetaMask);
+    }
 
     return () => {
+      timers.forEach(clearTimeout);
       window.removeEventListener('load', checkMetaMask);
-      clearTimeout(timeoutCheck);
     };
-  }, []);
+  }, [checkMetaMask]);
 
   // Listen for account changes
   useEffect(() => {
@@ -53,15 +78,42 @@ const Login: React.FC<LoginProps> = ({ onSubmit, loading = false }) => {
       console.log("Accounts changed:", accounts);
       if (accounts.length > 0) {
         setFormData((prev) => ({ ...prev, publicKey: accounts[0] }));
+        setConnectionError(null);
       } else {
         setFormData((prev) => ({ ...prev, publicKey: "" }));
       }
     };
 
-    ethereum.on("accountsChanged", handleAccountsChanged);
+    const handleChainChanged = () => {
+      // MetaMask recommends reloading the page on chain change
+      console.log("Chain changed, reloading...");
+      window.location.reload();
+    };
+
+    // Subscribe to events
+    if (ethereum.on) {
+      ethereum.on("accountsChanged", handleAccountsChanged);
+      ethereum.on("chainChanged", handleChainChanged);
+    }
+    
+    // Check if already connected (silently)
+    const checkExistingConnection = async () => {
+      try {
+        const accounts = await ethereum.request?.({ method: "eth_accounts" });
+        if (accounts && accounts.length > 0) {
+          setFormData((prev) => ({ ...prev, publicKey: accounts[0] }));
+        }
+      } catch (err) {
+        console.log("eth_accounts error:", err);
+      }
+    };
+    
+    checkExistingConnection();
+
     return () => {
       if (ethereum.removeListener) {
         ethereum.removeListener("accountsChanged", handleAccountsChanged);
+        ethereum.removeListener("chainChanged", handleChainChanged);
       }
     };
   }, []);
@@ -71,43 +123,69 @@ const Login: React.FC<LoginProps> = ({ onSubmit, loading = false }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // 🔧 FIXED: Proper connect wallet function with guaranteed user gesture
   const connectWallet = async () => {
     console.log("🔥 CONNECT WALLET CLICKED");
     setConnectionError(null);
     setIsConnecting(true);
 
     try {
-      const ethereum = (window as any).ethereum;
+      const ethereum = checkMetaMask();
       
       if (!ethereum) {
-        throw new Error("MetaMask is not installed. Please install MetaMask to continue.");
+        throw new Error("MetaMask not found. Please install MetaMask extension.");
       }
 
-      console.log("✅ MetaMask found, requesting accounts...");
+      console.log("Requesting accounts from MetaMask...");
       
-      // Request accounts - this opens MetaMask popup
-      const accounts = await ethereum.request({
-        method: "eth_requestAccounts",
-      });
+      // 🔧 CRITICAL: This MUST be triggered by a user gesture (button click)
+      // The popup will only show if called in response to user interaction
+      let accounts;
+      
+      try {
+        // Primary method: eth_requestAccounts (this triggers the popup)
+        accounts = await ethereum.request({
+          method: "eth_requestAccounts",
+        });
+      } catch (reqError: any) {
+        console.error("eth_requestAccounts error:", reqError);
+        
+        // Handle specific error codes
+        if (reqError.code === 4001) {
+          throw new Error("You rejected the connection request in MetaMask.");
+        } else if (reqError.code === -32002) {
+          throw new Error("MetaMask is already processing a request. Please check the MetaMask extension icon in your browser toolbar.");
+        } else if (reqError.message?.includes("User rejected")) {
+          throw new Error("Connection rejected. Please approve the request in MetaMask.");
+        }
+        
+        // Fallback for older MetaMask versions
+        if (ethereum.enable) {
+          console.log("Trying legacy enable() method...");
+          accounts = await ethereum.enable();
+        } else {
+          throw reqError;
+        }
+      }
 
-      console.log("✅ Accounts received:", accounts);
+      console.log("Accounts received:", accounts);
 
       if (accounts && accounts.length > 0) {
         setFormData((prev) => ({ ...prev, publicKey: accounts[0] }));
         setConnectionError(null);
         console.log("✅ Wallet connected:", accounts[0]);
       } else {
-        throw new Error("No accounts found. Please unlock MetaMask and try again.");
+        throw new Error("No accounts returned. Please create an account in MetaMask.");
       }
     } catch (error: any) {
-      console.error("❌ Wallet connection error:", error);
+      console.error("❌ Connection error:", error);
       
       let errorMessage = "Failed to connect wallet";
       
-      if (error.code === 4001) {
+      if (error.code === 4001 || error.message?.includes("rejected")) {
         errorMessage = "You rejected the connection request in MetaMask.";
-      } else if (error.code === -32002) {
-        errorMessage = "MetaMask is already open. Please check your browser extensions.";
+      } else if (error.code === -32002 || error.message?.includes("pending")) {
+        errorMessage = "MetaMask is already processing a request. Please check the MetaMask extension icon in your browser toolbar.";
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -121,17 +199,10 @@ const Login: React.FC<LoginProps> = ({ onSubmit, loading = false }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate all fields
     if (!formData.email || !formData.password || !formData.publicKey) {
-      console.log("❌ Form validation failed:", formData);
+      console.log("Validation failed:", formData);
       return;
     }
-    
-    console.log("✅ Submitting login:", {
-      email: formData.email,
-      publicKey: formData.publicKey,
-      password: "***"
-    });
     
     onSubmit(formData);
   };
@@ -195,7 +266,7 @@ const Login: React.FC<LoginProps> = ({ onSubmit, loading = false }) => {
         />
       </div>
 
-      {/* Wallet Connection - REPLACES the old Public Key Input */}
+      {/* Wallet Connection */}
       <div className="space-y-1.5">
         <Label
           className="text-slate-700 font-semibold flex items-center gap-2"
@@ -205,7 +276,7 @@ const Login: React.FC<LoginProps> = ({ onSubmit, loading = false }) => {
           <span style={{ color: "#ef4444" }}>*</span>
         </Label>
 
-        {!hasMetaMask && (
+        {hasMetaMask === false && (
           <div 
             className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2"
             style={{ fontSize: "12px" }}
@@ -229,10 +300,20 @@ const Login: React.FC<LoginProps> = ({ onSubmit, loading = false }) => {
           </div>
         )}
 
-        {/* Connect Wallet Button */}
+        {hasMetaMask === null && (
+          <div 
+            className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center gap-2"
+            style={{ fontSize: "12px" }}
+          >
+            <div className="animate-spin w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
+            <span className="text-slate-600">Checking for MetaMask...</span>
+          </div>
+        )}
+
+        {/* 🔧 FIXED: Using onClick instead of onMouseDown for proper event handling */}
         <button
           type="button"
-          onClick={connectWallet}
+          onClick={connectWallet}  // Changed from onMouseDown to onClick
           disabled={isConnecting || loading || !hasMetaMask}
           className={`w-full py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
             formData.publicKey 
@@ -258,16 +339,19 @@ const Login: React.FC<LoginProps> = ({ onSubmit, loading = false }) => {
         </button>
 
         {connectionError && (
-          <p className="flex items-center gap-1.5 mt-2" style={{ fontSize: "11px", color: "#ef4444" }}>
-            <AlertCircle className="w-3 h-3" />
-            {connectionError}
-          </p>
+          <div 
+            className="p-2 rounded bg-red-50 border border-red-200 flex items-start gap-1.5"
+            style={{ fontSize: "11px", color: "#ef4444" }}
+          >
+            <AlertCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+            <span>{connectionError}</span>
+          </div>
         )}
 
         <p style={{ fontSize: "11px", color: "#64748b" }}>
           {formData.publicKey 
-            ? "Wallet connected successfully. You can now login." 
-            : "Click to connect your MetaMask wallet."
+            ? "Wallet connected. Click button to change account." 
+            : "Click to open MetaMask and select an account."
           }
         </p>
       </div>
