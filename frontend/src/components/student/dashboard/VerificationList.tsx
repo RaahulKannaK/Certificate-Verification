@@ -741,39 +741,12 @@ const VerificationList: React.FC<VerificationListProps> = ({
     return (
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0" }}>
         <div style={{
-          background: 'white',
-          borderRadius: '20px',
-          border: `1px solid ${t.cardBorder}`,
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
-          padding: '32px',
+          /* Flattened layout wrapper */
+          padding: '16px 0',
           position: 'relative',
-          minHeight: '600px'
+          minHeight: 'auto' /* Fixed scroll */
         }}>
-          <button
-            onClick={handleBackFromSigningSetup}
-            style={{
-              position: 'absolute',
-              top: '24px',
-              left: '24px',
-              padding: '8px 16px',
-              borderRadius: '10px',
-              border: 'none',
-              background: '#f1f5f9',
-              color: '#374151',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              zIndex: 10
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; }}
-          >
-            <ArrowLeft size={16} /> Back to Credentials
-          </button>
-          <div style={{ marginTop: '20px' }}>
+          <div style={{ marginTop: '0px' }}>
             <SigningSetup onBack={handleBackFromSigningSetup} />
           </div>
         </div>
@@ -786,13 +759,10 @@ const VerificationList: React.FC<VerificationListProps> = ({
     return (
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0" }}>
         <div style={{
-          background: 'white',
-          borderRadius: '20px',
-          border: `1px solid ${t.cardBorder}`,
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
-          padding: '32px',
+          /* Flattened layout wrapper */
+          padding: '16px 0',
           position: 'relative',
-          minHeight: '600px'
+          minHeight: 'auto'
         }}>
           <button
             onClick={handleBackFromVerify}
@@ -818,8 +788,8 @@ const VerificationList: React.FC<VerificationListProps> = ({
           >
             <ArrowLeft size={16} /> Back to Credentials
           </button>
-          <div style={{ marginTop: '20px' }}>
-            <VerifyCredential credentialId={verifyCredentialId} />
+          <div style={{ marginTop: '16px' }}>
+            <VerifyCredential credentialId={verifyCredentialId} isEmbedded={true} />
           </div>
         </div>
       </div>
@@ -883,7 +853,7 @@ const VerificationList: React.FC<VerificationListProps> = ({
         </div>
 
         {/* List Container */}
-        <div style={{ background: "white", borderRadius: "24px", border: `1px solid #e2e8f0`, boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)", overflow: "hidden" }}>
+        <div style={{ overflow: "hidden" }}>
           
           {/* List Toolbar */}
           <div style={{ padding: "24px", borderBottom: `1px solid #f1f5f9`, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "20px" }}>

@@ -307,9 +307,9 @@ export const SigningEditor: React.FC<SigningEditorProps> = ({
         </div>
 
         {/* PDF Document */}
-        <div style={{ background: "white", borderRadius: "16px", border: `1px solid ${t.docBorder}`, boxShadow: "0 4px 20px rgba(0,0,0,0.06)", overflow: "auto" }}>
-          <div ref={containerRef} style={{ position: "relative", width: DOC_WIDTH, height: "75vh", margin: "0 auto" }} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-            <canvas ref={canvasRef} width={pdfSize.width} height={pdfSize.height} style={{ width: "100%", height: "100%" }} />
+        <div style={{ background: "white", borderRadius: "16px", border: `1px solid ${t.docBorder}`, boxShadow: "0 4px 20px rgba(0,0,0,0.06)", overflow: "auto", maxHeight: "calc(100vh - 160px)" }}>
+          <div ref={containerRef} style={{ position: "relative", width: DOC_WIDTH, height: "auto", margin: "0 auto" }} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+            <canvas ref={canvasRef} width={pdfSize.width} height={pdfSize.height} style={{ width: "100%", height: "auto", display: "block" }} />
             {signatureBoxes.map((box) => {
               const signer = signers.find((s) => s.publicKey === box.signerPublicKey);
               const isSelfSign = box.isStudent;
