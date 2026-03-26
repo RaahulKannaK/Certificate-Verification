@@ -129,7 +129,7 @@ export const SigningSetup: React.FC<SigningSetupProps> = ({ onBack }) => {
         {/* UPLOAD STEP */}
         {step === 'upload' && (
           <div className="max-w-2xl mx-auto">
-            <div style={{ background: 'rgba(255, 255, 255, 0.45)', backdropFilter: 'blur(16px)', borderRadius: '24px', border: `1px solid ${t.cardBorder}`, padding: '48px 40px', textAlign: 'center' }}>
+            <div style={{ background: 'white', borderRadius: '24px', border: `1px solid ${t.cardBorder}`, padding: '48px 40px', textAlign: 'center' }}>
               <div style={{ width: '72px', height: '72px', borderRadius: '20px', background: t.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                 <Upload size={32} color="white" />
               </div>
@@ -240,8 +240,7 @@ const SigningTypeCard: React.FC<{
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? t.uploadHoverBg : 'rgba(255, 255, 255, 0.45)',
-        backdropFilter: 'blur(16px)',
+        background: hovered ? t.uploadHoverBg : 'white',
         borderRadius: '18px',
         border: `1px solid ${hovered ? t.cardHoverBorder : t.cardBorder}`,
         padding: '32px 24px',

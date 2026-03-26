@@ -25,7 +25,7 @@ const StudentDashboard: React.FC<DashboardProps> = ({ onStartSigning, onShowCred
                 background: 'white',
                 borderRadius: '20px', 
                 border: `1px solid ${t.actionBorder}`,
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
+                boxShadow: 'none', 
                 padding: '48px 32px', 
                 textAlign: 'center'
             }}>
@@ -34,7 +34,7 @@ const StudentDashboard: React.FC<DashboardProps> = ({ onStartSigning, onShowCred
                     height: '64px', 
                     borderRadius: '20px', 
                     background: '#1e1a6b', 
-                    boxShadow: t.btnShadow, 
+                    boxShadow: 'none', 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center', 
@@ -58,11 +58,11 @@ const StudentDashboard: React.FC<DashboardProps> = ({ onStartSigning, onShowCred
                             fontSize: '15px', 
                             fontWeight: 600, 
                             cursor: 'pointer', 
-                            boxShadow: t.btnShadow, 
+                            boxShadow: 'none', 
                             transition: 'all 0.2s' 
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = t.btnShadowHover; }}
-                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = t.btnShadow; }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'none'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
                     >
                         Start Signing
                     </button>

@@ -164,7 +164,7 @@ const VerifyCredential = () => {
           borderRadius: "24px",
           textAlign: "center",
           maxWidth: "400px",
-          boxShadow: "0 10px 40px rgba(0,0,0,0.1)"
+          boxShadow: "none"
         }}>
           <XCircle size={64} color="#dc2626" style={{ marginBottom: "16px" }} />
           <h2 style={{ color: "#dc2626", marginBottom: "8px" }}>Invalid Credential</h2>
@@ -249,7 +249,7 @@ const VerifyCredential = () => {
         background: "white",
         borderRadius: "24px",
         overflow: "hidden",
-        boxShadow: "0 10px 40px rgba(0,0,0,0.1)"
+        boxShadow: "none"
       }}>
         {/* Header */}
         <div style={{ 

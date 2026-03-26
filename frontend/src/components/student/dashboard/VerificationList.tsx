@@ -583,18 +583,18 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
               justifyContent: "center",
               gap: "8px",
               transition: "all 0.2s",
-              boxShadow: t.btnShadow,
+              boxShadow: 'none',
               color: "white",
               width: "fit-content",
               height: "fit-content"
             }}
             onMouseEnter={e => {
               e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 12px 24px -10px rgba(30,26,107,0.3)';
+              e.currentTarget.style.boxShadow = 'none';
             }}
             onMouseLeave={e => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = t.btnShadow;
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
             <Edit3 size={18} color="white" />
@@ -604,7 +604,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
       </div>
 
       {/* List Container */}
-      <div style={{ background: "white", borderRadius: "24px", border: `1px solid #e2e8f0`, boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)", overflow: "hidden" }}>
+      <div style={{ background: "white", borderRadius: "24px", border: `1px solid #e2e8f0`, boxShadow: "none", overflow: "hidden" }}>
 
         {/* List Toolbar */}
         <div style={{ padding: "24px", borderBottom: `1px solid #f1f5f9`, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "20px" }}>
@@ -747,7 +747,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            boxShadow: "none",
             animation: "slideUp 0.3s ease-out"
           }}>
             {/* Modal Header */}
@@ -1076,7 +1076,7 @@ const VerificationList: React.FC<VerificationListProps> = ({ onSign, onStartSign
                     fontSize: "14px",
                     fontWeight: 600,
                     cursor: "pointer",
-                    boxShadow: t.btnShadow,
+                    boxShadow: 'none',
                     transition: "all 0.2s",
                     display: "flex",
                     alignItems: "center",

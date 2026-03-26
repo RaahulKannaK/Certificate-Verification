@@ -288,7 +288,7 @@ export const SigningEditor: React.FC<SigningEditorProps> = ({
   return (
     <div style={{ display: "flex", gap: "24px", alignItems: "flex-start" }}>
       <div style={{ flex: 1 }}>
-        <div style={{ display: "flex", gap: "8px", padding: "12px 16px", background: t.toolbarBg, backdropFilter: "blur(16px)", borderRadius: "14px", border: `1px solid ${t.toolbarBorder}`, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", marginBottom: "16px" }}>
+        <div style={{ display: "flex", gap: "8px", padding: "12px 16px", background: "white", borderRadius: "14px", border: `1px solid ${t.toolbarBorder}`, boxShadow: "none", marginBottom: "16px" }}>
           {tools.map((tool) => (
             <button
               key={tool.id}
@@ -342,7 +342,7 @@ export const SigningEditor: React.FC<SigningEditorProps> = ({
       </div>
 
       <div style={{ width: "300px", flexShrink: 0 }}>
-        <div style={{ background: t.sidebarBg, backdropFilter: "blur(16px)", borderRadius: "18px", border: `1px solid ${t.sidebarBorder}`, boxShadow: "0 4px 20px rgba(0,0,0,0.06)", padding: "24px", position: "sticky", top: "24px" }}>
+        <div style={{ background: "white", borderRadius: "18px", border: `1px solid ${t.sidebarBorder}`, boxShadow: "none", padding: "24px", position: "sticky", top: "24px" }}>
           <h3 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "16px", fontWeight: 700, color: "#0f172a", marginBottom: "16px" }}>{signingType === "self" ? "Self Signing" : "Signers"}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {signingType === "self" ? (
