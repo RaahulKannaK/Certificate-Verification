@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
   Search, 
-  Upload, 
   User, 
   Users, 
   GitBranch, 
@@ -16,11 +15,11 @@ import {
   Loader2,
   Fingerprint,
   Key,
-  ChevronRight,
   Lock,
   ArrowLeft,
   Sparkles,
-  Eye
+  Eye,
+  Plus
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -29,7 +28,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import ImportToMetamask from "./ImportToMetamask";
 import { SigningSetup } from "../../signing/SigningSetup";
-import VerifyCredential from "../../../pages/VerifyCredential";// Import VerifyCredential
+import VerifyCredential from "../../../pages/VerifyCredential";
 
 /* ================= TYPES ================= */
 export interface Signer {
@@ -266,7 +265,7 @@ const VerificationList: React.FC<VerificationListProps> = ({
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // Signing Stage State - NEW
+  // Signing Stage State
   const [signingStage, setSigningStage] = useState<SigningStage>("idle");
   const [stageError, setStageError] = useState<string>("");
   const [signingCertId, setSigningCertId] = useState<string | null>(null);
@@ -282,10 +281,10 @@ const VerificationList: React.FC<VerificationListProps> = ({
     signerData?: Signer;
   } | null>(null);
 
-  // NEW: Start Signing flow state
+  // Issue Certificate flow state
   const [showSigningSetup, setShowSigningSetup] = useState(false);
   
-  // NEW: Verify Credential flow state
+  // Verify Credential flow state
   const [verifyCredentialId, setVerifyCredentialId] = useState<string | null>(null);
 
   /* ================= FETCH ISSUED CERTIFICATES ================= */
@@ -705,24 +704,28 @@ const VerificationList: React.FC<VerificationListProps> = ({
   // Check if currently signing
   const isCurrentlySigning = signingStage !== "idle" && signingStage !== "error" && signingCertId === selectedCert?.id;
 
-  // NEW: Handle Start Signing Setup flow
-  const handleStartSigningSetup = () => {
+  // Handle Issue Certificate - for creating NEW credentials
+  const handleIssueCertificate = () => {
+    if (!user?.biometricSetup) {
+      toast.info("Please set up biometric authentication first");
+      return;
+    }
     setShowSigningSetup(true);
   };
 
-  // NEW: Handle back from SigningSetup
+  // Handle back from SigningSetup
   const handleBackFromSigningSetup = () => {
     setShowSigningSetup(false);
     // Refresh certificates after signing setup (in case a new one was created)
     fetchCertificates();
   };
 
-  // NEW: Handle verify credential - show inside box
+  // Handle verify credential - show inside box
   const handleVerifyCredential = (certId: string) => {
     setVerifyCredentialId(certId);
   };
 
-  // NEW: Handle back from verify
+  // Handle back from verify
   const handleBackFromVerify = () => {
     setVerifyCredentialId(null);
   };
@@ -1026,7 +1029,7 @@ const VerificationList: React.FC<VerificationListProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleVerifyCredential(cert.id); // Use internal verify instead of navigate
+                              handleVerifyCredential(cert.id);
                             }}
                             style={{
                               padding: "8px 14px",
