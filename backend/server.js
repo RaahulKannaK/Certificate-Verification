@@ -120,18 +120,25 @@ app.post("/signup", async (req, res) => {
 // 🔐 LOGIN (Email + Password + Public Key) - DEBUG VERSION
 // ==========================================================
 app.post("/login", async (req, res) => {
-  const { email, password, publicKey } = req.body;
+  const { email, password, walletAddress } = req.body;
 
   try {
+    // Validate input
+    if (!email || !password || !walletAddress) {
+      return res.status(400).json({ 
+        message: "Email, password, and wallet address are required" 
+      });
+    }
+
     // Parallelize user and institution lookups
     const [userResult, instResult] = await Promise.all([
       db.query(
         "SELECT id, firstName, lastName, age, phone, email, role, walletPublicKey, password FROM users WHERE email = ? AND walletPublicKey = ?",
-        [email, publicKey]
+        [email, walletAddress]
       ),
       db.query(
         "SELECT id, institutionName AS firstName, '' AS lastName, null AS age, phone, email, 'institution' AS role, walletPublicKey, password FROM institutions WHERE email = ? AND walletPublicKey = ?",
-        [email, publicKey]
+        [email, walletAddress]
       )
     ]);
 
@@ -147,7 +154,7 @@ app.post("/login", async (req, res) => {
     }
 
     if (!foundUser) {
-      return res.status(404).json({ message: "User or institution not found" });
+      return res.status(404).json({ message: "User or institution not found with provided credentials" });
     }
 
     // Verify password (plain text as per existing logic)
