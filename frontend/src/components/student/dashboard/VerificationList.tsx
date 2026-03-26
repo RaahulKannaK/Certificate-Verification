@@ -17,7 +17,10 @@ import {
   Fingerprint,
   Key,
   ChevronRight,
-  Lock
+  Lock,
+  ArrowLeft,
+  Sparkles,
+  Eye
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -25,6 +28,8 @@ import { ethers } from "ethers";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import ImportToMetamask from "./ImportToMetamask";
+import { SigningSetup } from "../../signing/SigningSetup";
+import VerifyCredential from "../../../pages/VerifyCredential";// Import VerifyCredential
 
 /* ================= TYPES ================= */
 export interface Signer {
@@ -57,7 +62,7 @@ type SigningStage = "idle" | "ecdsa" | "face" | "complete" | "error";
 
 interface VerificationListProps {
   onSign?: (certificate: Certificate, signingType: SigningType) => void;
-  onNavigateToSigningView?: (credentialId: string) => void; // NEW: Navigate to SigningView
+  onNavigateToSigningView?: (credentialId: string) => void;
 }
 
 /* ================= THEME ================= */
@@ -277,6 +282,12 @@ const VerificationList: React.FC<VerificationListProps> = ({
     certificate: Certificate;
     signerData?: Signer;
   } | null>(null);
+
+  // NEW: Start Signing flow state
+  const [showSigningSetup, setShowSigningSetup] = useState(false);
+  
+  // NEW: Verify Credential flow state
+  const [verifyCredentialId, setVerifyCredentialId] = useState<string | null>(null);
 
   /* ================= FETCH ISSUED CERTIFICATES ================= */
   const fetchCertificates = async () => {
@@ -700,31 +711,144 @@ const VerificationList: React.FC<VerificationListProps> = ({
   // Check if currently signing
   const isCurrentlySigning = signingStage !== "idle" && signingStage !== "error" && signingCertId === selectedCert?.id;
 
+  // NEW: Handle Start Signing Setup flow
+  const handleStartSigningSetup = () => {
+    setShowSigningSetup(true);
+  };
+
+  // NEW: Handle back from SigningSetup
+  const handleBackFromSigningSetup = () => {
+    setShowSigningSetup(false);
+    // Refresh certificates after signing setup (in case a new one was created)
+    fetchCertificates();
+  };
+
+  // NEW: Handle verify credential - show inside box
+  const handleVerifyCredential = (certId: string) => {
+    setVerifyCredentialId(certId);
+  };
+
+  // NEW: Handle back from verify
+  const handleBackFromVerify = () => {
+    setVerifyCredentialId(null);
+  };
+
+  // If showing signing setup, render it inside the box
+  if (showSigningSetup) {
+    return (
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0" }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '20px',
+          border: `1px solid ${t.cardBorder}`,
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
+          padding: '32px',
+          position: 'relative',
+          minHeight: '600px'
+        }}>
+          <button
+            onClick={handleBackFromSigningSetup}
+            style={{
+              position: 'absolute',
+              top: '24px',
+              left: '24px',
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: 'none',
+              background: '#f1f5f9',
+              color: '#374151',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              zIndex: 10
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; }}
+          >
+            <ArrowLeft size={16} /> Back to Credentials
+          </button>
+          <div style={{ marginTop: '20px' }}>
+            <SigningSetup onBack={handleBackFromSigningSetup} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If showing verify credential, render it inside the box
+  if (verifyCredentialId) {
+    return (
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0" }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '20px',
+          border: `1px solid ${t.cardBorder}`,
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
+          padding: '32px',
+          position: 'relative',
+          minHeight: '600px'
+        }}>
+          <button
+            onClick={handleBackFromVerify}
+            style={{
+              position: 'absolute',
+              top: '24px',
+              left: '24px',
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: 'none',
+              background: '#f1f5f9',
+              color: '#374151',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              zIndex: 10
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; }}
+          >
+            <ArrowLeft size={16} /> Back to Credentials
+          </button>
+          <div style={{ marginTop: '20px' }}>
+            <VerifyCredential credentialId={verifyCredentialId} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0", position: "relative" }}>
         
         {/* Header Section */}
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "16px", marginBottom: "32px" }}>
-          <div>
-            <h1 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginBottom: "8px" }}>
-              My Credentials
-            </h1>
-            <p style={{ fontSize: "16px", color: "#64748b" }}>View and sign your issued digital credentials.</p>
-          </div>
-          <button
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: "8px",
-                padding: "12px 24px", borderRadius: "12px", border: "none",
-                background: t.gradient, color: "white",
-                fontSize: "14px", fontWeight: 600, cursor: "pointer",
-                boxShadow: t.btnShadow, transition: "all 0.2s",
-              }}
-            >
-              <Upload size={18} /> Upload New
-            </button>
-            <input ref={fileInputRef} type="file" hidden />
-        </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "16px", marginBottom: "32px" }}>
+                <div>
+                    <h1 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginBottom: "8px" }}>
+                        My Credentials
+                    </h1>
+                    <p style={{ fontSize: "16px", color: "#64748b" }}>View and manage your digital credentials.</p>
+                </div>
+                <button
+                    onClick={handleStartSigning}
+                    style={{
+                        display: "inline-flex", alignItems: "center", gap: "8px",
+                        padding: "12px 24px", borderRadius: "12px", border: "none",
+                        background: "linear-gradient(135deg, #1e1a6b, #2d2870)", color: "white",
+                        fontSize: "14px", fontWeight: 600, cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(30,26,107,0.20)", transition: "all 0.2s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = "0 8px 20px rgba(30,26,107,0.32)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = "0 4px 12px rgba(30,26,107,0.20)"; }}
+                >
+                    + Issue Certificate
+                </button>
+            </div>
 
         {/* Stats / Filtering Controls */}
         <div style={{ marginBottom: "32px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px" }}>
@@ -905,7 +1029,7 @@ const VerificationList: React.FC<VerificationListProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/verify/${cert.id}`);
+                              handleVerifyCredential(cert.id); // Use internal verify instead of navigate
                             }}
                             style={{
                               padding: "8px 14px",
@@ -915,10 +1039,13 @@ const VerificationList: React.FC<VerificationListProps> = ({
                               color: "#1e1a6b",
                               fontSize: "12px",
                               fontWeight: 600,
-                              cursor: "pointer"
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px"
                             }}
                           >
-                            Verify
+                            <Eye size={14} /> Verify
                           </button>
                         )}
                       </div>
@@ -1261,7 +1388,7 @@ const VerificationList: React.FC<VerificationListProps> = ({
                 gap: "12px"
               }}>
                 <button
-                  onClick={() => navigate(`/verify/${selectedCert.id}`)}
+                  onClick={() => handleVerifyCredential(selectedCert.id)}
                   style={{
                     padding: "10px 20px",
                     borderRadius: "10px",
