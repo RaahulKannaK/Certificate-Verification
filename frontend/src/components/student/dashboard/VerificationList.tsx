@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
   Search, 
-  Upload, 
   User, 
   Users, 
   GitBranch, 
@@ -16,11 +15,11 @@ import {
   Loader2,
   Fingerprint,
   Key,
-  ChevronRight,
   Lock,
   ArrowLeft,
   Sparkles,
-  Eye
+  Eye,
+  Plus
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -29,7 +28,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import ImportToMetamask from "./ImportToMetamask";
 import { SigningSetup } from "../../signing/SigningSetup";
-import VerifyCredential from "../../../pages/VerifyCredential";// Import VerifyCredential
+import VerifyCredential from "../../../pages/VerifyCredential";
 
 /* ================= TYPES ================= */
 export interface Signer {
@@ -267,7 +266,7 @@ const VerificationList: React.FC<VerificationListProps> = ({
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // Signing Stage State - NEW
+  // Signing Stage State
   const [signingStage, setSigningStage] = useState<SigningStage>("idle");
   const [stageError, setStageError] = useState<string>("");
   const [signingCertId, setSigningCertId] = useState<string | null>(null);
@@ -283,10 +282,10 @@ const VerificationList: React.FC<VerificationListProps> = ({
     signerData?: Signer;
   } | null>(null);
 
-  // NEW: Start Signing flow state
+  // Issue Certificate flow state
   const [showSigningSetup, setShowSigningSetup] = useState(false);
   
-  // NEW: Verify Credential flow state
+  // Verify Credential flow state
   const [verifyCredentialId, setVerifyCredentialId] = useState<string | null>(null);
 
   /* ================= FETCH ISSUED CERTIFICATES ================= */
@@ -711,24 +710,28 @@ const VerificationList: React.FC<VerificationListProps> = ({
   // Check if currently signing
   const isCurrentlySigning = signingStage !== "idle" && signingStage !== "error" && signingCertId === selectedCert?.id;
 
-  // NEW: Handle Start Signing Setup flow
-  const handleStartSigningSetup = () => {
+  // Handle Issue Certificate - for creating NEW credentials
+  const handleIssueCertificate = () => {
+    if (!user?.biometricSetup) {
+      toast.info("Please set up biometric authentication first");
+      return;
+    }
     setShowSigningSetup(true);
   };
 
-  // NEW: Handle back from SigningSetup
+  // Handle back from SigningSetup
   const handleBackFromSigningSetup = () => {
     setShowSigningSetup(false);
     // Refresh certificates after signing setup (in case a new one was created)
     fetchCertificates();
   };
 
-  // NEW: Handle verify credential - show inside box
+  // Handle verify credential - show inside box
   const handleVerifyCredential = (certId: string) => {
     setVerifyCredentialId(certId);
   };
 
-  // NEW: Handle back from verify
+  // Handle back from verify
   const handleBackFromVerify = () => {
     setVerifyCredentialId(null);
   };
@@ -826,29 +829,29 @@ const VerificationList: React.FC<VerificationListProps> = ({
   return (
     <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "20px 0", position: "relative" }}>
         
-        {/* Header Section */}
-                    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "16px", marginBottom: "32px" }}>
-                <div>
-                    <h1 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginBottom: "8px" }}>
-                        My Credentials
-                    </h1>
-                    <p style={{ fontSize: "16px", color: "#64748b" }}>View and manage your digital credentials.</p>
-                </div>
-                <button
-                    onClick={handleStartSigning}
-                    style={{
-                        display: "inline-flex", alignItems: "center", gap: "8px",
-                        padding: "12px 24px", borderRadius: "12px", border: "none",
-                        background: "linear-gradient(135deg, #1e1a6b, #2d2870)", color: "white",
-                        fontSize: "14px", fontWeight: 600, cursor: "pointer",
-                        boxShadow: "0 4px 12px rgba(30,26,107,0.20)", transition: "all 0.2s",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = "0 8px 20px rgba(30,26,107,0.32)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = "0 4px 12px rgba(30,26,107,0.20)"; }}
-                >
-                    + Issue Certificate
-                </button>
-            </div>
+        {/* Header Section with Issue Certificate Button */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "16px", marginBottom: "32px" }}>
+          <div>
+            <h1 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginBottom: "8px" }}>
+              My Credentials
+            </h1>
+            <p style={{ fontSize: "16px", color: "#64748b" }}>View and manage your digital credentials.</p>
+          </div>
+          <button
+              onClick={handleIssueCertificate}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "8px",
+                padding: "12px 24px", borderRadius: "12px", border: "none",
+                background: t.gradient, color: "white",
+                fontSize: "14px", fontWeight: 600, cursor: "pointer",
+                boxShadow: t.btnShadow, transition: "all 0.2s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = t.btnShadowHover; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = t.btnShadow; }}
+            >
+              <Plus size={18} /> Issue Certificate
+            </button>
+        </div>
 
         {/* Stats / Filtering Controls */}
         <div style={{ marginBottom: "32px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px" }}>
@@ -1029,7 +1032,7 @@ const VerificationList: React.FC<VerificationListProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleVerifyCredential(cert.id); // Use internal verify instead of navigate
+                              handleVerifyCredential(cert.id);
                             }}
                             style={{
                               padding: "8px 14px",
