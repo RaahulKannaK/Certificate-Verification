@@ -73,7 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <nav style={{
                 width: "100%",
                 maxWidth: "1100px",
-                background: scrolled ? "rgba(255, 255, 255, 0.98)" : "transparent",
+                background: "white",
                 borderRadius: "16px",
                 border: "1px solid rgba(30, 26, 107, 0.1)",
                 boxShadow: "0 10px 30px rgba(0, 0, 0, 0.05)",

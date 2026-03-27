@@ -24,7 +24,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6"
+      className="h-screen w-full flex items-center justify-center p-6 overflow-hidden"
       style={{
         backgroundImage: "url('/images/bg.png')",
         backgroundSize: "cover",
@@ -42,7 +42,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       />
 
       {/* ===== HERO CONTENT ===== */}
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '1250px', margin: '0 auto', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '100px 24px 24px', transform: 'translateY(0)' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: '1250px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '100px 24px 24px', transform: 'translateY(0)' }}>
         <div style={{ textAlign: 'left', maxWidth: '700px' }}>
 
           <h1 style={{
